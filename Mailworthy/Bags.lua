@@ -83,6 +83,8 @@ function Bags.Evaluate(settings)
     if settings.serverDay == nil then settings.serverDay = ns.Config.ServerDay() end
     if settings.professions == nil then settings.professions = ns.Characters.Professions() end
     if settings.tiers == nil then settings.tiers = ns.Tiers.On() end
+    -- What the profession window last showed still in use past the table (TierCheck): kept.
+    if settings.tiers then ns.TierCheck.Annotate(settings.professions) end
     -- Auction unit prices by item ID, for the leather conversions (Tiers.WorthConverting).
     if settings.priceOf == nil and ns.Prices.Auctionator() then settings.priceOf = ns.Prices.MaterialPrice end
     local priced = ns.Prices.Auctionator() ~= nil
@@ -216,6 +218,11 @@ local function workings(item, settings)
         parts[#parts + 1] = string.format("your %s (%s) is past it", r.outgrown.name, tostring(r.outgrown.skill))
     end
     if r.untilSkill then parts[#parts + 1] = "kept until skill " .. r.untilSkill end
+    if r.window then
+        parts[#parts + 1] = string.format("past the table, but your profession window still shows %s (%s)%s",
+            tostring(r.window.recipe), ns.TierCheck.COLORS[r.window.difficulty] or "?",
+            r.window.via and (" via " .. r.window.via) or "")
+    end
     if r.convert then
         parts[#parts + 1] = string.format("past its recipes; %d make a %s, worth more than selling them",
             r.convert.count, r.convert.name)
@@ -243,7 +250,7 @@ function Bags.OutgrownText(professions)
     for _, p in ipairs(type(professions) == "table" and professions or {}) do
         local id = tonumber(type(p) == "table" and p.skillLine)
         local known = ns.Valuation.PROFESSION_MATS[id or -1]
-        local past = known and ns.Tiers.PastText(id, p.rank) or ""
+        local past = known and ns.Tiers.PastText(id, p.rank, nil, p.stillUsed) or ""
         if past ~= "" then parts[#parts + 1] = string.format("%s %d is past %s", known.name, p.rank, past) end
     end
     return table.concat(parts, "; ")

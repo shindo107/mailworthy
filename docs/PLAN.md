@@ -315,6 +315,25 @@ them) then I just keep going to the AH. Same methodology for all crafting materi
   (Peacebloom 95, Briarthorn 125, Small Venom Sac 150, Bruiseweed 175, Liferoot 215, Sungrass
   270, Thick Leather 280; Golden Sansam, Large / Huge Venom Sac, Rugged Leather never).
 - Switch: `/mw feature tiers off` (own professions and bindings keep every material again).
+- **Tier check** (2026-11-06, `TierCheck.lua`; the table is a beta-client snapshot, never checked
+  in game): the player's own profession window colours each recipe for the player's skill, which
+  is ground truth for the tier rule. On `TRADE_SKILL_SHOW` / `TRADE_SKILL_LIST_UPDATE` /
+  `TRADE_SKILL_DATA_SOURCE_CHANGED` (and Classic's `TRADE_SKILL_UPDATE` / `CRAFT_SHOW` /
+  `CRAFT_UPDATE`, which Forever doesn't route), half a second after the last one, it reads every
+  learned recipe (`C_TradeSkillUI`; linked, guild and NPC windows skipped) and saves
+  `MailworthyDB.tierCheck[character key][skill line] = { rank, at, recipes, source, reagents }`,
+  `reagents[itemID]` = the hardest non-grey recipe using it `{ recipe, difficulty, via }` or
+  `false`. Through parts like the table: a reagent of a recipe whose output (a trade good, by
+  `GetItemInfoInstant`) another non-grey recipe uses counts, `via` that part; a leather's own
+  up-conversion doesn't. `/mw report` lists, per read, each material the table calls done at that
+  rank that a non-grey recipe still uses (`TierCheck.Findings`), except First Aid cloth (its rule
+  is the next bandage's learn skill). Those findings are evidence for `tools/tiers/data.py`; a
+  human checks them (holiday recipes count here, not in the table). Meanwhile they are kept:
+  `Bags.Evaluate` gives this character's profession entries `stillUsed` (`TierCheck.Annotate`),
+  and `Valuation.NeededBy` keeps an outgrown material listed there ("your Tailoring needs it
+  (Soft-soled Linen Boots still yellow)") until a later read says only grey recipes use it.
+  Bindings still use the table (the friend's window isn't ours). Read only, no frames. Switch
+  `/mw feature tierCheck off`.
 
 ## Mailing
 
@@ -436,6 +455,7 @@ only in `## OptionalDeps`).
 | `Routes.lua` / `RoutesUI.lua` | bindings (a profession's materials to a player): store, pure divert with price cap, skip once, candidates (party, guild, own characters, peers); the friends window | busted |
 | `Comms.lua` | hellos between Mailworthys (professions, skill ranks, scan day) over addon messages | busted |
 | `Tiers.lua` | material tiers: the skill at which each crafting profession is done with each material | busted (pure) |
+| `TierCheck.lua` | tier check: reads the player's own profession window (recipe colours, reagents), reports and keeps materials the table calls done too early | busted (stubbed `C_TradeSkillUI`) + in game |
 
 SavedVariables: `MailworthyDB` (account: characters, bank alt per
 realm+faction, name history, settings, blocked actions) and

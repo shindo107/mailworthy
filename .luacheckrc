@@ -34,6 +34,8 @@ read_globals = {
     "GameTooltip",
     -- menus (Menu is read only for the API report), controller UI, timers
     "Menu", "hooksecurefunc", "CreateAtlasMarkup", "C_Timer",
+    -- the tier check reads the player's own profession window (TierCheck.lua; Classic globals via _G)
+    "C_TradeSkillUI",
     -- UI
     "CreateFrame", "UIParent", "UISpecialFrames", "ChatFontNormal",
     -- minimap button

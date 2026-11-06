@@ -49,24 +49,32 @@ function Tiers.Threshold(profession, itemID)
     return row and row.at or nil
 end
 
+--- Pure: the material's name in the table ("Linen Cloth"), or nil when it has no row.
+function Tiers.Name(profession, itemID)
+    local rows = index()[tonumber(profession) or -1]
+    local row = rows and rows[tonumber(itemID) or -1]
+    return row and row.name or nil
+end
+
 --- Pure: true when a `skill` in `profession` is past the item (nil skill: unknown, not past).
 function Tiers.Outgrown(profession, itemID, skill)
     local at = Tiers.Threshold(profession, itemID)
     return at ~= nil and tonumber(skill) ~= nil and tonumber(skill) >= at
 end
 
---- Pure: the names of the materials a `skill` in `profession` is past, in tier order.
-function Tiers.OutgrownNames(profession, skill)
+--- Pure: the names of the materials a `skill` in `profession` is past, in tier order (`skip`: an
+--- itemID set left out, such as what the profession window still uses: TierCheck).
+function Tiers.OutgrownNames(profession, skill, skip)
     local names = {}
     for _, row in ipairs(Tiers.DONE[tonumber(profession) or -1] or {}) do
-        if tonumber(skill) and tonumber(skill) >= row[2] then names[#names + 1] = row[3] end
+        if tonumber(skill) and tonumber(skill) >= row[2] and not (skip and skip[row[1]]) then names[#names + 1] = row[3] end
     end
     return names
 end
 
 --- Pure: "Linen Cloth, Peacebloom, Briarthorn and 4 more" (the latest outgrown first), or "".
-function Tiers.PastText(profession, skill, max)
-    local names, out = Tiers.OutgrownNames(profession, skill), {}
+function Tiers.PastText(profession, skill, max, skip)
+    local names, out = Tiers.OutgrownNames(profession, skill, skip), {}
     max = max or 3
     for i = #names, math.max(1, #names - max + 1), -1 do out[#out + 1] = names[i] end
     local text = table.concat(out, ", ")
