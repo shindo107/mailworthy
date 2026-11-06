@@ -289,9 +289,13 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   kept, 2026-10-22), v0.12.0 (description refresh, 2026-10-24), **v0.13.0** (bindings: a
   profession's materials to a friend with delivery by profession; Disenchantry as a
   disenchant source through the ported era tables; `disenchantry` relation restored,
-  2026-10-26). **CurseForge has v0.13.0 as its latest file** (release run 40390552564:
-  "Uploading Mailworthy-v0.13.0-forever.zip (1.60.1 release) ... Success!"); its project
-  description is `media/curseforge-description.html` as of PR #30 (pasted by the operator).
+  2026-10-26), **v0.14.0** (UX pass: one task per window, windows fit their content; Send
+  on the Inbox says to open the Send Mail tab and the window follows; PR #33, 2026-11-06).
+  **CurseForge has v0.14.0 as its latest file** (release run 42235669126: "Uploading
+  Mailworthy-v0.14.0-forever.zip (1.60.1 release) ... Success!"); its project description
+  is `media/curseforge-description.html` as of PR #30 (pasted by the operator).
+- On `main`, not tagged yet: the stale-prices nudge (PR #34, 2026-11-06: `Stale.lua`, the
+  "!" on the Mailworthy button past 3 days, peers' scan days over the addon messages).
 - Confirmed in game: the `/mw scan` math (v0.2.0, by hand), settings with mouse and
   controller and after `/reload`, one-press sending with no money / COD, the window
   lists, row locks, minimap button (v0.4.0; operator 2026-10-14).
@@ -301,8 +305,8 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
 - Still open: AH cut (needs a sale mail; the invoice reader in `Report.lua` logs it),
   disenchant prices for green items (Siz DisenchantValue, or the era tables with
   Disenchantry: see either in game), ForeverMail compatibility (replaces the mailbox
-  window), the in-game check of bindings and of the Disenchantry value (item 7 below and
-  README "Beta unknowns").
+  window), the in-game checks of bindings and of the Disenchantry value (item 7 below), of
+  the UX pass (item 8) and of the stale-prices nudge (item 9), and README "Beta unknowns".
 
 ## 8. What's left (in order)
 
