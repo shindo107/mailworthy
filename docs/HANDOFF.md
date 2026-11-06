@@ -397,8 +397,12 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    `/mw report` "binding: ... skill N" from the roster; two Mailworthy users: "skills: ..." in
    each other's peer line, and past the friend's threshold the material goes to the bank alt
    with "not to <name>: their <profession> (N) is past it" in `/mw scan`.
-11. Open (research 2026-11-06): on Forever, First Aid also makes healing potions (from
-   Alchemy: Peacebloom, Briarthorn, Bruiseweed, Liferoot, Sungrass, Golden Sansam),
-   Tourniquets (Thick / Rugged Leather) and Anti-Venoms (venom sacs), but
-   `Valuation.PROFESSION_MATS` keeps only cloth for First Aid. Not changed yet: ask the
-   operator whether a first-aider should keep those too.
+11. Done (operator 2026-11-06, "Yes, keep them"): on Forever First Aid also makes the
+   healing potions, Anti-Venoms and Tourniquets, so `PROFESSION_MATS[129].items` keeps those
+   exact items (`Valuation.Uses`: listed item IDs whatever their class, or the subclasses):
+   Peacebloom, Briarthorn, Bruiseweed, Liferoot, Sungrass, Golden Sansam, Small / Large / Huge
+   Venom Sac, Thick / Rugged Leather, each with a First Aid tier row (its recipe's grey) or
+   none (used at 300). Poultice reagents (Spider Ichor, Murloc Fin, Elemental Water, Essence
+   of Water) were not asked about and stay mailable. Swollen Venom Sac (Potent Anti-Venom)
+   has no known item ID yet: read it in game and add it. In game: a first-aider's Briarthorn
+   under Staying "your First Aid needs it (until skill 125)".

@@ -299,6 +299,10 @@ them) then I just keep going to the AH. Same methodology for all crafting materi
   Mailworthys drop the unknown kind; a peer whose hello was lost is made from it), and a new
   hello at the next mailbox when a skill-up crossed a threshold since the last one
   (`Comms.Steps`). Validated: known crafting skill lines, ranks 0-999, clean names.
+- First Aid on Forever also makes healing potions, Anti-Venoms and Tourniquets: it keeps those
+  exact items (`PROFESSION_MATS[129].items`, `Valuation.Uses`), each until its recipe goes grey
+  (Peacebloom 95, Briarthorn 125, Small Venom Sac 150, Bruiseweed 175, Liferoot 215, Sungrass
+  270, Thick Leather 280; Golden Sansam, Large / Huge Venom Sac, Rugged Leather never).
 - Switch: `/mw feature tiers off` (own professions and bindings keep every material again).
 
 ## Mailing

@@ -121,9 +121,7 @@ function Routes.Matches(route, item, tiers)
         and ns.Valuation.CanDisenchant(item) then
         return true
     end
-    if item.classID ~= ns.Valuation.TRADE_GOODS then return false end
-    local p = ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1]
-    if p == nil or p.subclasses[item.subclassID] ~= true then return false end
+    if not ns.Valuation.Uses(ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1], item) then return false end
     if tiers ~= false and ns.Tiers.Outgrown(route.profession, item.itemID, route.skill) then return false, true end
     return true
 end

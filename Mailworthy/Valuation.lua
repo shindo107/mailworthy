@@ -56,7 +56,16 @@ Valuation.PROFESSION_MATS = {
         mats = "metal and stone, parts, explosives, devices" },
     [165] = { name = "Leatherworking", subclasses = { [6] = true }, mats = "leather and hides" },
     [197] = { name = "Tailoring", subclasses = { [5] = true }, mats = "cloth" },
-    [129] = { name = "First Aid", subclasses = { [5] = true }, mats = "cloth" },
+    -- On Forever First Aid also makes the healing potions (moved from Alchemy), Tourniquets
+    -- and Anti-Venoms (research 2026-11-06; operator: "Yes, keep them"): those exact items,
+    -- not all herbs or leather (nearly every character has First Aid). Poultice reagents
+    -- (Spider Ichor, Murloc Fin, Elemental Water, Essence of Water) stay mailable.
+    [129] = { name = "First Aid", subclasses = { [5] = true }, mats = "cloth, healing-potion herbs, venom sacs, leather",
+        items = {
+            [2447] = true, [2450] = true, [2453] = true, [3357] = true, [8838] = true, [13464] = true, -- herbs
+            [1475] = true, [1288] = true, [19441] = true, -- Small, Large, Huge Venom Sac
+            [4304] = true, [8170] = true,                 -- Thick, Rugged Leather (Tourniquets)
+        } },
     [171] = { name = "Alchemy", subclasses = { [9] = true }, mats = "herbs" },
     [333] = { name = "Enchanting", subclasses = { [12] = true }, mats = "dust, essences and shards" },
     [185] = { name = "Cooking", subclasses = { [8] = true }, mats = "meat and fish" },
@@ -107,18 +116,25 @@ function Valuation.CraftingProfessions(professions)
     return list
 end
 
+--- Pure: a crafting profession (a PROFESSION_MATS entry) uses the item: a trade good of one
+--- of its subclasses, or one of its listed `items` (by item ID, whatever its class).
+function Valuation.Uses(p, item)
+    if type(p) ~= "table" then return false end
+    if p.items and p.items[tonumber(item.itemID) or -1] then return true end
+    return item.classID == Valuation.TRADE_GOODS and p.subclasses[item.subclassID] == true
+end
+
 --- Pure: the name of this character's crafting profession that uses the item, or nil.
 --- A profession whose skill (`rank` in a { skillLine, rank } entry) is past the item
 --- (Tiers: Linen Cloth is done for First Aid at 80) doesn't count, unless `tiers` is
 --- false. Second return: { name, skill } of the first profession past it, when none
 --- needs it; third: the skill at which the needing profession will be done with it.
 function Valuation.NeededBy(item, professions, tiers)
-    if item.classID ~= Valuation.TRADE_GOODS then return nil end
     local outgrown
     for _, p in ipairs(type(professions) == "table" and professions or {}) do
         local id = tonumber(type(p) == "table" and p.skillLine or p)
         local known = Valuation.PROFESSION_MATS[id or -1]
-        if known and known.subclasses[item.subclassID] then
+        if Valuation.Uses(known, item) then
             local rank = type(p) == "table" and tonumber(p.rank) or nil
             if tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank) then
                 outgrown = outgrown or { name = known.name, skill = rank }

@@ -68,7 +68,9 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - Profession tools (fishing poles, Mining Pick, Blacksmith Hammer, Skinning Knife, ...)
   always stay. Gold is never attached.
 - **Your professions' materials stay** (on by default, a setting turns it off): cloth for
-  a tailor or first-aider, leather for a leatherworker, metal and stone for a blacksmith
+  a tailor; for a first-aider cloth plus what Forever's First Aid makes potions, Anti-Venoms
+  and Tourniquets from (Peacebloom, Briarthorn, Bruiseweed, Liferoot, Sungrass, Golden
+  Sansam, venom sacs, Thick and Rugged Leather; not other herbs or leather); leather for a leatherworker, metal and stone for a blacksmith
   or engineer (plus parts, explosives and devices), herbs for an alchemist, dust, essences
   and shards for an enchanter, meat and fish for a cook. Gathering professions keep
   nothing: what they gather is what gets sold. Elemental materials are still mailed

@@ -29,11 +29,20 @@ ns.Tiers = Tiers
 
 -- profession skill line -> { { itemID, skill at which it's done, name }, ... } in tier order.
 Tiers.DONE = {
-    [129] = { -- First Aid: the next bandage's learn skill
+    [129] = { -- First Aid: cloth at the next bandage's learn skill; the rest when its recipe goes grey
+        -- No row: Large Venom Sac (Plague Doctor's Laboratory at 300), Huge Venom Sac, Golden Sansam,
+        -- Rugged Leather (used at 300 and up).
         { 2589, 80, "Linen Cloth" },        -- Wool Bandage learn 80
+        { 2447, 95, "Peacebloom" },         -- Minor Healing Potion grey 95
+        { 2450, 125, "Briarthorn" },        -- Lesser Healing Potion grey 125
         { 2592, 150, "Wool Cloth" },        -- Silk Bandage learn 150
+        { 1475, 150, "Small Venom Sac" },   -- Anti-Venom grey 150
+        { 2453, 175, "Bruiseweed" },        -- Healing Potion grey 175
         { 4306, 210, "Silk Cloth" },        -- Mageweave Bandage learn 210
+        { 3357, 215, "Liferoot" },          -- Greater Healing Potion grey 215
         { 4338, 260, "Mageweave Cloth" },   -- Runecloth Bandage learn 260
+        { 8838, 270, "Sungrass" },          -- Superior Healing Potion grey 270
+        { 4304, 280, "Thick Leather" },     -- Leather Tourniquet grey 280
     },
     [197] = { -- Tailoring: cloth and its bolt together (a tailor bolts cloth as needed)
         { 2589, 125, "Linen Cloth" },       -- est.: every route is on wool by 75-87

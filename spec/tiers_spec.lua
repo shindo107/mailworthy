@@ -50,9 +50,29 @@ describe("material tiers", function()
             assert.is_false(ns.Tiers.Outgrown(FIRST_AID, LINEN, nil), "skill unknown: not past it")
             assert.is_false(ns.Tiers.Outgrown(FIRST_AID, 14047, 300), "Runecloth: the last tier, never done")
             assert.is_nil(ns.Tiers.Threshold(FIRST_AID, 10940), "not a First Aid material")
-            assert.same({ "Linen Cloth", "Wool Cloth" }, ns.Tiers.OutgrownNames(FIRST_AID, 150))
+            assert.same({ "Linen Cloth", "Peacebloom", "Briarthorn", "Wool Cloth", "Small Venom Sac" },
+                ns.Tiers.OutgrownNames(FIRST_AID, 150))
             assert.equal(0, ns.Tiers.Step(FIRST_AID, 1))
-            assert.equal(2, ns.Tiers.Step(FIRST_AID, 175))
+            assert.equal(1, ns.Tiers.Step(FIRST_AID, 80))
+        end)
+
+        it("Forever's First Aid also keeps its potion herbs, venom sacs and Tourniquet leather; not other herbs", function()
+            local V = ns.Valuation
+            local s = V.Settings({})
+            s.professions = { { skillLine = FIRST_AID, rank = 100 } }
+            local function reason(id, classID, subclassID)
+                return V.Evaluate({ itemID = id, classID = classID, subclassID = subclassID, quality = 1, vendor = 10,
+                    count = 5 }, nil, s).reason
+            end
+            assert.equal("your First Aid needs it", reason(2450, 7, 9), "Briarthorn: Lesser Healing Potion to 125")
+            assert.equal("common item (no price data)", reason(2447, 7, 9), "Peacebloom: Minor Healing Potion grey at 95")
+            assert.equal("common item (no price data)", reason(785, 7, 9), "Mageroyal: not a First Aid herb")
+            assert.equal("your First Aid needs it", reason(1475, 15, 0), "Small Venom Sac, whatever its class")
+            assert.equal("your First Aid needs it", reason(4304, 7, 6), "Thick Leather: Leather Tourniquet")
+            assert.equal("common item (no price data)", reason(2318, 7, 6), "Light Leather: not First Aid's")
+            assert.equal("your First Aid needs it", reason(13464, 7, 9), "Golden Sansam: never outgrown")
+            assert.is_true(ns.Routes.Matches({ profession = FIRST_AID }, { itemID = 3357, classID = 7, subclassID = 9 }),
+                "a First Aid binding takes Liferoot")
         end)
 
         it("other professions: where the last recipe using it goes grey (Forever data); no tiers for Alchemy, Cooking", function()
