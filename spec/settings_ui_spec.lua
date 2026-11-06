@@ -147,7 +147,7 @@ describe("settings window", function()
         WowStub.state.professions[2] = { index = 9, name = "Enchanting", rank = 1, maxRank = 75, skillLine = 333 }
         _G.MailworthySettingsMats:Click()
         assert.is_false(ns.Config.Get("keepProfessionMats"))
-        assert.equal("Keep my professions' materials: off (Enchanting)",
+        assert.equal("Keep my professions' materials: off (Enchanting 1)",
             _G.MailworthySettingsMats:GetText())
         assert.equal("Sell what I gather: off (Mining)", _G.MailworthySettingsGather:GetText(), "the stub character mines")
         _G.MailworthySettingsGather:Click()

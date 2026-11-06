@@ -269,6 +269,42 @@ explicit choice over the default keep. The bank alt's tags ignore bindings.
 - Two presses with the controller: the friends window is all buttons (Nav / PadKey
   "settings" set).
 
+## Material tiers (operator, 2026-11-06)
+
+"I just got my first aid to 80, which is a threshold to where I shouldn't be using linen
+cloth anymore. So ideally I send my linen cloth to the AH or my friend's tailor ... once my
+friend goes past the similar threshold on tailoring or first aid (if I have a binding for
+them) then I just keep going to the AH. Same methodology for all crafting materials."
+
+- **The threshold** (`Tiers.lua`, pure data, research 2026-11-06 on Forever client data
+  1.60.1 and the Forever guides; Forever's recipes are not Classic 1.15's): First Aid, the
+  operator's rule, the skill at which the next cloth's bandage is learnable (Linen 80, Wool
+  150, Silk 210, Mageweave 260); every other profession, the skill at which the last normal
+  recipe using the material turns grey (Forever's new recipe sets reuse older materials past
+  the levelling switch). No row = never outgrown: each line's last tier, Mithril / Solid
+  Stone and up, Alchemy, Cooking (conservative: when in doubt, no row or a later skill).
+- **Own professions:** `Valuation.NeededBy(item, professions, tiers)` skips a profession whose
+  `rank` is at or past the item's threshold, so the item is valued like anything else (or a
+  binding that still needs it takes it); another of this character's professions that still
+  needs it keeps it. Kept items say "until skill N"; the workings say "your First Aid (80) is
+  past it".
+- **Bindings:** `Routes.Matches(route, item, tiers)` is false for a material the recipient's
+  `route.skill` is past, so the next binding that needs it, or the normal rule (the bank alt),
+  gets it; the workings say "not to Bob: their First Aid (80) is past it". `Routes.Skill(route)`
+  = the highest of: their Mailworthy's `S2` message (for the bound player or the crafter alt
+  the mail goes to), this account's own character's last-login rank, and the guild roster's
+  `profession1Rank` / `profession2Rank` (primary professions only). Unknown = the binding takes
+  everything, as before. A hard keep still wins.
+- **Comms:** `S2|<id:rank,...>|<Name=id:rank,...;...>` right after each hello (older
+  Mailworthys drop the unknown kind; a peer whose hello was lost is made from it), and a new
+  hello at the next mailbox when a skill-up crossed a threshold since the last one
+  (`Comms.Steps`). Validated: known crafting skill lines, ranks 0-999, clean names.
+- First Aid on Forever also makes healing potions, Anti-Venoms and Tourniquets: it keeps those
+  exact items (`PROFESSION_MATS[129].items`, `Valuation.Uses`), each until its recipe goes grey
+  (Peacebloom 95, Briarthorn 125, Small Venom Sac 150, Bruiseweed 175, Liferoot 215, Sungrass
+  270, Thick Leather 280; Golden Sansam, Large / Huge Venom Sac, Rugged Leather never).
+- Switch: `/mw feature tiers off` (own professions and bindings keep every material again).
+
 ## Mailing
 
 - Attach with `C_Container.UseContainerItem(bag, slot)` while the Send Mail tab
@@ -387,7 +423,8 @@ only in `## OptionalDeps`).
 | `MinimapButton.lua` | minimap button that opens settings (from LedgerLink) | busted |
 | `Report.lua` | `/mw report`, one copyable report; AH sale mails (house cut) | busted |
 | `Routes.lua` / `RoutesUI.lua` | bindings (a profession's materials to a player): store, pure divert with price cap, skip once, candidates (party, guild, own characters, peers); the friends window | busted |
-| `Comms.lua` | hellos between Mailworthys (bank alt, professions) over addon messages | busted |
+| `Comms.lua` | hellos between Mailworthys (professions, skill ranks, scan day) over addon messages | busted |
+| `Tiers.lua` | material tiers: the skill at which each crafting profession is done with each material | busted (pure) |
 
 SavedVariables: `MailworthyDB` (account: characters, bank alt per
 realm+faction, name history, settings, blocked actions) and

@@ -430,16 +430,17 @@ describe("bindings", function()
             assert.is_true(WowStub.state.prefixes.Mailworthy, "prefix registered at login")
             WowStub.runTimers(10)
             local sent = WowStub.state.addonMessages
-            assert.equal(2, #sent)
+            assert.equal(4, #sent, "a hello and the skills, on each channel")
             assert.equal("GUILD", sent[1].channel)
             assert.equal("PARTY", sent[2].channel)
             assert.equal("H2|333|Alt Mine=165", sent[1].message, "the other faction's character can't be mailed")
             assert.equal("Mailworthy", sent[1].prefix)
+            assert.equal("S2|333:1|", sent[3].message, "Alt Mine's skill isn't known: left out")
             ns.Fire("GROUP_ROSTER_UPDATE")
-            assert.equal(2, #sent, "throttled: 10 s between hellos")
+            assert.equal(4, #sent, "throttled: 10 s between hellos")
             WowStub.state.now = WowStub.state.now + 11
             ns.Fire("GROUP_ROSTER_UPDATE")
-            assert.equal(4, #sent)
+            assert.equal(8, #sent)
         end)
 
         it("remembers who said hello, answers an ask, drops junk, and forgets after 60 days", function()
@@ -459,13 +460,13 @@ describe("bindings", function()
             local before = #WowStub.state.addonMessages
             WowStub.state.now = WowStub.state.now + 11
             ns.Fire("CHAT_MSG_ADDON", "Mailworthy", "A2", "GUILD", "Bob Surname")
-            assert.equal(before + 1, #WowStub.state.addonMessages, "an ask gets a hello")
+            assert.equal(before + 2, #WowStub.state.addonMessages, "an ask gets a hello (and the skills)")
             local candidates = ns.Routes.Candidates()
             assert.equal(BOB, candidates[1].name)
             assert.equal("Bob Surname - Enchanting, Tailoring - Mailworthy", ns.Routes.CandidateText(candidates[1]))
             local report = table.concat(ns.Comms.ReportLines(), "\n")
-            assert.truthy(report:find("mailworthy peer: Bob Surname (Enchanting, Tailoring; other characters: Alice Alt = Leatherworking",
-                1, true), report)
+            assert.truthy(report:find("mailworthy peer: Bob Surname (Enchanting, Tailoring; skills: not sent; "
+                .. "other characters: Alice Alt = Leatherworking", 1, true), report)
             ns.Comms.Prune(WowStub.state.serverTime + 61 * 86400)
             assert.is_nil(ns.Comms.Peer(BOB))
         end)
@@ -690,8 +691,8 @@ describe("bindings", function()
         it("/mw report lists the bindings", function()
             ns.Routes.Add(BOB, ENCHANTING)
             local text = ns.Report.Build()
-            assert.truthy(text:find("binding: Enchanting materials to Bob Surname (all my characters, to my alt at 5g each or more)",
-                1, true), text)
+            assert.truthy(text:find("binding: Enchanting materials to Bob Surname (all my characters, "
+                .. "to my alt at 5g each or more, skill unknown)", 1, true), text)
             assert.truthy(text:find("comms=on", 1, true))
         end)
     end)

@@ -82,6 +82,7 @@ function Bags.Evaluate(settings)
     settings = settings or Bags.CurrentSettings()
     if settings.serverDay == nil then settings.serverDay = ns.Config.ServerDay() end
     if settings.professions == nil then settings.professions = ns.Characters.Professions() end
+    if settings.tiers == nil then settings.tiers = ns.Tiers.On() end
     local priced = ns.Prices.Auctionator() ~= nil
     local routes = settings.routes or ns.Routes.Active()
     local result = { settings = settings, priced = priced, routes = routes, mail = {}, keep = {}, unmailable = {},
@@ -93,8 +94,9 @@ function Bags.Evaluate(settings)
         item.vendor = item.noValue and 0 or ns.Prices.Vendor(item.link)
         item.price = priced and ns.Prices.Lookup(item.link) or nil
         item.result = ns.Valuation.Evaluate(item, item.price, settings)
-        local diverted, capped = ns.Routes.Divert(item, item.result, item.price, settings, routes)
+        local diverted, capped, past = ns.Routes.Divert(item, item.result, item.price, settings, routes)
         if diverted then item.result = diverted elseif capped then item.result.capped = capped end
+        if not diverted and past then item.result.pastFor = past end
         if item.result.action == "mail" then
             table.insert(result.mail, item)
             local t = result.totals
@@ -204,15 +206,53 @@ local function workings(item, settings)
         parts[#parts + 1] = string.format("not to %s: at or above the %s cap", tostring(r.capped.to),
             money(r.capped.cap or 0))
     end
+    if r.pastFor then
+        parts[#parts + 1] = string.format("not to %s: their %s (%s) is past it", tostring(r.pastFor.to),
+            tostring(ns.Routes.ProfessionName(r.pastFor.profession)), tostring(r.pastFor.skill))
+    end
+    if r.outgrown then
+        parts[#parts + 1] = string.format("your %s (%s) is past it", r.outgrown.name, tostring(r.outgrown.skill))
+    end
+    if r.untilSkill then parts[#parts + 1] = "kept until skill " .. r.untilSkill end
     return table.concat(parts, "; ")
 end
 
---- "kept for Tailoring, Enchanting" / "kept (no crafting profession here)" / "mailed".
+--- Pure: "First Aid 80, Tailoring 130" (each crafting profession with its skill, when known).
+function Bags.CraftingText(professions)
+    local names = {}
+    for _, p in ipairs(type(professions) == "table" and professions or {}) do
+        local id = tonumber(type(p) == "table" and p.skillLine or p)
+        local known = ns.Valuation.PROFESSION_MATS[id or -1]
+        if known then
+            local rank = type(p) == "table" and tonumber(p.rank) or nil
+            names[#names + 1] = known.name .. (rank and (" " .. rank) or "")
+        end
+    end
+    return table.concat(names, ", ")
+end
+
+--- Pure: "First Aid 80 is past Linen Cloth; Tailoring 180 is past Linen Cloth, Wool Cloth" or "".
+function Bags.OutgrownText(professions)
+    local parts = {}
+    for _, p in ipairs(type(professions) == "table" and professions or {}) do
+        local id = tonumber(type(p) == "table" and p.skillLine)
+        local known = ns.Valuation.PROFESSION_MATS[id or -1]
+        local past = known and ns.Tiers.OutgrownNames(id, p.rank) or {}
+        if #past > 0 then
+            parts[#parts + 1] = string.format("%s %d is past %s", known.name, p.rank, table.concat(past, ", "))
+        end
+    end
+    return table.concat(parts, "; ")
+end
+
+--- "kept for Tailoring 130, Enchanting 90" / "kept (no crafting profession here)" / "mailed".
 function Bags.ProfessionMatsText(settings)
     if not settings.keepProfessionMats then return "mailed" end
-    local names = {}
-    for _, p in ipairs(ns.Valuation.CraftingProfessions(settings.professions)) do names[#names + 1] = p.name end
-    local text = #names > 0 and ("kept for " .. table.concat(names, ", ")) or "kept (no crafting profession here)"
+    local crafting = Bags.CraftingText(settings.professions)
+    local text = crafting ~= "" and ("kept for " .. crafting) or "kept (no crafting profession here)"
+    local past = settings.tiers ~= false and Bags.OutgrownText(settings.professions) or ""
+    if past ~= "" then text = text .. "; " .. past .. " (mailed)" end
+    local names = ns.Valuation.CraftingProfessions(settings.professions)
     if settings.sellGathered and #names > 0 then
         local gathered = {}
         for _, p in ipairs(ns.Valuation.GatheringProfessions(settings.professions)) do gathered[#gathered + 1] = p.name end

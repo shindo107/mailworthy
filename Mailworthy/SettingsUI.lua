@@ -377,10 +377,9 @@ local function fillMain(bankAlt, here, choices)
     local deAddon = ns.Prices.DisenchantAddon()
     disenchantButton:SetText(string.format("Include disenchant value: %s (%s)", v.disenchant and "on" or "off",
         deAddon or "era tables"))
-    local crafting = {}
-    for _, p in ipairs(ns.Valuation.CraftingProfessions(ns.Characters.Professions())) do crafting[#crafting + 1] = p.name end
+    local crafting = ns.Bags.CraftingText(ns.Characters.Professions()) -- "First Aid 80, Tailoring 130"
     matsButton:SetText(string.format("Keep my professions' materials: %s (%s)", v.keepProfessionMats and "on" or "off",
-        #crafting > 0 and table.concat(crafting, ", ") or "no crafting profession here"))
+        crafting ~= "" and crafting or "no crafting profession here"))
     local gathering = {}
     for _, p in ipairs(ns.Valuation.GatheringProfessions(ns.Characters.Professions())) do gathering[#gathering + 1] = p.name end
     gatherButton:SetText(string.format("Sell what I gather: %s (%s)", v.sellGathered and "on" or "off",
