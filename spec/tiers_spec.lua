@@ -55,11 +55,25 @@ describe("material tiers", function()
             assert.equal(2, ns.Tiers.Step(FIRST_AID, 175))
         end)
 
+        it("other professions: where the last recipe using it goes grey (Forever data); no tiers for Alchemy, Cooking", function()
+            assert.equal(125, ns.Tiers.Threshold(TAILORING, LINEN))
+            assert.equal(ns.Tiers.Threshold(TAILORING, LINEN), ns.Tiers.Threshold(TAILORING, 2996), "cloth and its bolt")
+            assert.equal(185, ns.Tiers.Threshold(164, 2840), "Copper Bar: Sterling Silver Breastplate")
+            assert.equal(240, ns.Tiers.Threshold(202, 2841), "Engineering keeps Bronze longer")
+            assert.equal(205, ns.Tiers.Threshold(333, 10940), "Strange Dust")
+            assert.is_nil(ns.Tiers.Threshold(164, 3860), "Mithril: used at 300")
+            assert.is_nil(ns.Tiers.Threshold(165, 8170), "Rugged Leather: the last tier")
+            assert.is_nil(ns.Tiers.DONE[171], "Alchemy: herbs stay in use into Artisan")
+            assert.is_nil(ns.Tiers.DONE[185], "Cooking: no tiers")
+        end)
+
         it("every row is a known crafting profession, in rising order, with a name", function()
             for profession, rows in pairs(ns.Tiers.DONE) do
                 assert.truthy(ns.Valuation.PROFESSION_MATS[profession], "crafting profession " .. profession)
-                local seen = {}
+                local seen, last = {}, 0
                 for _, row in ipairs(rows) do
+                    assert.truthy(row[2] >= last, "rising order: " .. row[3])
+                    last = row[2]
                     assert.equal("number", type(row[1]))
                     assert.truthy(row[2] > 0 and row[2] <= 300, "skill in 1-300")
                     assert.equal("string", type(row[3]))

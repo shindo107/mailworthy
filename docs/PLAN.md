@@ -85,8 +85,12 @@ Notes:
    - totals: "14 items in 2 mails, about 3g 20s more than vendoring, postage 4s 20c";
    - buttons: **Send**, **Settings** (opens the settings panel on top of the
      preview; the preview recalculates when it closes); the X, Escape and Circle
-     close it. On the Inbox tab Send reads "Open the Send Mail tab" and the window
-     follows the player there (UX pass, 2026-11-06).
+     close it. On the Inbox tab there is no Send button (a note says to open the
+     Send Mail tab) and the window follows the player there (UX pass, 2026-11-06;
+     v0.16.1's secure tab button didn't show in game and is gone, 2026-11-06).
+     With more than one recipient (bindings), "To:" gets one line per recipient
+     (what they get, how many mails; at most three, then "+N more") and the
+     Mailing list is grouped by recipient, the bank alt's first.
 4. **Send.** Mail 1 of N goes to the bank alt (12 items per mail), and each
    next mail follows on `MAIL_SEND_SUCCESS` without another press.
 5. **Vendor the rest.** Whatever stays in your bags is worth more at the vendor
@@ -272,11 +276,13 @@ cloth anymore. So ideally I send my linen cloth to the AH or my friend's tailor 
 friend goes past the similar threshold on tailoring or first aid (if I have a binding for
 them) then I just keep going to the AH. Same methodology for all crafting materials."
 
-- **The threshold** (`Tiers.lua`, pure data): per crafting profession and material, the skill
-  at which the next material's recipe becomes learnable, where Classic levelling guides switch
-  (First Aid: Wool Bandage at 80, so Linen Cloth is done at 80). No row = never outgrown: the
-  last material of a line, and any material still used in recipes made past the switch
-  (research 2026-11-06, conservative: when in doubt, no row).
+- **The threshold** (`Tiers.lua`, pure data, research 2026-11-06 on Forever client data
+  1.60.1 and the Forever guides; Forever's recipes are not Classic 1.15's): First Aid, the
+  operator's rule, the skill at which the next cloth's bandage is learnable (Linen 80, Wool
+  150, Silk 210, Mageweave 260); every other profession, the skill at which the last normal
+  recipe using the material turns grey (Forever's new recipe sets reuse older materials past
+  the levelling switch). No row = never outgrown: each line's last tier, Mithril / Solid
+  Stone and up, Alchemy, Cooking (conservative: when in doubt, no row or a later skill).
 - **Own professions:** `Valuation.NeededBy(item, professions, tiers)` skips a profession whose
   `rank` is at or past the item's threshold, so the item is valued like anything else (or a
   binding that still needs it takes it); another of this character's professions that still

@@ -67,7 +67,7 @@ must never break the game.
 | `Config.lua` | saved settings (`MailworthyDB.settings` only what the player touched, `bankAlts[realm|faction]` set by a pick or by the bank alt itself via `SetBankAltHere`, `names` history); flags `minimapHidden`, `tagsEverywhere`, `glowEverywhere`; choices, auto-complete, steppers |
 | `Widgets.lua` | window / button / label / legend helpers shared by all windows |
 | `Mailer.lua` | sending: plan 12 stacks per mail, re-check each slot, attach, zero money/COD, `SendMail`, chain on `MAIL_SEND_SUCCESS`; stops on failure / close / combat / 10 s; a run id kills a stopped run's timers; records `MailworthyDB.mailed` (30 days) |
-| `MailWindow.lua` | the window at the mailbox (`media/ux-pass-prototype.png`): To, binding rows (only while there are bindings: Skip once / Remove, Friends...), Mailing rows (chip + gain), Staying rows (reason), total (its second line: fees, or the mailer's status), Send / Settings (no Close: X, Escape, Circle); `UI.Layout` sizes the window to the rows shown; rows toggle item locks; pages of 8 / 5. Opened on the Inbox (mouse), Send's place goes to `MailworthyOpenSendTab`, a secure "click" button on `MailFrameTab2` (v0.16.1 fix: v0.14.0's button only said what to do; switch `tabButton`), and `MailworthyTabWatcher` moves the window to Send Mail when the player goes there (Mailworthy's code never switches tabs) |
+| `MailWindow.lua` | the window at the mailbox (`media/ux-pass-prototype.png`): To, binding rows (only while there are bindings: Skip once / Remove, Friends...), Mailing rows (chip + gain), Staying rows (reason), total (its second line: fees, or the mailer's status), Send / Settings (no Close: X, Escape, Circle); `UI.Layout` sizes the window to the rows shown; rows toggle item locks; pages of 8 / 5. Opened on the Inbox, there is no Send button (a note says to open the Send Mail tab; v0.16.1's secure "click" button on `MailFrameTab2` never showed in game and was removed, operator 2026-11-06: "otherwise just don't show it"), and `MailworthyTabWatcher` moves the window to Send Mail when the player goes there (Mailworthy's code never switches tabs). Several recipients: `UI.Recipients(totals)` puts one line per recipient under "To:" (what, how many mails; `Bags` totals `byRecipient`) and the Mailing list is grouped by recipient |
 | `BankAlt.lua` | bank alt view: verdicts with no postage (`Verdict`: ah / de / v), tags on bag buttons (a `Border` decorator), tooltip lines via `TooltipDataProcessor`, summary window (`/mw summary`, mail button on the bank alt); switches `bankAltTags`, `tooltipLines`; setting `tagsEverywhere` |
 | `SettingsUI.lua` | settings window, two views (`UI.View`): main (bank alt row with Change..., "What gets mailed": steppers, 2/8/24h, disenchant, profession materials; "In your bags": tags, glow; "More": friends, summary, minimap; the prices source) and pick (opened by Change..., and first while no bank alt is set: known characters, "This character is my bank alt" for a second account, optional typed name with "not seen" second press, Back); a pick returns to main; controller via `PadKey` set `settings` (works away from the mailbox) |
 | `MinimapButton.lua` | LedgerLink's minimap button (click: settings; drag: move); feature `minimapButton` |
@@ -286,12 +286,21 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   hid. Also from the operator that day: Send on the **Inbox** tab "didn't do anything, it felt
   like a bug" (the status said why, too quietly): the button now reads "Open the Send Mail tab"
   and the window follows the player to that tab (we still never switch tabs ourselves).
+  2026-11-06 later: v0.16.1 put a secure "click" button on the Send Mail tab in Send's place;
+  in game it didn't show ("hides unless you are on the send mail tab ... otherwise just
+  don't show it"), so it is gone: on the Inbox there is no Send button, only the note. Same
+  day: "when sending to multiple people ... make sure the receiver is made clear": one "To:"
+  line per recipient and the Mailing list grouped by recipient.
 
 - Material tiers (operator, 2026-11-06: "I just got my first aid to 80 ... I shouldn't be
   using linen cloth anymore ... once my friend goes past the similar threshold ... I just keep
-  going to the AH"): `Tiers.lua`, PLAN "Material tiers". Chosen: the threshold is where the next
-  material's recipe becomes learnable (the operator's 80 for First Aid linen), not where every
-  recipe goes grey; conservative rows (no row = kept forever); the friend's skill is the
+  going to the AH"): `Tiers.lua`, PLAN "Material tiers". Chosen: for First Aid the threshold is where the next
+  cloth's bandage becomes learnable (the operator's 80 for linen); for the other professions
+  it is where every normal recipe using the material goes grey, because Forever's recipes (not
+  Classic 1.15's: earlier tiers, new Mender's / Sterling Silver / Officer's sets) keep older
+  materials in use past the levelling switch (research 2026-11-06, Forever client data via
+  zockify and wow-professions.com's Forever guides; Wowhead's Forever skill numbers are
+  script-drawn and couldn't be read); Alchemy and Cooking have no rows; conservative rows (no row = kept forever); the friend's skill is the
   highest known of their Mailworthy's `S2`, the guild roster rank and our own character's
   record, and unknown means the binding takes everything as before; a new message kind, so
   older Mailworthys are unaffected. No settings button (the Mats line shows the ranks; the
@@ -329,9 +338,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   days, peers' scan days over the addon messages; PR #34, 2026-11-06), v0.16.0 ("Sell what I
   gather"; PR #35), v0.16.1 (the Inbox's "Open the Send Mail tab" is a secure click on the
   tab; PR #36), **v0.17.0** (Enchanting bindings take green and blue gear; popups open beside
-  their opener; PR #37, all 2026-11-06). **CurseForge has v0.17.0 as its latest file**
-  (release run 42252231820: "Uploading Mailworthy-v0.17.0-forever.zip (1.60.1 release) ...
-  Success!"); its project description
+  their opener; PR #37), **v0.17.1** (no Send button on the Inbox: v0.16.1's secure tab
+  button never showed in game; one "To:" line per recipient; PR #38, all 2026-11-06).
+  **CurseForge has v0.17.1 as its latest file** (release run 42285823587: "Uploading
+  Mailworthy-v0.17.1-forever.zip (1.60.1 release) ... Success!"); its project description
   is `media/curseforge-description.html` as of PR #30 (pasted by the operator).
 - Confirmed in game: the `/mw scan` math (v0.2.0, by hand), settings with mouse and
   controller and after `/reload`, one-press sending with no money / COD, the window
@@ -387,3 +397,8 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    `/mw report` "binding: ... skill N" from the roster; two Mailworthy users: "skills: ..." in
    each other's peer line, and past the friend's threshold the material goes to the bank alt
    with "not to <name>: their <profession> (N) is past it" in `/mw scan`.
+11. Open (research 2026-11-06): on Forever, First Aid also makes healing potions (from
+   Alchemy: Peacebloom, Briarthorn, Bruiseweed, Liferoot, Sungrass, Golden Sansam),
+   Tourniquets (Thick / Rugged Leather) and Anti-Venoms (venom sacs), but
+   `Valuation.PROFESSION_MATS` keeps only cloth for First Aid. Not changed yet: ask the
+   operator whether a first-aider should keep those too.
