@@ -18,6 +18,7 @@ Locks.lua
 Border.lua
 Prices.lua
 Disenchant.lua
+Tiers.lua
 Valuation.lua
 Config.lua
 Routes.lua

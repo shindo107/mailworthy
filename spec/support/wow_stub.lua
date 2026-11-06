@@ -31,7 +31,7 @@ local function defaultState()
         inbox = {}, invoices = {},
         mods = {}, bindings = {}, bindingOwners = {}, activeFrame = nil, now = 1000, gamepadUI = false,
         navButton = nil,
-        -- bindings: guild = nil (not in one) or { clubId, members = { { name, level, class, online, professions } } },
+        -- bindings: guild = nil (not in one) or { clubId, members = { { name, level, class, online, professions, ranks } } },
         -- group = nil or { raid, members = { ... } } (party: the others; raid: everyone), addon messages sent / prefixes
         guild = nil, group = nil, addonMessages = {}, prefixes = {}, rosterRequests = 0,
     }
@@ -309,7 +309,8 @@ _G.C_Club = {
         if not m then return nil end
         return { isSelf = m.name == s().name, memberId = i, name = m.name .. (m.realm and ("-" .. m.realm) or ""),
             presence = m.online and 1 or 3, level = m.level, classID = 1,
-            profession1ID = m.professions and m.professions[1], profession2ID = m.professions and m.professions[2] }
+            profession1ID = m.professions and m.professions[1], profession2ID = m.professions and m.professions[2],
+            profession1Rank = m.ranks and m.ranks[1], profession2Rank = m.ranks and m.ranks[2] }
     end,
 }
 

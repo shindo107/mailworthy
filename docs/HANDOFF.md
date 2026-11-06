@@ -73,7 +73,8 @@ must never break the game.
 | `MinimapButton.lua` | LedgerLink's minimap button (click: settings; drag: move); feature `minimapButton` |
 | `Report.lua` | `/mw report` (one copyable report: build, controller, switches, bank alt, settings, locks, last send, bindings, peers, blocked actions, log), the copy box `/mw scan` uses, and the AH sale-mail reader (house cut). Replaced the discovery self-test in Phase 5 |
 | `Routes.lua` | **bindings** (2026-10-26): a crafting profession's materials to one player (`MailworthyDB.routes[realm\|faction]` for all the account's characters, `MailworthyCharDB.routes` for this one; this character's win). Pure `Divert(item, verdict, price, settings, routes)`: route `friend`, `to`, `what`; never over a hard keep; at or above the binding's `cap` (copper per unit, `CAP_STEPS`, 5g default, nil = none) the normal verdict stands with `capped`. `SkipOnce` per mailbox visit. `Candidates()`: party / raid units, guild via `C_Club` (`GetGuildRosterInfo` fallback), known characters, peers; `Clean` drops "-Realm". Pure `Crafter(route, peer)` / `Recipient(route)`: the bound player, or the character of theirs that has the profession (from their hello) |
-| `Comms.lua` | hellos between Mailworthys (`C_ChatInfo`, prefix `Mailworthy`): `H2\|<own crafting skill lines>\|<Name=ids;...>` (the account's other crafters here) / `A2`; peers in `MailworthyDB.peers[realm\|faction]` (60 days); throttled; everything received is validated data. Switch `comms` |
+| `Tiers.lua` | **material tiers** (2026-11-06): `DONE[skill line] = { { itemID, skill, name }, ... }`, the skill at which a crafting profession is done with a material (the next material's recipe is learnable: First Aid Linen 80); pure `Threshold`, `Outgrown`, `OutgrownNames`, `Step`. No row = never outgrown. Used by `Valuation.NeededBy` (own rank) and `Routes.Matches` (the recipient's `route.skill`). Switch `tiers` |
+| `Comms.lua` | hellos between Mailworthys (`C_ChatInfo`, prefix `Mailworthy`): `H2\|<own crafting skill lines>\|<Name=ids;...>` (the account's other crafters here) / `A2` / `S2\|<id:rank,...>\|<Name=id:rank;...>` (skill ranks after each hello, and again at the mailbox after a skill-up crosses a tier: `Steps`); peers in `MailworthyDB.peers[realm\|faction]` (60 days); throttled; everything received is validated data. Switch `comms` |
 | `Stale.lua` | stale auction prices (2026-11-06): freshness = days since Auctionator saw the freshest of 12 everyday trade goods (`WATCH`, `GetAuctionAgeByItemID`); the scan day goes out as `F2\|<server day>` after each hello (Comms; older Mailworthys drop unknown kinds) and peers' days are kept in `MailworthyDB.fresh[realm\|faction]` (60 days; separate from `peers`, so bindings data is untouched). Pure `Nudge(ownAge, freshest, today, maxAgeDays, nudgeDays)`: nil up to `NUDGE_DAYS` (3, operator 2026-11-06), "self" past that (`ignored` past `maxAgeDays`, 7: those items stay in the bags), "peer" when someone heard in 14 days scanned within 2 days. Shown as "!" on the mail buttons, a line at the top of the Mailworthy window, and (peer only) one chat line at `MAIL_SHOW`; logging in stale sends an ask so fresh peers answer. Display only. Switch `staleNudge` |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), two views (`UI.View`): list (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step); opens on add while there are no bindings; a binding returns to the list |
 
@@ -286,6 +287,16 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   like a bug" (the status said why, too quietly): the button now reads "Open the Send Mail tab"
   and the window follows the player to that tab (we still never switch tabs ourselves).
 
+- Material tiers (operator, 2026-11-06: "I just got my first aid to 80 ... I shouldn't be
+  using linen cloth anymore ... once my friend goes past the similar threshold ... I just keep
+  going to the AH"): `Tiers.lua`, PLAN "Material tiers". Chosen: the threshold is where the next
+  material's recipe becomes learnable (the operator's 80 for First Aid linen), not where every
+  recipe goes grey; conservative rows (no row = kept forever); the friend's skill is the
+  highest known of their Mailworthy's `S2`, the guild roster rank and our own character's
+  record, and unknown means the binding takes everything as before; a new message kind, so
+  older Mailworthys are unaffected. No settings button (the Mats line shows the ranks; the
+  window says "until skill N"); `/mw feature tiers off` is the way back.
+
 - Bindings (operator, 2026-10-26: "send my enchanting mats to a guild member and bind that,
   until cancelled; easy to X on each send and to remove; few settings; an insane market high
   still goes to my alt"): `Routes.lua` / `RoutesUI.lua` / `Comms.lua`, PLAN "Bindings". Chosen:
@@ -315,9 +326,12 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   2026-10-26), **v0.14.0** (UX pass: one task per window, windows fit their content; Send
   on the Inbox says to open the Send Mail tab and the window follows; PR #33, 2026-11-06),
   **v0.15.0** (the stale-prices nudge: `Stale.lua`, the "!" on the Mailworthy button past 3
-  days, peers' scan days over the addon messages; PR #34, 2026-11-06). **CurseForge has
-  v0.15.0 as its latest file** (release run 42242514018: "Uploading
-  Mailworthy-v0.15.0-forever.zip (1.60.1 release) ... Success!"); its project description
+  days, peers' scan days over the addon messages; PR #34, 2026-11-06), v0.16.0 ("Sell what I
+  gather"; PR #35), v0.16.1 (the Inbox's "Open the Send Mail tab" is a secure click on the
+  tab; PR #36), **v0.17.0** (Enchanting bindings take green and blue gear; popups open beside
+  their opener; PR #37, all 2026-11-06). **CurseForge has v0.17.0 as its latest file**
+  (release run 42252231820: "Uploading Mailworthy-v0.17.0-forever.zip (1.60.1 release) ...
+  Success!"); its project description
   is `media/curseforge-description.html` as of PR #30 (pasted by the operator).
 - Confirmed in game: the `/mw scan` math (v0.2.0, by hand), settings with mouse and
   controller and after `/reload`, one-press sending with no money / COD, the window
@@ -329,7 +343,7 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   disenchant prices for green items (Siz DisenchantValue, or the era tables with
   Disenchantry: see either in game), ForeverMail compatibility (replaces the mailbox
   window), the in-game checks of bindings and of the Disenchantry value (item 7 below), of
-  the UX pass (item 8) and of the stale-prices nudge (item 9), and README "Beta unknowns".
+  the UX pass (item 8) of the stale-prices nudge (item 9) and of the material tiers (item 10), and README "Beta unknowns".
 
 ## 8. What's left (in order)
 
@@ -367,3 +381,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    `/mw report` shows "price stamp: <name> scanned 0 day(s) ago", the Mailworthy button shows
    "!", the window's top line names the fresh player, and one chat line appears at the mailbox.
    After their own scan, all of it is gone. `/mw report` "price freshness" reads a plausible age.
+10. In-game check of the material tiers (2026-11-06): First Aid 80+ with Linen Cloth in the
+   bags: linen in the Mailing list, wool under Staying with "your First Aid needs it (until
+   skill 150)", `/mw report` "First Aid 80 is past Linen Cloth"; a binding to a guild tailor:
+   `/mw report` "binding: ... skill N" from the roster; two Mailworthy users: "skills: ..." in
+   each other's peer line, and past the friend's threshold the material goes to the bank alt
+   with "not to <name>: their <profession> (N) is past it" in `/mw scan`.

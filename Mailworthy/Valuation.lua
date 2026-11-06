@@ -108,12 +108,26 @@ function Valuation.CraftingProfessions(professions)
 end
 
 --- Pure: the name of this character's crafting profession that uses the item, or nil.
-function Valuation.NeededBy(item, professions)
+--- A profession whose skill (`rank` in a { skillLine, rank } entry) is past the item
+--- (Tiers: Linen Cloth is done for First Aid at 80) doesn't count, unless `tiers` is
+--- false. Second return: { name, skill } of the first profession past it, when none
+--- needs it; third: the skill at which the needing profession will be done with it.
+function Valuation.NeededBy(item, professions, tiers)
     if item.classID ~= Valuation.TRADE_GOODS then return nil end
-    for _, p in ipairs(Valuation.CraftingProfessions(professions)) do
-        if p.subclasses[item.subclassID] then return p.name end
+    local outgrown
+    for _, p in ipairs(type(professions) == "table" and professions or {}) do
+        local id = tonumber(type(p) == "table" and p.skillLine or p)
+        local known = Valuation.PROFESSION_MATS[id or -1]
+        if known and known.subclasses[item.subclassID] then
+            local rank = type(p) == "table" and tonumber(p.rank) or nil
+            if tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank) then
+                outgrown = outgrown or { name = known.name, skill = rank }
+            else
+                return known.name, nil, tiers ~= false and ns.Tiers.Threshold(id, item.itemID) or nil
+            end
+        end
     end
-    return nil
+    return nil, outgrown
 end
 
 --- Pure: days since the realm launched (0 before launch and on launch day). `now` is
@@ -313,6 +327,8 @@ local function mail(route, reason, r, item, settings)
     return r
 end
 
+local evaluate
+
 --- item: { link, itemID, count, stacks, quality, classID, vendor (copper per unit; nil = not
 ---   loaded yet), bound, quest, inUse (locked by the game), locked (Mailworthy lock) }
 --- price: nil when there's no price source at all (no Auctionator); else
@@ -330,12 +346,22 @@ function Valuation.Evaluate(item, price, settings)
     if item.inUse then return keep("in use") end
     if Valuation.IsTool(item) then return keep("profession tool") end
     if settings.keepProfessionMats then
-        local profession = Valuation.NeededBy(item, settings.professions)
+        local profession, _, untilSkill = Valuation.NeededBy(item, settings.professions, settings.tiers)
         -- "Sell what I gather": what a gathering profession brought in is valued like anything else.
         if profession and not (settings.sellGathered and Valuation.GatheredBy(item, settings.professions)) then
-            return keep("your " .. profession .. " needs it")
+            return keep("your " .. profession .. " needs it", { untilSkill = untilSkill })
         end
     end
+    local r = evaluate(item, price, settings)
+    if settings.keepProfessionMats and r.reason ~= "item info not loaded yet" then
+        local _, outgrown = Valuation.NeededBy(item, settings.professions, settings.tiers)
+        r.outgrown = outgrown -- "your First Aid (80) is past it", in the workings
+    end
+    return r
+end
+
+-- Evaluate past the hard keeps and the profession keep: price against vendor.
+evaluate = function(item, price, settings)
     if item.vendor == nil then return keep("item info not loaded yet") end
 
     local n = item.count or 1

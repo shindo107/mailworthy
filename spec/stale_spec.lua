@@ -101,12 +101,13 @@ describe("stale prices", function()
             ns.Comms.Announce("test")
             local m = messages()
             assert.equal("H2|", m[1]:sub(1, 3))
-            assert.equal("F2|" .. (today() - 1), m[2])
+            assert.equal("S2|", m[2]:sub(1, 3), "the skills (material tiers)")
+            assert.equal("F2|" .. (today() - 1), m[3])
             WowStub.state.addonMessages = {}
             WowStub.state.now = WowStub.state.now + 60
             ages[2770] = nil
             ns.Comms.Announce("test")
-            assert.equal(1, #messages(), "only the hello")
+            assert.equal(2, #messages(), "only the hello and the skills")
         end)
 
         it("records a peer's scan day; drops days in the future, too old, or malformed", function()

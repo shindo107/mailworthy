@@ -113,15 +113,19 @@ function Routes.Key(profession, to)
 end
 
 --- Pure: the item is a trade good the binding's profession uses, or, for Enchanting, a
---- green or blue weapon or armor piece to disenchant.
-function Routes.Matches(route, item)
+--- green or blue weapon or armor piece to disenchant. A material the bound player's skill
+--- (`route.skill`, Routes.Skill) is past (Tiers) doesn't match, unless `tiers` is false;
+--- the second return is then true.
+function Routes.Matches(route, item, tiers)
     if tonumber(route.profession) == Routes.ENCHANTING and Routes.GEAR_QUALITIES[tonumber(item.quality) or -1]
         and ns.Valuation.CanDisenchant(item) then
         return true
     end
     if item.classID ~= ns.Valuation.TRADE_GOODS then return false end
     local p = ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1]
-    return p ~= nil and p.subclasses[item.subclassID] == true
+    if p == nil or p.subclasses[item.subclassID] ~= true then return false end
+    if tiers ~= false and ns.Tiers.Outgrown(route.profession, item.itemID, route.skill) then return false, true end
+    return true
 end
 
 local function has(ids, profession)
@@ -147,14 +151,61 @@ function Routes.Recipient(route)
     return Routes.Crafter(route, ns.Comms and ns.Comms.Peer(route.to) or nil)
 end
 
+-- The guild roster's rank for a member's primary profession (C_Club member info carries
+-- profession1ID / profession1Rank, as Blizzard's Communities roster sorts by them).
+local function guildSkill(name, profession)
+    if call(IsInGuild) ~= true then return nil end
+    local club = rawget(_G, "C_Club")
+    local clubId = type(club) == "table" and call(club.GetGuildClubId) or nil
+    local members = clubId and call(club.GetClubMembers, clubId) or nil
+    for _, memberId in ipairs(type(members) == "table" and members or {}) do
+        local info = call(club.GetMemberInfo, clubId, memberId)
+        if type(info) == "table" and info.name and tostring(Routes.Clean(info.name)):lower() == name:lower() then
+            if tonumber(info.profession1ID) == profession then return tonumber(info.profession1Rank) end
+            if tonumber(info.profession2ID) == profession then return tonumber(info.profession2Rank) end
+            return nil
+        end
+    end
+    return nil
+end
+
+local function ownSkill(name, profession)
+    for _, entry in ipairs(ns.Characters.Mailable()) do
+        if tostring(entry.name):lower() == name:lower() then
+            for _, p in ipairs(entry.professions or {}) do
+                if tonumber(p.skillLine) == profession then return tonumber(p.rank) end
+            end
+        end
+    end
+    return nil
+end
+
+--- The skill in a binding's profession of the character that gets its mail, or nil when
+--- unknown: the highest of what their Mailworthy said (Comms "S2"), this account's own
+--- character's last login, and the guild roster (primary professions only). Skill only
+--- grows, so the highest is the latest.
+function Routes.Skill(route)
+    local to = Routes.Recipient(route)
+    local profession = tonumber(route.profession)
+    local best
+    for _, skill in ipairs({ ns.Comms and ns.Comms.Skill(to, profession) or false, ownSkill(to, profession) or false,
+        guildSkill(to, profession) or false }) do
+        if skill and (not best or skill > best) then best = skill end
+    end
+    return best
+end
+
 --- Pure: divert an item to a binding. `verdict` is Valuation.Evaluate's result for the
 --- item, `routes` the active bindings (Routes.Active()). Returns the new verdict, or nil
 --- when no binding applies; a second return names the binding whose cap kept the item on
---- the normal rule.
+--- the normal rule, a third the binding whose player's skill is past the material (Tiers).
 function Routes.Divert(item, verdict, price, settings, routes)
     if verdict and verdict.action == "keep" and Routes.HARD_KEEPS[verdict.reason] then return nil end
+    local outgrown
     for _, route in ipairs(routes or {}) do
-        if Routes.Matches(route, item) then
+        local matches, past = Routes.Matches(route, item, settings and settings.tiers)
+        if past then outgrown = outgrown or route end
+        if matches then
             local unit
             if type(price) == "table" and price.ah ~= nil
                 and (price.age == nil or price.age <= (settings and settings.maxAgeDays or math.huge)) then
@@ -171,7 +222,7 @@ function Routes.Divert(item, verdict, price, settings, routes)
             }
         end
     end
-    return nil
+    return nil, nil, outgrown
 end
 
 -- Saved bindings ----------------------------------------------------------------
@@ -199,11 +250,15 @@ end
 
 function Routes.Count() return #Routes.List() end
 
---- The bindings in force for this mailbox visit (not skipped once).
+--- The bindings in force for this mailbox visit (not skipped once), each with the
+--- recipient's `skill` (Routes.Skill) for the material tiers.
 function Routes.Active()
     local list = {}
     for _, r in ipairs(Routes.List()) do
-        if not skipped[r.key] then list[#list + 1] = r end
+        if not skipped[r.key] then
+            r.skill = Routes.Skill(r)
+            list[#list + 1] = r
+        end
     end
     return list
 end
@@ -476,9 +531,12 @@ function Routes.ReportLines()
     local lines = {}
     for _, r in ipairs(Routes.List()) do
         local to, crafter = Routes.Recipient(r)
-        lines[#lines + 1] = string.format("binding: %s (%s, %s%s%s)", Routes.Describe(r),
+        local skill = Routes.Skill(r)
+        local past = skill and ns.Tiers.OutgrownNames(r.profession, skill) or {}
+        lines[#lines + 1] = string.format("binding: %s (%s, %s%s, skill %s%s%s)", Routes.Describe(r),
             r.scope == "character" and "this character" or "all my characters", Routes.CapText(r),
-            crafter and (", delivered to their crafter " .. to) or "",
+            crafter and (", delivered to their crafter " .. to) or "", skill and tostring(skill) or "unknown",
+            #past > 0 and (": past " .. table.concat(past, ", ")) or "",
             skipped[r.key] and ", skipped this visit" or "")
     end
     return lines

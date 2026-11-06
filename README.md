@@ -73,6 +73,18 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   and shards for an enchanter, meat and fish for a cook. Gathering professions keep
   nothing: what they gather is what gets sold. Elemental materials are still mailed
   (lock them to keep them).
+- **Materials you've levelled past are mailed again.** Each material is kept only until
+  your skill reaches the point where levelling moves on to the next one: First Aid keeps
+  Linen Cloth until 80 (Wool Bandage), Wool Cloth until 150, and so on (the full table:
+  `Mailworthy/Tiers.lua`). The window says "your First Aid needs it (until skill 80)". The
+  same goes for **bindings**: once your friend's skill in the bound profession is past a
+  material, it goes to your bank alt instead (or to another binding that still needs it).
+  Their skill comes from their Mailworthy (sent with the addon messages above, again after
+  each skill-up that passes a material), the guild roster (Blacksmithing, Tailoring, ... but
+  not First Aid or Cooking), or your own character's last login. When nothing is known, the
+  binding takes everything, as before. The last material of each line (Runecloth, ...) and
+  anything still used in high-level recipes is never outgrown. `/mw feature tiers off`
+  keeps every material again.
 - **Sell what I gather** (off by default, a setting turns it on): for a gatherer who also
   crafts with the same materials (a miner-blacksmith, an herbalist-alchemist, a
   skinner-leatherworker, a fisher-cook), what the gathering profession brings in is mailed
@@ -127,6 +139,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Reagent bag (bag 5, `NUM_TOTAL_EQUIPPED_BAG_SLOTS`) scanned, locked (Alt+click, L3) and mailed like bags 0-4 | a white item in the reagent bag: `/mw scan` lists it, Send mails it | open (CurseForge user report, 2026-10-21; source-backed: `Enum.BagIndex.ReagentBag` = 5 in `Blizzard_FrameXMLBase/Constants.lua`) |
 | Guild members through `C_Club.GetGuildClubId` / `GetClubMembers` / `GetMemberInfo` (`name`, `presence`, `profession1ID` / `profession2ID` as skill line IDs, as Blizzard's Communities roster reads them on Forever; `GetGuildRosterInfo` fallback), party through `GetNumGroupMembers` / `GetUnitName(unit, true)` / `UnitIsConnected`, the roster asked for with `C_GuildInfo.GuildRoster()` | `/mw friends` lists guild and party members with "online" and their professions; a two-part name without a realm suffix lands in the binding and the mail arrives | open (2026-10-26) |
 | Addon messages between Mailworthys: `C_ChatInfo.RegisterAddonMessagePrefix("Mailworthy")`, `SendAddonMessage(prefix, text, "GUILD" / "PARTY" / "RAID")`, `CHAT_MSG_ADDON` (sender possibly "Name-Realm") | two guild members with Mailworthy: `/mw report` shows "mailworthy peer: <name> (<professions>; other characters: ...)" on each, `/mw friends` marks them "Mailworthy", and a binding for a profession only an alt of theirs has says "delivered to their ... character" | open (2026-10-26) |
+| Skill ranks: `GetProfessionInfo` 3rd return for this character (First Aid and Cooking included), `C_Club.GetMemberInfo` `profession1Rank` / `profession2Rank` for guild members (in Forever's `ClubDocumentation.lua` and Communities roster sort) | `/mw report` "kept for First Aid 85; First Aid 85 is past Linen Cloth (mailed)"; a binding line says "skill N" with a guild member's rank, or a Mailworthy peer's "skills: ..." | open (2026-11-06) |
 | "Open the Send Mail tab" on the Inbox: a `SecureActionButtonTemplate` button, `type` "click", `clickbutton` `MailFrameTab2` (Blizzard's `SECURE_ACTIONS.click` in `SecureTemplates.lua`), registered for `AnyUp` / `AnyDown` | open the Mailworthy window on the Inbox with the mouse, press "Open the Send Mail tab": the Send Mail tab opens, the window follows, Send works; `/mw report` shows no blocked actions; then the controller still jumps / targets / uses items | open (2026-11-06) |
 | Scan freshness: `Auctionator.API.v1.GetAuctionAgeByItemID(caller, itemID)` (read in Auctionator's source: days since seen, nil past 21 days; else the `item:ID` link form) over 12 everyday trade goods; the scan day sent as `F2\|<server day>` after each hello | a character that hasn't scanned for a week, in a guild with a Mailworthy user who just scanned: `/mw report` "price stamp: <name> scanned 0 day(s) ago", a **!** on the Mailworthy button and the chat line at the mailbox | open (2026-11-06) |
 | Lock glow only while a mailbox is open (`MAIL_SHOW` / `MAIL_CLOSED`, `MailFrame:IsShown()`), "always" setting; a new lock flashes 3 s anywhere | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: glow; close it: gone | open (CurseForge user report + operator, 2026-10-21) |
