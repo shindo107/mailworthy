@@ -283,8 +283,19 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
 - Tags so far: v0.2.0 (Phase 1), v0.3.0 (settings), v0.4.0 (sending), v0.5.0 (bank alt
   view), v0.5.1 (window refreshes after sending), v0.6.0, v0.7.0 (2026-10-14), v0.8.0
   (decision rule v2, 2026-10-20), v0.9.0 (CurseForge feedback: reagent bag, mailbox-only
-  glow, 2026-10-22). **CurseForge has v0.7.0 as its latest file**: v0.8.0 and v0.9.0 failed
-  there on the dead `disenchantry` relation; the next tag after the fix carries both.
+  glow, 2026-10-22; its upload and v0.8.0's failed on the then-dead `disenchantry`
+  relation), v0.9.1 (relation dropped; the first file on CurseForge since v0.7.0), v0.10.0
+  (Siz DisenchantValue as the disenchant source, 2026-10-21), v0.11.0 (profession materials
+  kept, 2026-10-22), v0.12.0 (description refresh, 2026-10-24), **v0.13.0** (bindings: a
+  profession's materials to a friend with delivery by profession; Disenchantry as a
+  disenchant source through the ported era tables; `disenchantry` relation restored,
+  2026-10-26), **v0.14.0** (UX pass: one task per window, windows fit their content; Send
+  on the Inbox says to open the Send Mail tab and the window follows; PR #33, 2026-11-06).
+  **CurseForge has v0.14.0 as its latest file** (release run 42235669126: "Uploading
+  Mailworthy-v0.14.0-forever.zip (1.60.1 release) ... Success!"); its project description
+  is `media/curseforge-description.html` as of PR #30 (pasted by the operator).
+- On `main`, not tagged yet: the stale-prices nudge (PR #34, 2026-11-06: `Stale.lua`, the
+  "!" on the Mailworthy button past 3 days, peers' scan days over the addon messages).
 - Confirmed in game: the `/mw scan` math (v0.2.0, by hand), settings with mouse and
   controller and after `/reload`, one-press sending with no money / COD, the window
   lists, row locks, minimap button (v0.4.0; operator 2026-10-14).
@@ -292,8 +303,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   Pending: the Phase 4c check and a v1.0 spot check on one build
   (DISCOVERY-SESSION-2.md "v1.0 check"), then tag `v1.0.0` when the operator says so.
 - Still open: AH cut (needs a sale mail; the invoice reader in `Report.lua` logs it),
-  disenchant prices for green items (now from Siz DisenchantValue: see it in game),
-  ForeverMail compatibility (replaces the mailbox window).
+  disenchant prices for green items (Siz DisenchantValue, or the era tables with
+  Disenchantry: see either in game), ForeverMail compatibility (replaces the mailbox
+  window), the in-game checks of bindings and of the Disenchantry value (item 7 below), of
+  the UX pass (item 8) and of the stale-prices nudge (item 9), and README "Beta unknowns".
 
 ## 8. What's left (in order)
 
