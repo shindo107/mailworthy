@@ -74,7 +74,7 @@ must never break the game.
 | `Report.lua` | `/mw report` (one copyable report: build, controller, switches, bank alt, settings, locks, last send, bindings, peers, blocked actions, log), the copy box `/mw scan` uses, and the AH sale-mail reader (house cut). Replaced the discovery self-test in Phase 5 |
 | `Routes.lua` | **bindings** (2026-10-26): a crafting profession's materials to one player (`MailworthyDB.routes[realm\|faction]` for all the account's characters, `MailworthyCharDB.routes` for this one; this character's win). Pure `Divert(item, verdict, price, settings, routes)`: route `friend`, `to`, `what`; never over a hard keep; at or above the binding's `cap` (copper per unit, `CAP_STEPS`, 5g default, nil = none) the normal verdict stands with `capped`. `SkipOnce` per mailbox visit. `Candidates()`: party / raid units, guild via `C_Club` (`GetGuildRosterInfo` fallback), known characters, peers; `Clean` drops "-Realm". Pure `Crafter(route, peer)` / `Recipient(route)`: the bound player, or the character of theirs that has the profession (from their hello) |
 | `Comms.lua` | hellos between Mailworthys (`C_ChatInfo`, prefix `Mailworthy`): `H2\|<own crafting skill lines>\|<Name=ids;...>` (the account's other crafters here) / `A2`; peers in `MailworthyDB.peers[realm\|faction]` (60 days); throttled; everything received is validated data. Switch `comms` |
-| `Stale.lua` | stale auction prices (2026-11-06): freshness = days since Auctionator saw the freshest of 12 everyday trade goods (`WATCH`, `GetAuctionAgeByItemID`); the scan day goes out as `F2\|<server day>` after each hello (Comms; older Mailworthys drop unknown kinds) and peers' days are kept in `MailworthyDB.fresh[realm\|faction]` (60 days; separate from `peers`, so bindings data is untouched). Pure `Nudge(ownAge, freshest, today, maxAgeDays)`: nil while prices count (<= 7 days), "self" past that, "peer" when someone heard in 14 days scanned within 2 days. Shown as "!" on the mail buttons, a line at the top of the Mailworthy window, and (peer only) one chat line at `MAIL_SHOW`; logging in stale sends an ask so fresh peers answer. Display only. Switch `staleNudge` |
+| `Stale.lua` | stale auction prices (2026-11-06): freshness = days since Auctionator saw the freshest of 12 everyday trade goods (`WATCH`, `GetAuctionAgeByItemID`); the scan day goes out as `F2\|<server day>` after each hello (Comms; older Mailworthys drop unknown kinds) and peers' days are kept in `MailworthyDB.fresh[realm\|faction]` (60 days; separate from `peers`, so bindings data is untouched). Pure `Nudge(ownAge, freshest, today, maxAgeDays, nudgeDays)`: nil up to `NUDGE_DAYS` (3, operator 2026-11-06), "self" past that (`ignored` past `maxAgeDays`, 7: those items stay in the bags), "peer" when someone heard in 14 days scanned within 2 days. Shown as "!" on the mail buttons, a line at the top of the Mailworthy window, and (peer only) one chat line at `MAIL_SHOW`; logging in stale sends an ask so fresh peers answer. Display only. Switch `staleNudge` |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), two views (`UI.View`): list (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step); opens on add while there are no bindings; a binding returns to the list |
 
 Tests: `spec/` (busted on LuaJIT, 207 specs) with a WoW stub in
@@ -245,8 +245,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
 - Stale-prices nudge (operator, 2026-11-06: "10 people using mailworthy and 8 of them have scanned
   the ah but 2 haven't scanned in a week ... the 2 get a signal next time they look at the mailbox
   button"): `Stale.lua`. Chosen: share only each player's scan day, never prices (spoofable, and
-  they don't fit a 255-byte message); display only, never a decision input; the 7-day cutoff is
-  Valuation's `maxAgeDays` (past it prices already stop counting); a quiet nudge with no fresher
+  they don't fit a 255-byte message); display only, never a decision input; the nudge starts past
+  3 days (operator, same day: "set that threshold to 3 days instead of 7"), while Valuation's
+  7-day `maxAgeDays` still decides when prices stop counting (the text then says items stay); a quiet nudge with no fresher
   peer too, so a guild without other Mailworthy users still sees it; "comms range" is the guild /
   group channels, so the signal waits in SavedVariables for the next mailbox visit.
 
@@ -326,7 +327,7 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    friends window's list and add views, Back from step 2 and step 1; long button texts fit
    ("Keep my professions' materials: on (Tailoring, Enchanting)").
 9. In-game check of the stale-prices nudge (2026-11-06): with two guild members running
-   Mailworthy, one scans the AH and the other hasn't for over a week: the stale one's
+   Mailworthy, one scans the AH and the other hasn't for over 3 days (a week for the "stay in your bags" wording): the stale one's
    `/mw report` shows "price stamp: <name> scanned 0 day(s) ago", the Mailworthy button shows
    "!", the window's top line names the fresh player, and one chat line appears at the mailbox.
    After their own scan, all of it is gone. `/mw report` "price freshness" reads a plausible age.

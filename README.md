@@ -58,8 +58,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   has the profession**: the friend when they do, their crafter alt when they don't, and the
   friend when nothing is known. Never their bank alt. The window names the recipient.
 - **Stale auction prices** get a nudge at the mailbox: once your Auctionator prices are over
-  7 days old (Mailworthy stops trusting them then, so those items stay in your bags), the
-  Mailworthy button gets a **!** and the window says so. When another Mailworthy user in
+  3 days old, the Mailworthy button gets a **!** and the window says so (past 7 days
+  Mailworthy stops trusting them, and those items stay in your bags). When another Mailworthy user in
   your guild or group has scanned in the last 2 days, it says who, and one chat line tells
   you at the mailbox. Only the day of each player's scan is shared (with the addon messages
   above), never prices, and it never changes what gets mailed. `/mw feature staleNudge off`

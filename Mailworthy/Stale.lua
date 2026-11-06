@@ -1,5 +1,7 @@
 -- Stale auction prices: a nudge at the mailbox when this character's Auctionator
--- prices are too old to count (Valuation's maxAgeDays, 7), louder when another
+-- prices are over NUDGE_DAYS (3) old (operator, 2026-11-06: "set that threshold to 3
+-- days"; they stop counting for verdicts past Valuation's maxAgeDays, 7, and the
+-- nudge then says those items stay in the bags), louder when another
 -- Mailworthy user nearby has scanned recently (operator, 2026-11-06: "8 of them
 -- have scanned the AH but 2 haven't scanned in a week ... the 2 get a signal next
 -- time they look at the mailbox button").
@@ -30,6 +32,7 @@ Stale.WATCH = {
     10940,             -- Strange Dust
 }
 Stale.VERSION = 2
+Stale.NUDGE_DAYS = 3        -- prices older than this get the nudge
 Stale.PEER_FRESH_DAYS = 2   -- a peer's scan counts as fresh this many days after it
 Stale.HEARD_DAYS = 14       -- and only if we heard it in the last two weeks
 Stale.KEEP_DAYS = 60
@@ -131,11 +134,12 @@ function Stale.Freshest(peers, at)
 end
 
 --- Pure: the nudge to show, or nil. `ownAge` from OwnAge (nil = no Auctionator: no nudge,
---- the window already says there are no prices). Stale = older than `maxAgeDays`.
---- { level = "peer" (someone scanned within PEER_FRESH_DAYS) or "self", age, peer, peerAgo }.
-function Stale.Nudge(ownAge, freshest, today, maxAgeDays)
-    if ownAge == nil or ownAge <= (maxAgeDays or 7) then return nil end
-    local nudge = { level = "self", age = ownAge }
+--- the window already says there are no prices). Stale = older than `nudgeDays` (NUDGE_DAYS);
+--- `ignored` = also older than `maxAgeDays`, so the verdicts no longer use those prices.
+--- { level = "peer" (someone scanned within PEER_FRESH_DAYS) or "self", age, ignored, peer, peerAgo }.
+function Stale.Nudge(ownAge, freshest, today, maxAgeDays, nudgeDays)
+    if ownAge == nil or ownAge <= (nudgeDays or Stale.NUDGE_DAYS) then return nil end
+    local nudge = { level = "self", age = ownAge, ignored = ownAge > (maxAgeDays or 7) }
     if freshest and today - freshest.day <= Stale.PEER_FRESH_DAYS and today - freshest.day < ownAge then
         nudge.level, nudge.peer, nudge.peerAgo = "peer", freshest.name, today - freshest.day
     end
@@ -160,11 +164,15 @@ function Stale.Text(nudge)
     if not nudge then return nil end
     if nudge.level == "peer" then
         return string.format("|cffff8040Your auction prices are %s; %s scanned %s.|r Run an Auctionator scan at the "
-            .. "auction house: until then, items with old prices stay in your bags.", ageText(nudge.age),
-            firstName(nudge.peer), agoText(nudge.peerAgo))
+            .. "auction house%s", ageText(nudge.age), firstName(nudge.peer), agoText(nudge.peerAgo),
+            nudge.ignored and ": until then, items with old prices stay in your bags." or " for up-to-date verdicts.")
     end
-    return string.format("|cffaaaaaaYour auction prices are %s: items with old prices stay in your bags until an "
-        .. "Auctionator scan.|r", ageText(nudge.age))
+    if nudge.ignored then
+        return string.format("|cffaaaaaaYour auction prices are %s: items with old prices stay in your bags until an "
+            .. "Auctionator scan.|r", ageText(nudge.age))
+    end
+    return string.format("|cffaaaaaaYour auction prices are %s: an Auctionator scan keeps the verdicts up to date.|r",
+        ageText(nudge.age))
 end
 
 --- Pure: the chat line at the mailbox (only when a peer is fresher).
