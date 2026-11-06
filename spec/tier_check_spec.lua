@@ -166,6 +166,20 @@ describe("tier check (the profession window against the tier table)", function()
             assert.same({ recipe = "Soft-soled Linen Boots", difficulty = 1, via = "Bolt of Linen Cloth" },
                 record.reagents[LINEN])
             assert.is_false(record.reagents[2587] or false)
+            -- the comparison is saved too, so a reader outside the game needs neither the table nor /mw report
+            assert.equal("Tailoring", record.profession)
+            assert.equal(TAILORING, record.skillLine)
+            assert.equal(ns.VERSION, record.version)
+            assert.same({
+                { itemID = LINEN, name = "Linen Cloth", doneAt = 115, recipe = "Soft-soled Linen Boots", difficulty = 1,
+                    color = "yellow", via = "Bolt of Linen Cloth",
+                    text = "tier check: Linen Cloth still used by Soft-soled Linen Boots (yellow) at skill 120, "
+                        .. "table says done at 115 (via Bolt of Linen Cloth)" },
+                { itemID = BOLT_LINEN, name = "Bolt of Linen Cloth", doneAt = 115, recipe = "Soft-soled Linen Boots",
+                    difficulty = 1, color = "yellow",
+                    text = "tier check: Bolt of Linen Cloth still used by Soft-soled Linen Boots (yellow) at skill 120, "
+                        .. "table says done at 115" },
+            }, record.findings)
             assert.equal(0, created)
             has(table.concat(ns.Log.Lines(), "\n"),
                 "Tailoring 120: 5 learned recipes read (C_TradeSkillUI (filtered list)), 2 material(s) still used past the table")
@@ -227,6 +241,7 @@ describe("tier check (the profession window against the tier table)", function()
             open()
             ns.HandleSlash("report")
             has(ns.Report.Text(), "C_TradeSkillUI (filtered list)): matches the table")
+            assert.same({}, MailworthyDB.tierCheck[ME][TAILORING].findings)
         end)
     end)
 
