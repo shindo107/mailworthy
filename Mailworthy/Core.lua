@@ -27,7 +27,7 @@ end
 -- can be isolated with /mw feature <name> off + /reload instead of a new build.
 ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
-    minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true,
+    minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
 } }
 
 function ns.Features.Describe()
@@ -102,7 +102,7 @@ local HELP = {
     "/mw locks - list this character's locked items",
     "/mw scan - what Mailworthy would mail and why (sends nothing)",
     "/mw summary - on your bank alt: what to list, disenchant or vendor",
-    "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags|tooltipLines|comms>"
+    "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags|tooltipLines|comms|staleNudge>"
         .. " on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",

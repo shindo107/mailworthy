@@ -96,7 +96,11 @@ function MailButton.Refresh()
     if not sendButton then return end
     local pad = MailButton.GamepadUI()
     local glyph = ns.Gamepad.Glyph(ns.Gamepad.FACE_TOP, 14)
-    sendButton:SetText(pad and ("Mailworthy " .. glyph) or "Mailworthy")
+    -- Stale auction prices (Stale.lua): a "!" on our own button; the window says why.
+    local ok, nudge = pcall(ns.Stale.Current)
+    local mark = (ok and nudge) and (nudge.level == "peer" and " |cffff8040!|r" or " |cffaaaaaa!|r") or ""
+    sendButton:SetText((pad and ("Mailworthy " .. glyph) or "Mailworthy") .. mark)
+    inboxButton:SetText("Mailworthy" .. mark)
     inboxHint:SetText(pad and ("R1 to Send Mail, then " .. glyph) or "")
 end
 
