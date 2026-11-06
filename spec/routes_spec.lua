@@ -228,6 +228,38 @@ describe("bindings", function()
             assert.truthy(report:find("1 stacks to friends", 1, true), report)
         end)
 
+        it("several recipients: one To line each with what and how many mails; the Mailing list grouped", function()
+            ns.Routes.Add(BOB, ENCHANTING)
+            WowStub.setBag(0, 3, WowStub.item(2592, "Wool Cloth", { count = 10, sell = 33, class = 7, subclass = 5 }))
+            prices[WowStub.link(2592, "Wool Cloth")] = 9000
+            ns.MailWindow.Show("send")
+            local result = ns.MailWindow.Result()
+            assert.same({ "", BOB }, result.totals.recipients)
+            assert.equal(1, result.totals.byRecipient[BOB].mails)
+            assert.same({ "Enchanting materials" }, { result.totals.byRecipient[BOB].what[1] })
+            assert.is_nil(result.mail[1].result.to, "the bank alt's items first ...")
+            assert.equal(BOB, result.mail[#result.mail].result.to, "... then Bob's")
+            local texts = ns.MailWindow.Texts()
+            assert.equal("|cffffd100To:|r Roknua Themicrulah", texts.to[1])
+            assert.equal("Bob Surname | Enchanting materials · 1 mail", texts.to[2])
+            assert.equal("Send to Roknua, Bob", _G.MailworthyMailSend.text)
+            local lines = ns.MailWindow.Recipients(result.totals, "Roknua Themicrulah", false)
+            assert.equal("your bank alt · 1 mail", lines[1].note)
+        end)
+
+        it("one recipient: the To line as before; a friend alone is named first", function()
+            local lines = ns.MailWindow.Recipients({ recipients = {} }, "Roknua Themicrulah", false)
+            assert.same({ { name = "Roknua Themicrulah", note = "your bank alt" } }, lines)
+            lines = ns.MailWindow.Recipients({ recipients = { BOB }, byRecipient = { [BOB] = { mails = 2,
+                what = { "Tailoring materials" }, crafter = true } } }, "Roknua Themicrulah", false)
+            assert.same({ { name = BOB, note = "Tailoring materials (their crafter)" } }, lines)
+            local many = { recipients = { "", "A", "B", "C" }, byRecipient = {} }
+            for _, k in ipairs(many.recipients) do many.byRecipient[k] = { mails = 1, what = {} } end
+            assert.equal(4, #ns.MailWindow.Recipients(many, "Roknua Themicrulah", false))
+            assert.truthy(ns.MailWindow.Layout({ to = 2, routes = 1, mail = 3, stay = 0 })
+                > ns.MailWindow.Layout({ routes = 1, mail = 3, stay = 0 }))
+        end)
+
         it("a locked material stays, and above the cap it goes to the bank alt", function()
             ns.Routes.Add(BOB, ENCHANTING)
             ns.Locks.ToggleItem(10940, "link", "spec")

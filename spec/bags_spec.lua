@@ -85,7 +85,8 @@ describe("bag scan", function()
         assert.equal("quest item", byName(result.unmailable, "Quest Thing").result.reason)
         assert.is_nil(byName(result.keep, "Hearthstone"), "never-mailable items aren't in the keep list")
         assert.equal("no price", byName(result.keep, "Rough Stone").result.reason)
-        assert.same({ items = 25, stacks = 2, mails = 1, gain = 966, postage = 60, routed = 0, recipients = { "" } },
+        assert.same({ items = 25, stacks = 2, mails = 1, gain = 966, postage = 60, routed = 0, recipients = { "" },
+            byRecipient = { [""] = { items = 25, stacks = 2, mails = 1, what = {} } } },
             result.totals)
     end)
 
