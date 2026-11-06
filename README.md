@@ -67,30 +67,36 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   hides it.
 - Profession tools (fishing poles, Mining Pick, Blacksmith Hammer, Skinning Knife, ...)
   always stay. Gold is never attached.
-- **Your professions' materials stay** (on by default, a setting turns it off): cloth for
-  a tailor; for a first-aider cloth plus what Forever's First Aid makes potions, Anti-Venoms
-  and Tourniquets from (Peacebloom, Briarthorn, Bruiseweed, Liferoot, Sungrass, Golden
-  Sansam, venom sacs, Thick and Rugged Leather; not other herbs or leather); leather for a leatherworker, metal and stone for a blacksmith
-  or engineer (plus parts, explosives and devices), herbs for an alchemist, dust, essences
-  and shards for an enchanter, meat and fish for a cook. Gathering professions keep
-  nothing: what they gather is what gets sold. Elemental materials are still mailed
-  (lock them to keep them).
+- **Your professions' materials stay** (on by default; the settings' "Keep my professions'
+  materials" turns it off, and then everything goes to the bank alt like any other item):
+  cloth for a tailor or first-aider, leather for a leatherworker, metal and stone for a
+  blacksmith or engineer (plus parts, explosives and devices), herbs for an alchemist, dust,
+  essences and shards for an enchanter, meat and fish for a cook. Each profession also keeps
+  the other materials it **levels** with: a blacksmith's gems and lower elementals, an
+  engineer's cloth, a cook's tea herbs, a first-aider's potion herbs, venom sacs and
+  Tourniquet leather (Forever's First Aid makes healing potions). Valuables a profession only
+  uses at skill 300 (Essence of Water, Righteous Orb, Star Ruby, Arcanite, ...) still go to
+  the auction house; lock them to keep them. Gathering professions keep nothing: what they
+  gather is what gets sold.
 - **Materials you've levelled past are mailed again.** First Aid keeps each cloth until the
-  next bandage is learnable (Linen Cloth until 80, Wool until 150, ...). Tailoring,
-  Leatherworking, Blacksmithing, Engineering and Enchanting keep a material until every
-  recipe that uses it has gone grey, from Forever's own recipe data (Forever's recipes
-  reuse older materials well past where Classic moved on: Copper Bar is kept by a
-  blacksmith until 185). Alchemy and Cooking keep everything; so does the last material of
-  each line (Runecloth, Rugged Leather, Thorium, ...). The full table with sources:
-  `Mailworthy/Tiers.lua`. The window says "your First Aid needs it (until skill 80)". The
-  same goes for **bindings**: once your friend's skill in the bound profession is past a
-  material, it goes to your bank alt instead (or to another binding that still needs it).
-  Their skill comes from their Mailworthy (sent with the addon messages above, again after
-  each skill-up that passes a material), the guild roster (Blacksmithing, Tailoring, ... but
-  not First Aid or Cooking), or your own character's last login. When nothing is known, the
-  binding takes everything, as before. The last material of each line (Runecloth, ...) and
-  anything still used in high-level recipes is never outgrown. `/mw feature tiers off`
-  keeps every material again.
+  next bandage is learnable (Linen Cloth until 80, Wool until 150, ...). Everything else is
+  kept until every recipe that uses it, directly or through a part the profession makes
+  (bolts, cured hides, grinding stones, blasting powders), has gone grey. That comes from all
+  of Forever's recipes, read one by one (Forever reuses older materials well past where
+  Classic moved on: a blacksmith keeps Iron Bar for good, for the Iron Buckle in a 310 belt).
+  Alchemy herbs that still make level-60 potions (Swiftthistle, Stranglekelp, Goldthorn,
+  Khadgar's Whisker, Arthas' Tears, Purple Lotus, Wintersbite, plus Oily Blackmouth) stay for
+  good, and so does anything used at 300. **Leather** past its own recipes stays while
+  converting it up (4 Light Leather make a Medium) is worth more at the auction house than
+  selling it, and goes when selling pays. The window says "your First Aid needs it (until
+  skill 80)" or "convert it: 4 make a Medium Leather (pays more)". The tables:
+  `Mailworthy/TierData.lua` (built from `tools/tiers/data.py`). The same goes for
+  **bindings**: once your friend's skill in the bound profession is past a material, it goes
+  to your bank alt instead (or to another binding that still needs it). Their skill comes
+  from their Mailworthy (sent with the addon messages above, again after each skill-up that
+  passes a material), the guild roster (Blacksmithing, Tailoring, ... but not First Aid or
+  Cooking), or your own character's last login. When nothing is known, the binding takes
+  everything, as before. `/mw feature tiers off` keeps every material again.
 - **Sell what I gather** (off by default, a setting turns it on): for a gatherer who also
   crafts with the same materials (a miner-blacksmith, an herbalist-alchemist, a
   skinner-leatherworker, a fisher-cook), what the gathering profession brings in is mailed

@@ -83,6 +83,8 @@ function Bags.Evaluate(settings)
     if settings.serverDay == nil then settings.serverDay = ns.Config.ServerDay() end
     if settings.professions == nil then settings.professions = ns.Characters.Professions() end
     if settings.tiers == nil then settings.tiers = ns.Tiers.On() end
+    -- Auction unit prices by item ID, for the leather conversions (Tiers.WorthConverting).
+    if settings.priceOf == nil and ns.Prices.Auctionator() then settings.priceOf = ns.Prices.MaterialPrice end
     local priced = ns.Prices.Auctionator() ~= nil
     local routes = settings.routes or ns.Routes.Active()
     local result = { settings = settings, priced = priced, routes = routes, mail = {}, keep = {}, unmailable = {},
@@ -214,6 +216,10 @@ local function workings(item, settings)
         parts[#parts + 1] = string.format("your %s (%s) is past it", r.outgrown.name, tostring(r.outgrown.skill))
     end
     if r.untilSkill then parts[#parts + 1] = "kept until skill " .. r.untilSkill end
+    if r.convert then
+        parts[#parts + 1] = string.format("past its recipes; %d make a %s, worth more than selling them",
+            r.convert.count, r.convert.name)
+    end
     return table.concat(parts, "; ")
 end
 
@@ -237,10 +243,8 @@ function Bags.OutgrownText(professions)
     for _, p in ipairs(type(professions) == "table" and professions or {}) do
         local id = tonumber(type(p) == "table" and p.skillLine)
         local known = ns.Valuation.PROFESSION_MATS[id or -1]
-        local past = known and ns.Tiers.OutgrownNames(id, p.rank) or {}
-        if #past > 0 then
-            parts[#parts + 1] = string.format("%s %d is past %s", known.name, p.rank, table.concat(past, ", "))
-        end
+        local past = known and ns.Tiers.PastText(id, p.rank) or ""
+        if past ~= "" then parts[#parts + 1] = string.format("%s %d is past %s", known.name, p.rank, past) end
     end
     return table.concat(parts, "; ")
 end

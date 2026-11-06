@@ -50,7 +50,7 @@ describe("material tiers", function()
             assert.is_false(ns.Tiers.Outgrown(FIRST_AID, LINEN, nil), "skill unknown: not past it")
             assert.is_false(ns.Tiers.Outgrown(FIRST_AID, 14047, 300), "Runecloth: the last tier, never done")
             assert.is_nil(ns.Tiers.Threshold(FIRST_AID, 10940), "not a First Aid material")
-            assert.same({ "Linen Cloth", "Peacebloom", "Briarthorn", "Wool Cloth", "Small Venom Sac" },
+            assert.same({ "Linen Cloth", "Peacebloom", "Briarthorn", "Small Venom Sac", "Wool Cloth" },
                 ns.Tiers.OutgrownNames(FIRST_AID, 150))
             assert.equal(0, ns.Tiers.Step(FIRST_AID, 1))
             assert.equal(1, ns.Tiers.Step(FIRST_AID, 80))
@@ -75,16 +75,64 @@ describe("material tiers", function()
                 "a First Aid binding takes Liferoot")
         end)
 
-        it("other professions: where the last recipe using it goes grey (Forever data); no tiers for Alchemy, Cooking", function()
-            assert.equal(125, ns.Tiers.Threshold(TAILORING, LINEN))
+        it("other professions: where the last recipe using it goes grey, through the parts it makes", function()
+            assert.equal(115, ns.Tiers.Threshold(TAILORING, LINEN))
             assert.equal(ns.Tiers.Threshold(TAILORING, LINEN), ns.Tiers.Threshold(TAILORING, 2996), "cloth and its bolt")
             assert.equal(185, ns.Tiers.Threshold(164, 2840), "Copper Bar: Sterling Silver Breastplate")
-            assert.equal(240, ns.Tiers.Threshold(202, 2841), "Engineering keeps Bronze longer")
+            assert.is_nil(ns.Tiers.Threshold(164, 3575), "Iron Bar: Iron Buckle into the Blessed Plate Belt (310)")
+            assert.equal(155, ns.Tiers.Threshold(164, 2835), "Rough Stone through Rough Grinding Stone")
+            assert.equal(270, ns.Tiers.Threshold(202, 2841), "Bronze: Bronze Tube, Accurate Scope, Goblin Bomb Dispenser")
             assert.equal(205, ns.Tiers.Threshold(333, 10940), "Strange Dust")
-            assert.is_nil(ns.Tiers.Threshold(164, 3860), "Mithril: used at 300")
+            assert.equal(25, ns.Tiers.Threshold(333, 247786), "Mote of Magic")
+            assert.equal(135, ns.Tiers.Threshold(165, 2318), "Light Leather: its own recipes")
             assert.is_nil(ns.Tiers.Threshold(165, 8170), "Rugged Leather: the last tier")
-            assert.is_nil(ns.Tiers.DONE[171], "Alchemy: herbs stay in use into Artisan")
-            assert.is_nil(ns.Tiers.DONE[185], "Cooking: no tiers")
+            assert.equal(120, ns.Tiers.Threshold(171, 765), "Silverleaf")
+            assert.is_nil(ns.Tiers.Threshold(171, 2452), "Swiftthistle still makes Swiftness Potions (operator: keep)")
+            assert.is_nil(ns.Tiers.Threshold(171, 3818), "Fadeleaf: Shadow Oil into Greater Shadow Protection")
+            assert.equal(165, ns.Tiers.Threshold(185, 6522), "Deviate Fish")
+            assert.is_nil(ns.Tiers.Threshold(185, 13759), "Nightfin Snapper: used at 300+")
+        end)
+
+        it("materials outside a profession's subclasses: levelling ones only, by exact item", function()
+            local V = ns.Valuation
+            local function needed(id, classID, subclassID, profession, rank)
+                return V.NeededBy({ itemID = id, classID = classID, subclassID = subclassID },
+                    { { skillLine = profession, rank = rank } })
+            end
+            assert.equal("Engineering", needed(LINEN, 7, 5, 202, 150), "an engineer levels with Linen to 210")
+            assert.is_nil(needed(LINEN, 7, 5, 202, 210))
+            assert.equal("Blacksmithing", needed(774, 7, 11, 164, 100), "Malachite to 120")
+            assert.is_nil(needed(7080, 7, 10, 164, 100), "Essence of Water (used at 300) isn't kept: AH")
+            assert.is_nil(needed(12811, 7, 11, 197, 100), "nor Righteous Orb")
+            assert.equal("Cooking", needed(5051, 12, 0, 185, 100), "Dig Rat, a quest-class cooking meat")
+            assert.equal("Cooking", needed(13755, 0, 5, 185, 300), "Raw Winter Squid: kept for good")
+            assert.equal("Alchemy", needed(6358, 7, 8, 171, 300), "Oily Blackmouth: kept for good (operator)")
+            assert.equal("Cooking", needed(3818, 7, 9, 185, 200), "Fadeleaf: Triage Tea to 235")
+        end)
+
+        it("leather past its recipes: kept while converting pays, sold when selling pays", function()
+            local V = ns.Valuation
+            local light = { itemID = 2318, classID = 7, subclassID = 6, quality = 1, vendor = 15, count = 20 }
+            local s = V.Settings({})
+            s.professions = { { skillLine = 165, rank = 140 } }
+            local ah = {}
+            s.priceOf = function(id) return ah[id] end
+            local r = V.Evaluate(light, nil, s)
+            assert.equal("keep", r.action, "no prices: can't tell, keep it to convert")
+            assert.same({ into = 2319, count = 4, name = "Medium Leather" }, r.convert)
+            assert.equal("convert it: 4 make a Medium Leather (pays more)", ns.MailWindow.StayReason(r))
+            ah[2318], ah[2319] = 20, 200
+            assert.equal("keep", V.Evaluate(light, nil, s).action, "4 x 20c < 200c: convert")
+            ah[2318] = 50
+            r = V.Evaluate(light, nil, s)
+            assert.equal("mail", r.action, "4 x 50c >= 200c: sell")
+            assert.same({ name = "Leatherworking", skill = 140 }, r.outgrown)
+            s.professions[1].rank = 120
+            assert.equal(135, V.Evaluate(light, nil, s).untilSkill, "still levelling with it")
+            assert.is_true(ns.Routes.Matches({ profession = 165, skill = 140 }, light, true,
+                function(id) return ({ [2318] = 20, [2319] = 200 })[id] end), "a friend converts it too")
+            assert.is_false((ns.Routes.Matches({ profession = 165, skill = 140 }, light, true,
+                function(id) return ({ [2318] = 50, [2319] = 200 })[id] end)))
         end)
 
         it("every row is a known crafting profession, in rising order, with a name", function()
