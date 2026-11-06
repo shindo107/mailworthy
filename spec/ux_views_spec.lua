@@ -111,6 +111,60 @@ describe("window views", function()
         assertNoBlankButtons()
     end)
 
+    describe("popups beside the window that opened them", function()
+        local function geometry(f, left, right, scale)
+            f.GetLeft = function() return left end
+            f.GetRight = function() return right end
+            f.GetEffectiveScale = function() return scale or 1 end
+        end
+        local function anchor(f)
+            local points = {}
+            f.SetPoint = function(_, point, rel, relPoint) points[#points + 1] = { point, rel, relPoint } end
+            return points
+        end
+
+        it("picks a side that fits on screen, else none", function()
+            local side = ns.Widgets.Side
+            assert.equal("right", side(408, 928, 420, 1365, 8))
+            assert.equal("left", side(800, 1300, 420, 1365, 8))
+            assert.is_nil(side(300, 1100, 560, 1365, 8), "neither side: laid over the opener")
+            assert.is_nil(side(nil, 928, 420, 1365, 8))
+        end)
+
+        it("settings from the mailbox window: beside it; from /mw: centred; opaque windows", function()
+            ns.Config.SetBankAlt("Roknua Themicrulah")
+            MailFrame:Show()
+            SendMailFrame:Show()
+            WowStub.setBag(0, 1, WowStub.item(2770, "Copper Ore", { count = 20, sell = 5 }))
+            ns.MailWindow.Show("send")
+            local window, settings = ns.MailWindow.Frame(), ns.SettingsUI.Frame()
+            geometry(window, 408, 928)
+            geometry(settings, 0, 0)
+            settings.GetWidth = function() return 420 end
+            geometry(UIParent, 0, 1365)
+            local points = anchor(settings)
+            _G.MailworthyMailSettings:Click()
+            assert.same({ "TOPLEFT", window, "TOPRIGHT" }, points[#points])
+
+            settings:Hide()
+            geometry(window, 300, 1100) -- no room either side: squarely over it
+            _G.MailworthyMailSettings:Click()
+            assert.same({ "TOPLEFT", window, "TOPLEFT" }, points[#points])
+
+            settings:Hide()
+            ns.HandleSlash("")
+            assert.same({ "CENTER" }, { points[#points][1] })
+
+            local friends = ns.RoutesUI.Frame()
+            geometry(settings, 936, 1356)
+            geometry(friends, 0, 0)
+            friends.GetWidth = function() return 560 end
+            local fpoints = anchor(friends)
+            _G.MailworthySettingsFriends:Click()
+            assert.same({ "TOPRIGHT", settings, "TOPLEFT" }, fpoints[#fpoints], "no room on the right: left of settings")
+        end)
+    end)
+
     it("mailbox window: the bindings block shows only with bindings, and the window fits its rows", function()
         ns.Config.SetBankAlt("Roknua Themicrulah")
         MailFrame:Show()

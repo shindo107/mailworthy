@@ -24,13 +24,55 @@ function Widgets.Window(name, width, height, parent)
     f:EnableMouse(true)
     if f.SetBackdrop then
         f:SetBackdrop(Widgets.BACKDROP)
-        f:SetBackdropColor(0.05, 0.05, 0.07, 0.95)
+        f:SetBackdropColor(0.05, 0.05, 0.07, 1) -- opaque: a window on top never shows the text below
     end
+    f:SetClampedToScreen(true)
     f.CloseButton = CreateFrame("Button", name .. "CloseButton", f, "UIPanelCloseButton")
     f.CloseButton:SetPoint("TOPRIGHT", -6, -6)
     if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, name) end
     f:Hide()
     return f
+end
+
+--- Pure: which side of an opener a window of `width` fits on, all in one unit:
+--- "right", "left" (both with `gap`), or nil when neither (the caller lays it over the opener).
+function Widgets.Side(openerLeft, openerRight, width, screenWidth, gap)
+    gap = gap or 8
+    if not (openerLeft and openerRight and width and screenWidth) then return nil end
+    if openerRight + gap + width <= screenWidth then return "right" end
+    if openerLeft - gap - width >= 0 then return "left" end
+    return nil
+end
+
+--- Place a window that another Mailworthy window opened (operator, 2026-11-06: popups
+--- "overlap the existing menus and you cant read the new popup easily"): beside the opener
+--- when it fits on screen, else squarely over it (opaque, so the opener's text never shows
+--- through); centred without an opener (/mw, the minimap button). Clamped to the screen.
+function Widgets.PlaceBeside(f, opener)
+    f:ClearAllPoints()
+    local side
+    if opener and opener ~= f and opener:IsVisible() then
+        local left, right = opener:GetLeft(), opener:GetRight()
+        local fScale, oScale = f:GetEffectiveScale(), opener:GetEffectiveScale()
+        local screen = UIParent:GetRight()
+        local uiScale = UIParent:GetEffectiveScale()
+        if left and right and screen and fScale and oScale and uiScale and fScale > 0 then
+            local k = oScale / fScale
+            side = Widgets.Side(left * k, right * k, f:GetWidth(), screen * uiScale / fScale, 8) or "over"
+        else
+            side = "over"
+        end
+    end
+    if side == "right" then
+        f:SetPoint("TOPLEFT", opener, "TOPRIGHT", 8, 0)
+    elseif side == "left" then
+        f:SetPoint("TOPRIGHT", opener, "TOPLEFT", -8, 0)
+    elseif side == "over" then
+        f:SetPoint("TOPLEFT", opener, "TOPLEFT", 0, 0)
+    else
+        f:SetPoint("CENTER")
+    end
+    return side or "center"
 end
 
 function Widgets.Button(parent, text, width, onClick, name)

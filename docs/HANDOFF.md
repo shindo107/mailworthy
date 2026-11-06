@@ -235,6 +235,17 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   goods the character's crafting professions use, as the keep reason "your Tailoring needs
   it", before any pricing. Mapping by `GetProfessionInfo` skill line ID and item subclass
   (`Valuation.PROFESSION_MATS`); gathering professions need nothing; elementals stay mailable.
+- Enchanting bindings take green and blue gear (operator, 2026-11-06: "the enchanter binding
+  for friend sending should also include green or blue items that can be used for
+  disenchanting"): `Routes.Matches` also takes uncommon / rare weapons and armor
+  (`Valuation.CanDisenchant`, `Routes.GEAR_QUALITIES`; epics stay on the normal rule) for a
+  binding on Enchanting 333. Soulbound gear is a hard keep; the binding's per-unit cap compares
+  the piece's AH price, so a green the AH pays well for still goes to the bank alt.
+- Popups beside their opener (operator, same day: the new popups "overlap the existing menus
+  and you cant read the new popup easily without closing the old one"): `Widgets.PlaceBeside`
+  puts settings / friends / the bank alt summary to the right of the Mailworthy window that
+  opened them, else to its left, else squarely over it; centred from `/mw` and the minimap
+  button. Every window is opaque now (backdrop alpha 1) and clamped to the screen.
 - Sell what I gather (operator, 2026-11-06: "some players use gathering professions simply to
   gather materials to send to the ah ... a toggle in the ui, off by default"): setting
   `sellGathered` (off), the settings button "Sell what I gather" under What gets mailed.
