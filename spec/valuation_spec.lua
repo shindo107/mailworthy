@@ -473,12 +473,42 @@ describe("valuation", function()
             assert.equal("locked", V.Evaluate({ locked = true, classID = 7, subclassID = 5 }, rich, S).reason,
                 "a lock is still the first reason")
         end)
+
+        it("knows the gathering professions and what they bring in", function()
+            local list = V.GatheringProfessions({ 186, { skillLine = 182 }, 197, 393, 356, "junk" })
+            assert.equal(4, #list)
+            assert.same({ "Mining", "Herbalism", "Skinning", "Fishing" },
+                { list[1].name, list[2].name, list[3].name, list[4].name })
+            assert.equal("Mining", V.GatheredBy({ classID = 7, subclassID = 7 }, { 164, 186 }))
+            assert.equal("Herbalism", V.GatheredBy({ classID = 7, subclassID = 9 }, { 182 }))
+            assert.equal("Skinning", V.GatheredBy({ classID = 7, subclassID = 6 }, { 393 }))
+            assert.equal("Fishing", V.GatheredBy({ classID = 7, subclassID = 8 }, { 356 }))
+            assert.is_nil(V.GatheredBy(cloth, { 186, 182, 393, 356 }), "nobody gathers cloth")
+            assert.is_nil(V.GatheredBy({ classID = 4, subclassID = 7 }, { 186 }), "trade goods only")
+        end)
+
+        it("'Sell what I gather' (off by default): a gatherer-crafter mails what they gather", function()
+            local ore = { classID = 7, subclassID = 7, quality = 1, vendor = 5, count = 20 }
+            local herb = { classID = 7, subclassID = 9, quality = 1, vendor = 5, count = 20 }
+            local rich = { ah = 1000, exact = true, age = 0 }
+            S.professions = { 164, 186 } -- Blacksmithing and Mining
+            assert.is_false(S.sellGathered)
+            assert.equal("your Blacksmithing needs it", V.Evaluate(ore, rich, S).reason, "off: kept for the craft")
+            S.sellGathered = true
+            assert.equal("mail", V.Evaluate(ore, rich, S).action, "on: the ore goes to the bank alt to be sold")
+            S.professions = { 164, 171, 186 } -- Blacksmithing, Alchemy, Mining: herbs aren't gathered here
+            assert.equal("your Alchemy needs it", V.Evaluate(herb, rich, S).reason)
+            S.professions = { 197 }
+            assert.equal("your Tailoring needs it", V.Evaluate(cloth, rich, S).reason, "no gathering profession: no change")
+            assert.equal("locked", V.Evaluate({ locked = true, classID = 7, subclassID = 7 }, rich, S).reason)
+            S.sellGathered = false
+        end)
     end)
 
     describe("settings", function()
         it("defaults: 24h, 5% cut, 30c postage, 5s and 25%, 7 days", function()
             assert.same({ duration = 3, relistFactor = 0.5, cut = 0.05, postage = 30, minGain = 500, minGainPct = 0.25,
-                maxAgeDays = 7, disenchant = false, keepProfessionMats = true }, S)
+                maxAgeDays = 7, disenchant = false, keepProfessionMats = true, sellGathered = false }, S)
         end)
 
         it("disenchant follows Disenchantry until the player sets it", function()

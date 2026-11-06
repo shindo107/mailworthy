@@ -40,6 +40,7 @@ Valuation.DEFAULTS = {
     maxAgeDays = 7,       -- older Auctionator prices don't count
     disenchant = false,   -- Valuation.Settings switches it on when a disenchant addon is installed
     keepProfessionMats = true, -- materials this character's crafting professions use stay (operator, 2026-10-22)
+    sellGathered = false,      -- ... except what its gathering professions gather (operator, 2026-11-06: off by default)
 }
 
 -- What each crafting profession needs from the trade goods (class 7) in the bags, by
@@ -60,6 +61,39 @@ Valuation.PROFESSION_MATS = {
     [333] = { name = "Enchanting", subclasses = { [12] = true }, mats = "dust, essences and shards" },
     [185] = { name = "Cooking", subclasses = { [8] = true }, mats = "meat and fish" },
 }
+
+-- What each gathering profession brings in, by skill line ID and trade-goods subclass. Used
+-- only by the "Sell what I gather" setting (sellGathered, off by default): a miner who is
+-- also a blacksmith, an herbalist who is also an alchemist, ... mails what they gather to
+-- be sold instead of keeping it for the crafting profession (operator, 2026-11-06: "some
+-- players use gathering professions simply to gather materials to send to the ah").
+-- Mining covers all of metal & stone (ore, stone, and the bars its own smelting makes).
+Valuation.GATHERED_MATS = {
+    [186] = { name = "Mining", subclasses = { [7] = true }, mats = "metal and stone" },
+    [182] = { name = "Herbalism", subclasses = { [9] = true }, mats = "herbs" },
+    [393] = { name = "Skinning", subclasses = { [6] = true }, mats = "leather and hides" },
+    [356] = { name = "Fishing", subclasses = { [8] = true }, mats = "fish" },
+}
+
+--- Pure: the gathering professions among `professions` (ids or { skillLine = } entries).
+function Valuation.GatheringProfessions(professions)
+    local list = {}
+    for _, p in ipairs(type(professions) == "table" and professions or {}) do
+        local id = type(p) == "table" and p.skillLine or p
+        local known = Valuation.GATHERED_MATS[tonumber(id) or -1]
+        if known then list[#list + 1] = known end
+    end
+    return list
+end
+
+--- Pure: the name of this character's gathering profession that brings in the item, or nil.
+function Valuation.GatheredBy(item, professions)
+    if item.classID ~= Valuation.TRADE_GOODS then return nil end
+    for _, p in ipairs(Valuation.GatheringProfessions(professions)) do
+        if p.subclasses[item.subclassID] then return p.name end
+    end
+    return nil
+end
 
 --- Pure: the crafting professions among `professions` (a list of skill line IDs, or of
 --- { skillLine = ... } entries) that Mailworthy keeps materials for: { { name, mats }, ... }.
@@ -297,7 +331,10 @@ function Valuation.Evaluate(item, price, settings)
     if Valuation.IsTool(item) then return keep("profession tool") end
     if settings.keepProfessionMats then
         local profession = Valuation.NeededBy(item, settings.professions)
-        if profession then return keep("your " .. profession .. " needs it") end
+        -- "Sell what I gather": what a gathering profession brought in is valued like anything else.
+        if profession and not (settings.sellGathered and Valuation.GatheredBy(item, settings.professions)) then
+            return keep("your " .. profession .. " needs it")
+        end
     end
     if item.vendor == nil then return keep("item info not loaded yet") end
 

@@ -230,6 +230,13 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   goods the character's crafting professions use, as the keep reason "your Tailoring needs
   it", before any pricing. Mapping by `GetProfessionInfo` skill line ID and item subclass
   (`Valuation.PROFESSION_MATS`); gathering professions need nothing; elementals stay mailable.
+- Sell what I gather (operator, 2026-11-06: "some players use gathering professions simply to
+  gather materials to send to the ah ... a toggle in the ui, off by default"): setting
+  `sellGathered` (off), the settings button "Sell what I gather" under What gets mailed.
+  Only changes the gather-and-craft overlap (a pure gatherer already mailed everything): what
+  `Valuation.GATHERED_MATS` (Mining 186 = metal & stone, Herbalism 182 = herbs, Skinning 393 =
+  leather, Fishing 356 = meat and fish subclass) brings in skips the "your X needs it" keep and
+  is valued like anything else. Mining covers bars too (one subclass; smelting is Mining's).
 - Optional deps: `.pkgmeta` `optional-dependencies` auctionator, siz-disenchantvalue and (since
   2026-10-26, the project being back) disenchantry: a slug that disappears fails the CurseForge
   upload with error 1018 (v0.8.0 and v0.9.0 did on disenchantry in October 2026), so if a tag's
@@ -290,12 +297,12 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   profession's materials to a friend with delivery by profession; Disenchantry as a
   disenchant source through the ported era tables; `disenchantry` relation restored,
   2026-10-26), **v0.14.0** (UX pass: one task per window, windows fit their content; Send
-  on the Inbox says to open the Send Mail tab and the window follows; PR #33, 2026-11-06).
-  **CurseForge has v0.14.0 as its latest file** (release run 42235669126: "Uploading
-  Mailworthy-v0.14.0-forever.zip (1.60.1 release) ... Success!"); its project description
+  on the Inbox says to open the Send Mail tab and the window follows; PR #33, 2026-11-06),
+  **v0.15.0** (the stale-prices nudge: `Stale.lua`, the "!" on the Mailworthy button past 3
+  days, peers' scan days over the addon messages; PR #34, 2026-11-06). **CurseForge has
+  v0.15.0 as its latest file** (release run 42242514018: "Uploading
+  Mailworthy-v0.15.0-forever.zip (1.60.1 release) ... Success!"); its project description
   is `media/curseforge-description.html` as of PR #30 (pasted by the operator).
-- On `main`, not tagged yet: the stale-prices nudge (PR #34, 2026-11-06: `Stale.lua`, the
-  "!" on the Mailworthy button past 3 days, peers' scan days over the addon messages).
 - Confirmed in game: the `/mw scan` math (v0.2.0, by hand), settings with mouse and
   controller and after `/reload`, one-press sending with no money / COD, the window
   lists, row locks, minimap button (v0.4.0; operator 2026-10-14).
