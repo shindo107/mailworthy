@@ -19,6 +19,7 @@ local UI = {}
 ns.MailWindow = UI
 
 UI.MAIL_ROWS, UI.STAY_ROWS, UI.ROUTE_ROWS = 8, 5, 3
+UI.TO_LINES = 2 -- recipient lines under "To:" (the last says "+N more" when there are more)
 local WIDTH, MAIL_ROW, STAY_ROW, ROUTE_ROW = 520, 30, 20, 24
 
 local W = ns.Widgets
@@ -26,8 +27,7 @@ local money = function(c) return ns.Valuation.Money(c) end
 
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
 local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine
-local mailRows, stayRows, routeRows = {}, {}, {}
-local tabButton
+local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
 local pages = { mail = 1, stay = 1 }
@@ -42,6 +42,14 @@ UI.CHIPS = {
 
 function UI.Frame() return frame end
 function UI.Result() return result end
+--- The texts at the top ("To:" and the recipient lines) and the fees / status line, for specs and the report.
+function UI.Texts()
+    local to = { toName and toName:GetText() }
+    for _, line in ipairs(toLines) do
+        if line.name:IsShown() then to[#to + 1] = line.name:GetText() .. " | " .. line.note:GetText() end
+    end
+    return { to = to, note = totalNote and totalNote:GetText() }
+end
 
 --- Pure: "|cffRRGGBB" + name from an item link (no brackets), or the link as is.
 function UI.ItemText(link, count, stacks)
@@ -81,6 +89,35 @@ function UI.SendText(recipients, bankAlt, isBankAlt)
     if #names == 0 then return (bankAlt and not isBankAlt) and ("Send to " .. firstName(bankAlt)) or "Send" end
     if #names > 2 then return string.format("Send to %s +%d", names[1], #names - 1) end
     return "Send to " .. table.concat(names, ", ")
+end
+
+local function mailsText(n) return string.format("%d mail%s", n, n == 1 and "" or "s") end
+
+--- Pure: who this scan mails to, one line each, the bank alt first: { { name, note }, ... }.
+--- `totals` from Bags.Evaluate (recipients, byRecipient). With nothing to mail: the bank alt
+--- alone, as before. With more than one recipient each note says what they get and how many
+--- mails (operator, 2026-11-06: "when sending to multiple people ... the receiver is made clear").
+function UI.Recipients(totals, bankAlt, isBankAlt)
+    local recipients = totals and totals.recipients or {}
+    local several = #recipients > 1
+    local lines = {}
+    local function bankLine(each)
+        local note = isBankAlt and "this is your bank alt" or (bankAlt and "your bank alt" or "")
+        if several and each and bankAlt then note = note .. " · " .. mailsText(each.mails) end
+        lines[#lines + 1] = { name = bankAlt or "|cffff8040no bank alt set: press Settings|r", note = note }
+    end
+    if #recipients == 0 then bankLine() end
+    for _, to in ipairs(recipients) do
+        local each = totals.byRecipient and totals.byRecipient[to] or { mails = 0, what = {} }
+        if to == "" then
+            bankLine(each)
+        else
+            local what = #each.what > 0 and table.concat(each.what, ", ") or "a binding"
+            lines[#lines + 1] = { name = to, note = what .. (each.crafter and " (their crafter)" or "")
+                .. (several and (" · " .. mailsText(each.mails)) or "") }
+        end
+    end
+    return lines
 end
 
 local function toggleLock(row)
@@ -255,6 +292,13 @@ function UI.Create()
     toName:SetPoint("TOPLEFT", 24, -48)
     toNote = W.Label(frame, "GameFontDisableSmall")
     toNote:SetPoint("TOPRIGHT", -26, -52)
+    for i = 1, UI.TO_LINES do
+        local name = W.Label(frame, "GameFontHighlight")
+        local note = W.Label(frame, "GameFontDisableSmall")
+        name:Hide()
+        note:Hide()
+        toLines[i] = { name = name, note = note }
+    end
     staleLine = W.Label(frame, "GameFontHighlightSmall")
     staleLine:SetWidth(WIDTH - 48)
     staleLine:SetJustifyH("LEFT")
@@ -289,9 +333,7 @@ function UI.Create()
 
     frame:SetScript("OnHide", function(self)
         if type(send) == "table" and self:GetParent() ~= send then self:SetParent(send) end
-        UI.PlaceTabButton()
     end)
-    UI.CreateTabButton()
     ns.Nav.Attach(frame)
     ns.Log.Add("ui", "mail window created%s", type(send) == "table" and " under SendMailFrame" or "")
     return frame
@@ -340,9 +382,18 @@ local function pageLabel(button, list, rows)
 end
 
 --- Place everything top to bottom for the rows that show; returns the window height.
---- `n` = { routes = , mail = , stay = } shown row counts; `n.stale` = the stale-prices line shows.
+--- `n` = { routes = , mail = , stay = } shown row counts; `n.stale` = the stale-prices line shows;
+--- `n.to` = recipient lines under "To:" (more than one recipient).
 function UI.Layout(n)
     local y = -76
+    for i, line in ipairs(toLines) do
+        if i <= (n.to or 0) then
+            at(line.name, 50, y + 4)
+            at(line.note, -26, y + 2, "TOPRIGHT")
+            y = y - 20
+        end
+    end
+    if (n.to or 0) > 0 then y = y - 6 end
     if n.stale then
         at(staleLine, 24, y)
         y = y - 32
@@ -407,10 +458,30 @@ function UI.Refresh(keepScan)
     title:SetText("Mailworthy  " .. (pad and ns.Gamepad.Glyph(ns.Gamepad.FACE_TOP) or ""))
     local bankAlt = ns.Config.BankAlt()
     local isBankAlt = ns.Config.IsBankAltHere()
-    toName:SetText("|cffffd100To:|r " .. (bankAlt or "|cffff8040no bank alt set: press Settings|r"))
-    toNote:SetText(isBankAlt and "this is your bank alt" or (bankAlt and "your bank alt" or ""))
-
     local t = result.totals
+    local recipients = UI.Recipients(t, bankAlt, isBankAlt)
+    toName:SetText("|cffffd100To:|r " .. recipients[1].name)
+    toNote:SetText(recipients[1].note)
+    local more = 0
+    for i, line in ipairs(toLines) do
+        local r = recipients[i + 1]
+        if r and i == UI.TO_LINES and #recipients > UI.TO_LINES + 1 then
+            line.name:SetText(string.format("|cffaaaaaa+ %d more (see Mailing)|r", #recipients - UI.TO_LINES))
+            line.note:SetText("")
+        elseif r then
+            line.name:SetText(r.name)
+            line.note:SetText(r.note)
+        end
+        if r then
+            line.name:Show()
+            line.note:Show()
+            more = more + 1
+        else
+            line.name:Hide()
+            line.note:Hide()
+        end
+    end
+
     for list, n in pairs({ mail = UI.MAIL_ROWS, stay = UI.STAY_ROWS }) do
         local items = result[list == "mail" and "mail" or "keep"]
         if pages[list] > math.max(1, math.ceil(#items / n)) then pages[list] = 1 end
@@ -423,6 +494,7 @@ function UI.Refresh(keepScan)
     staleLine:SetText(staleText or "")
     if staleText then staleLine:Show() else staleLine:Hide() end
     local shown = {
+        to = more,
         stale = staleText ~= nil,
         routes = fillRoutes(),
         mail = fillList(mailRows, result.mail, pages.mail, UI.MAIL_ROWS, fillMailRow),
@@ -449,19 +521,21 @@ function UI.Refresh(keepScan)
     -- While sending (and after), the mailer's progress or problem takes the fees line.
     local status = ns.Mailer.Status()
     if status then totalNote:SetText(status) end
-    local sendText = ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt)
+    sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt))
     if UI.OnInbox() and not ns.Mailer.Busy() then
         -- Mail goes out from the Send Mail tab only, and we never switch tabs ourselves
-        -- (MailFrameTab_OnClick taints the controller UI): say so on the button itself,
-        -- and follow the player to that tab (the watcher below).
-        sendText = "Open the Send Mail tab"
-        totalNote:SetText("|cffffd100Mail goes out from the Send Mail tab: press the button below (or the tab under the "
-            .. "mail window), and this list follows you there.|r")
+        -- (MailFrameTab_OnClick taints the controller UI). No Send button here at all
+        -- (operator, 2026-11-06: v0.16.1's secure "Open the Send Mail tab" button didn't show
+        -- in game; "if it ... actually switches to the send mail tab that's good but otherwise
+        -- just don't show it"): the note says where to go, and the list follows (the watcher).
+        sendButton:Hide()
+        totalNote:SetText("|cffffd100Mail goes out from the Send Mail tab: open it (the tab under the mail window) "
+            .. "and this list follows you there.|r")
+    else
+        sendButton:Show()
     end
-    sendButton:SetText(sendText)
     legend:SetText(pad and W.Legend() or "")
     frame:SetHeight(UI.Layout(shown))
-    UI.PlaceTabButton()
     ns.Nav.Revalidate()
 end
 
@@ -489,64 +563,7 @@ function UI.Show(tab)
     pages.mail, pages.stay = 1, 1
     UI.Refresh()
     frame:Show()
-    UI.PlaceTabButton() -- needs the window visible
     ns.Log.Add("ui", "mail window shown (%s tab): %d to mail, %d staying", tostring(tab), #result.mail, #result.keep)
-end
-
--- The Inbox's "Open the Send Mail tab" button (operator, 2026-11-06: "open send mail tab
--- button doesnt work": v0.14.0's Send button only said what to do). Mailworthy never
--- switches tabs from its own code (MailFrameTab_OnClick writes MailFrame.activeSubFrame,
--- which the controller focus code reads: taint). This button is a SecureActionButtonTemplate
--- with type "click" and clickbutton = MailFrameTab2: the player's own mouse click makes
--- Blizzard's secure code (SecureTemplates.lua SECURE_ACTIONS.click) press the Send Mail tab,
--- the same path as a /click macro, so no Mailworthy code runs on the way. Created at login
--- on UIParent; shown over the Send button only on the Inbox, with the mouse UI, out of
--- combat (hidden and unanchored at PLAYER_REGEN_DISABLED, before lockdown); never driven
--- by Nav (whose Cross press is addon code). Switch: /mw feature tabButton off (the Send
--- button then only says what to do, as in v0.14.0).
-function UI.CreateTabButton()
-    if tabButton or not ns.Features.On("tabButton") then return tabButton end
-    local ok, b = pcall(CreateFrame, "Button", "MailworthyOpenSendTab", UIParent,
-        "UIPanelButtonTemplate,SecureActionButtonTemplate")
-    if not ok or not b then
-        ns.Log.Add("ui", "send-tab button not created: %s", tostring(b))
-        return nil
-    end
-    b:SetSize(190, 22)
-    b:SetText("Open the Send Mail tab")
-    b:RegisterForClicks("AnyUp", "AnyDown") -- the action fires on down or up, per ActionButtonUseKeyDown
-    b:SetAttribute("type", "click")
-    b:Hide()
-    tabButton = b
-    return b
-end
-
-function UI.TabButton() return tabButton end
-
-local function tabButtonWanted()
-    local tab = rawget(_G, "MailFrameTab2")
-    return tabButton ~= nil and frame ~= nil and frame:IsVisible() and UI.OnInbox() and type(tab) == "table"
-        and not ns.MailButton.GamepadUI() and not ns.Mailer.Busy() and not InCombatLockdown()
-end
-
---- Show the secure button over Send while on the Inbox; otherwise hide and unanchor it.
---- Out of combat only (a protected frame can't be shown, hidden or moved in combat).
-function UI.PlaceTabButton(entering)
-    if not tabButton or (InCombatLockdown() and not entering) then return end
-    if not entering and tabButtonWanted() then
-        tabButton:SetAttribute("clickbutton", rawget(_G, "MailFrameTab2"))
-        tabButton:SetFrameStrata(frame:GetFrameStrata())
-        tabButton:SetFrameLevel(frame:GetFrameLevel() + 10)
-        tabButton:ClearAllPoints()
-        tabButton:SetAllPoints(sendButton)
-        if not tabButton:IsShown() then ns.Log.Add("ui", "send-tab button shown on the Inbox") end
-        tabButton:Show()
-        sendButton:Hide()
-    else
-        tabButton:Hide()
-        tabButton:ClearAllPoints()
-        if sendButton then sendButton:Show() end
-    end
 end
 
 --- True while the window sits on the Inbox tab (mouse/keyboard), where nothing can be sent.
@@ -606,9 +623,6 @@ ns.On("PLAYER_LOGIN", function()
     local friends = ns.RoutesUI.Frame()
     if friends then friends:HookScript("OnHide", refreshIfShown) end
 end)
--- PLAYER_REGEN_DISABLED runs before combat lockdown: the last moment to hide the secure button.
-ns.On("PLAYER_REGEN_DISABLED", function() UI.PlaceTabButton(true) end)
-ns.On("PLAYER_REGEN_ENABLED", function() if frame and frame:IsShown() then UI.PlaceTabButton() end end)
 ns.On("BAG_UPDATE_DELAYED", function()
     if not ns.Mailer.Busy() then refreshIfShown() end
 end)

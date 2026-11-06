@@ -28,7 +28,6 @@ end
 ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
-    tabButton = true,
 } }
 
 function ns.Features.Describe()
@@ -104,7 +103,7 @@ local HELP = {
     "/mw scan - what Mailworthy would mail and why (sends nothing)",
     "/mw summary - on your bank alt: what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
-        .. "|tooltipLines|comms|staleNudge|tabButton> on|off"
+        .. "|tooltipLines|comms|staleNudge> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",
     "/mw help - this list",

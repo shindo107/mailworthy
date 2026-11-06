@@ -85,8 +85,12 @@ Notes:
    - totals: "14 items in 2 mails, about 3g 20s more than vendoring, postage 4s 20c";
    - buttons: **Send**, **Settings** (opens the settings panel on top of the
      preview; the preview recalculates when it closes); the X, Escape and Circle
-     close it. On the Inbox tab Send reads "Open the Send Mail tab" and the window
-     follows the player there (UX pass, 2026-11-06).
+     close it. On the Inbox tab there is no Send button (a note says to open the
+     Send Mail tab) and the window follows the player there (UX pass, 2026-11-06;
+     v0.16.1's secure tab button didn't show in game and is gone, 2026-11-06).
+     With more than one recipient (bindings), "To:" gets one line per recipient
+     (what they get, how many mails; at most three, then "+N more") and the
+     Mailing list is grouped by recipient, the bank alt's first.
 4. **Send.** Mail 1 of N goes to the bank alt (12 items per mail), and each
    next mail follows on `MAIL_SEND_SUCCESS` without another press.
 5. **Vendor the rest.** Whatever stays in your bags is worth more at the vendor

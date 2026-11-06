@@ -85,7 +85,7 @@ function Bags.Evaluate(settings)
     local priced = ns.Prices.Auctionator() ~= nil
     local routes = settings.routes or ns.Routes.Active()
     local result = { settings = settings, priced = priced, routes = routes, mail = {}, keep = {}, unmailable = {},
-        totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, recipients = {} } }
+        totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, recipients = {}, byRecipient = {} } }
     local stacksTo = {}
     for _, item in ipairs(Bags.Group(Bags.Slots())) do
         item.locked = ns.Locks.IsItemLocked(item.itemID)
@@ -105,15 +105,26 @@ function Bags.Evaluate(settings)
             if not stacksTo[to] then
                 stacksTo[to] = 0
                 t.recipients[#t.recipients + 1] = to
+                t.byRecipient[to] = { items = 0, stacks = 0, mails = 0, what = {}, crafter = item.result.crafter }
             end
             stacksTo[to] = stacksTo[to] + item.stacks
+            local each = t.byRecipient[to]
+            each.items, each.stacks = each.items + item.count, each.stacks + item.stacks
+            if item.result.what and not each.what[item.result.what] then
+                each.what[item.result.what] = true
+                each.what[#each.what + 1] = item.result.what
+            end
         elseif ns.Valuation.Unmailable(item.result) then
             table.insert(result.unmailable, item)
         else
             table.insert(result.keep, item)
         end
     end
-    for _, n in pairs(stacksTo) do result.totals.mails = result.totals.mails + math.ceil(n / Bags.ATTACHMENTS) end
+    for to, n in pairs(stacksTo) do
+        local mails = math.ceil(n / Bags.ATTACHMENTS)
+        result.totals.mails = result.totals.mails + mails
+        result.totals.byRecipient[to].mails = mails
+    end
     for i, to in ipairs(result.totals.recipients) do -- the bank alt first
         if to == "" and i > 1 then
             table.remove(result.totals.recipients, i)
@@ -125,7 +136,14 @@ function Bags.Evaluate(settings)
         if ga ~= gb then return ga > gb end
         return a.link < b.link
     end
-    table.sort(result.mail, byGain)
+    -- The Mailing list in recipient groups (the bank alt's first), so who gets what is plain.
+    local order = {}
+    for i, to in ipairs(result.totals.recipients) do order[to] = i end
+    table.sort(result.mail, function(a, b)
+        local oa, ob = order[a.result.to or ""] or 0, order[b.result.to or ""] or 0
+        if oa ~= ob then return oa < ob end
+        return byGain(a, b)
+    end)
     table.sort(result.keep, byGain)
     return result
 end
