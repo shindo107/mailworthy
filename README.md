@@ -97,6 +97,15 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   passes a material), the guild roster (Blacksmithing, Tailoring, ... but not First Aid or
   Cooking), or your own character's last login. When nothing is known, the binding takes
   everything, as before. `/mw feature tiers off` keeps every material again.
+- **Tier check** (the tiers above come from a beta-client snapshot, so they are checked against
+  the live realm): when you open one of your own crafting professions, Mailworthy reads the
+  colour of every recipe you know (orange / yellow / green / grey) and which materials it uses.
+  A material the table calls done that a recipe above grey still uses (directly, or through a
+  part like a bolt of cloth or a grinding stone) is listed in `/mw report` ("tier check: Linen
+  Cloth still used by Soft-soled Linen Boots (yellow) at skill 120, table says done at 115"),
+  and it stays in your bags until the window shows that recipe grey. First Aid cloth is not
+  checked (it is done when the next bandage can be learned, not when the old one turns grey).
+  Read only: nothing is clicked or changed in the profession window. `/mw feature tierCheck off`.
 - **Sell what I gather** (off by default, a setting turns it on): for a gatherer who also
   crafts with the same materials (a miner-blacksmith, an herbalist-alchemist, a
   skinner-leatherworker, a fisher-cook), what the gathering profession brings in is mailed
@@ -153,6 +162,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Addon messages between Mailworthys: `C_ChatInfo.RegisterAddonMessagePrefix("Mailworthy")`, `SendAddonMessage(prefix, text, "GUILD" / "PARTY" / "RAID")`, `CHAT_MSG_ADDON` (sender possibly "Name-Realm") | two guild members with Mailworthy: `/mw report` shows "mailworthy peer: <name> (<professions>; other characters: ...)" on each, `/mw friends` marks them "Mailworthy", and a binding for a profession only an alt of theirs has says "delivered to their ... character" | open (2026-10-26) |
 | Skill ranks: `GetProfessionInfo` 3rd return for this character (First Aid and Cooking included), `C_Club.GetMemberInfo` `profession1Rank` / `profession2Rank` for guild members (in Forever's `ClubDocumentation.lua` and Communities roster sort) | `/mw report` "kept for First Aid 85; First Aid 85 is past Linen Cloth (mailed)"; a binding line says "skill N" with a guild member's rank, or a Mailworthy peer's "skills: ..." | open (2026-11-06) |
 | Scan freshness: `Auctionator.API.v1.GetAuctionAgeByItemID(caller, itemID)` (read in Auctionator's source: days since seen, nil past 21 days; else the `item:ID` link form) over 12 everyday trade goods; the scan day sent as `F2\|<server day>` after each hello | a character that hasn't scanned for a week, in a guild with a Mailworthy user who just scanned: `/mw report` "price stamp: <name> scanned 0 day(s) ago", a **!** on the Mailworthy button and the chat line at the mailbox | open (2026-11-06) |
+| Tier check: Forever's Professions window is the retail one, fed by `C_TradeSkillUI` (in Forever's source: `GetBaseProfessionInfo` / `GetChildProfessionInfo` `professionID` / `skillLevel`, `GetRecipeInfo` `learned` / `relativeDifficulty` 0 orange .. 3 grey, `GetRecipeSchematic` `reagentSlotSchematics[].reagents[].itemID` / `outputItemID`, `GetFilteredRecipeIDs`, `IsTradeSkillLinked` / `IsTradeSkillGuild` / `IsTradeSkillGuildMember` / `IsNPCCrafting`; events `TRADE_SKILL_SHOW`, `TRADE_SKILL_LIST_UPDATE`, `TRADE_SKILL_DATA_SOURCE_CHANGED`). Not in Forever's Lua, tried first: `GetAllRecipeIDs` (retail has it; else the filtered list, so a search or "skill-up only" filter hides recipes). The Classic globals (`GetTradeSkillInfo`, `GetCraftInfo`, `CRAFT_SHOW`, ...) aren't in Forever's source; they are a fallback only. The skill line comes from `GetProfessionInfo` (matched by ID, else by name) | open each crafting profession: `/mw report` "tier check: <name> <profession> <rank> read ... (N learned recipes, C_TradeSkillUI)", N close to the window's learned recipe count; then any "still used" lines, checked against the window's colours | open (2026-11-06) |
 | Lock glow only while a mailbox is open (`MAIL_SHOW` / `MAIL_CLOSED`, `MailFrame:IsShown()`), "always" setting; a new lock flashes 3 s anywhere | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: glow; close it: gone | open (CurseForge user report + operator, 2026-10-21) |
 
 ## Picking up the work

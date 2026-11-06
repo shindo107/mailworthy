@@ -71,6 +71,10 @@ function UI.StayReason(r)
     if r.reason == "junk (no price data)" then return "junk: sell it at a vendor" end
     if r.reason == "uncommon or better (no price data)" then return "uncommon: needs Auctionator prices" end
     if r.untilSkill then return r.reason .. " (until skill " .. r.untilSkill .. ")" end
+    if r.window then
+        return string.format("%s (%s still %s)", r.reason, tostring(r.window.recipe),
+            ns.TierCheck.COLORS[r.window.difficulty] or "in use")
+    end
     if r.convert then return string.format("convert it: %d make a %s (pays more)", r.convert.count, r.convert.name) end
     return r.reason
 end

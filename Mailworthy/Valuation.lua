@@ -126,7 +126,9 @@ end
 --- false. Second return: { name, skill } of the first profession past it, when none
 --- needs it; third: the skill at which the needing profession will be done with it; fourth:
 --- the conversion ({ into, count, name }) when it's past its own recipes but converting it pays
---- (Tiers.WorthConverting with `priceOf`, an itemID -> unit auction price function).
+--- (Tiers.WorthConverting with `priceOf`, an itemID -> unit auction price function); fifth: the
+--- non-grey recipe ({ recipe, difficulty, via }) the profession window last showed still using a
+--- material the table calls done (the entry's `stillUsed`, TierCheck.Annotate): it stays.
 function Valuation.NeededBy(item, professions, tiers, priceOf)
     local outgrown
     for _, p in ipairs(type(professions) == "table" and professions or {}) do
@@ -134,11 +136,14 @@ function Valuation.NeededBy(item, professions, tiers, priceOf)
         local known = Valuation.PROFESSION_MATS[id or -1]
         if Valuation.Uses(known, item) then
             local rank = type(p) == "table" and tonumber(p.rank) or nil
-            local convert = tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank)
-                and ns.Tiers.WorthConverting(id, item.itemID, priceOf) or nil
-            if convert then
+            local outgrownHere = tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank)
+            local window = outgrownHere and type(p.stillUsed) == "table" and p.stillUsed[tonumber(item.itemID) or -1] or nil
+            local convert = outgrownHere and not window and ns.Tiers.WorthConverting(id, item.itemID, priceOf) or nil
+            if window then
+                return known.name, nil, nil, nil, window
+            elseif convert then
                 return known.name, nil, nil, convert
-            elseif tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank) then
+            elseif outgrownHere then
                 outgrown = outgrown or { name = known.name, skill = rank }
             else
                 return known.name, nil, tiers ~= false and ns.Tiers.Threshold(id, item.itemID) or nil
@@ -364,11 +369,12 @@ function Valuation.Evaluate(item, price, settings)
     if item.inUse then return keep("in use") end
     if Valuation.IsTool(item) then return keep("profession tool") end
     if settings.keepProfessionMats then
-        local profession, _, untilSkill, convert = Valuation.NeededBy(item, settings.professions, settings.tiers,
-            settings.priceOf)
+        local profession, _, untilSkill, convert, window = Valuation.NeededBy(item, settings.professions,
+            settings.tiers, settings.priceOf)
         -- "Sell what I gather": what a gathering profession brought in is valued like anything else.
         if profession and not (settings.sellGathered and Valuation.GatheredBy(item, settings.professions)) then
-            return keep("your " .. profession .. " needs it", { untilSkill = untilSkill, convert = convert })
+            return keep("your " .. profession .. " needs it", { untilSkill = untilSkill, convert = convert,
+                window = window })
         end
     end
     local r = evaluate(item, price, settings)

@@ -105,6 +105,7 @@ function Report.Build()
     for _, l in ipairs(ns.Routes.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.Comms.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.Stale.ReportLines()) do lines[#lines + 1] = l end
+    for _, l in ipairs(ns.TierCheck.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.Blocked.Lines()) do lines[#lines + 1] = l end
     lines[#lines + 1] = "log:"
     for _, l in ipairs(ns.Log.Lines()) do lines[#lines + 1] = l end

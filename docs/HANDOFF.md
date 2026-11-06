@@ -75,11 +75,12 @@ must never break the game.
 | `Routes.lua` | **bindings** (2026-10-26): a crafting profession's materials to one player (`MailworthyDB.routes[realm\|faction]` for all the account's characters, `MailworthyCharDB.routes` for this one; this character's win). Pure `Divert(item, verdict, price, settings, routes)`: route `friend`, `to`, `what`; never over a hard keep; at or above the binding's `cap` (copper per unit, `CAP_STEPS`, 5g default, nil = none) the normal verdict stands with `capped`. `SkipOnce` per mailbox visit. `Candidates()`: party / raid units, guild via `C_Club` (`GetGuildRosterInfo` fallback), known characters, peers; `Clean` drops "-Realm". Pure `Crafter(route, peer)` / `Recipient(route)`: the bound player, or the character of theirs that has the profession (from their hello) |
 | `TierData.lua` | **generated** by `tools/tiers/build.py` from `tools/tiers/data.py` (edit those, rerun): `Tiers.DONE` (rows), `Tiers.KEEP` (items kept beyond the subclasses), `Tiers.CONVERT` (leather up-conversions). Source: the 2026-11-06 recipe-by-recipe research of every profession |
 | `Tiers.lua` | **material tiers** (2026-11-06): the rules over `TierData.lua`'s tables; pure `Threshold`, `Outgrown`, `OutgrownNames`, `PastText`, `Step`, `WorthConverting` (a leather past its recipes stays while converting it pays at the AH). First Aid cloth: the next bandage's learn skill; the rest: the last recipe's grey, through the profession's own parts. No row = never outgrown. Used by `Valuation.NeededBy` (own rank) and `Routes.Matches` (the recipient's `route.skill`). Switch `tiers`; all of it only while `keepProfessionMats` is on |
+| `TierCheck.lua` | **tier check** (2026-11-06): reads the player's own profession window when it opens or its list changes (`C_TradeSkillUI`: learned recipes' `relativeDifficulty` and schematic reagents; Classic globals as a fallback; linked / guild / NPC windows skipped), saves `MailworthyDB.tierCheck[char key][skill line]` (rank, time, recipe count, source, per reagent the hardest non-grey recipe using it, through the profession's own trade-goods parts, or false). Pure `Summarize`, `Findings` (table says done, window says still used; First Aid cloth exempt), `FindingText`; `ReportLines` for `/mw report`; `Annotate` gives `Bags.Evaluate`'s profession entries `stillUsed`, which `Valuation.NeededBy` keeps. No frames, no hooks. Switch `tierCheck` |
 | `Comms.lua` | hellos between Mailworthys (`C_ChatInfo`, prefix `Mailworthy`): `H2\|<own crafting skill lines>\|<Name=ids;...>` (the account's other crafters here) / `A2` / `S2\|<id:rank,...>\|<Name=id:rank;...>` (skill ranks after each hello, and again at the mailbox after a skill-up crosses a tier: `Steps`); peers in `MailworthyDB.peers[realm\|faction]` (60 days); throttled; everything received is validated data. Switch `comms` |
 | `Stale.lua` | stale auction prices (2026-11-06): freshness = days since Auctionator saw the freshest of 12 everyday trade goods (`WATCH`, `GetAuctionAgeByItemID`); the scan day goes out as `F2\|<server day>` after each hello (Comms; older Mailworthys drop unknown kinds) and peers' days are kept in `MailworthyDB.fresh[realm\|faction]` (60 days; separate from `peers`, so bindings data is untouched). Pure `Nudge(ownAge, freshest, today, maxAgeDays, nudgeDays)`: nil up to `NUDGE_DAYS` (3, operator 2026-11-06), "self" past that (`ignored` past `maxAgeDays`, 7: those items stay in the bags), "peer" when someone heard in 14 days scanned within 2 days. Shown as "!" on the mail buttons, a line at the top of the Mailworthy window, and (peer only) one chat line at `MAIL_SHOW`; logging in stale sends an ask so fresh peers answer. Display only. Switch `staleNudge` |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), two views (`UI.View`): list (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step); opens on add while there are no bindings; a binding returns to the list |
 
-Tests: `spec/` (busted on LuaJIT, 207 specs) with a WoW stub in
+Tests: `spec/` (busted on LuaJIT, 280 specs) with a WoW stub in
 `spec/support/wow_stub.lua` (bags, mail send tab, postage, timers with delays,
 override bindings, focused frame, item buttons that **error on any field write**).
 `Nav` drives the most recently shown visible window (`Nav.Root`); Circle closes only that one.
@@ -293,6 +294,19 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   day: "when sending to multiple people ... make sure the receiver is made clear": one "To:"
   line per recipient and the Mailing list grouped by recipient.
 
+- Tier check (2026-11-06, asked from the tiers work: "verify the tiers against the live realm";
+  rl-companion can't read game data): `TierCheck.lua`, PLAN "Material tiers". Chosen: the
+  profession window's colours are ground truth for the tier rule, so Mailworthy reads them (read
+  only, every API pcall'd) when the player opens their own profession; only learned recipes count
+  (an unlearned recipe's colour isn't the player's); `GetAllRecipeIDs` first, else the filtered
+  list; a material the table calls done but a non-grey recipe still uses is a `/mw report` line
+  and stays in the bags until a later read shows it grey ("keep until the window says
+  otherwise", the latest read wins: the rank only rises by crafting, which reopens the window).
+  First Aid cloth is exempt (the operator's bandage-learn rule); a leather's own up-conversion
+  doesn't count (Tiers.CONVERT decides that). Not done: the opposite direction (the table keeps a
+  material the window shows only in grey recipes) is not reported, since unlearned recipes
+  would make it noisy.
+
 - Material tiers, full research (2026-11-06, v0.18.0 follow-up): every Forever recipe of every
   crafting profession read one by one (7 research agents; Tailoring 414, Leatherworking 512,
   Blacksmithing 437, Engineering 242, Enchanting 221, Alchemy 178, Cooking 123 recipes). It
@@ -365,7 +379,8 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   disenchant prices for green items (Siz DisenchantValue, or the era tables with
   Disenchantry: see either in game), ForeverMail compatibility (replaces the mailbox
   window), the in-game checks of bindings and of the Disenchantry value (item 7 below), of
-  the UX pass (item 8) of the stale-prices nudge (item 9) and of the material tiers (item 10), and README "Beta unknowns".
+  the UX pass (item 8) of the stale-prices nudge (item 9), of the material tiers (item 10) and of
+  the tier check (item 12), and README "Beta unknowns".
 
 ## 8. What's left (in order)
 
@@ -418,3 +433,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    of Water) were not asked about and stay mailable. Swollen Venom Sac (Potent Anti-Venom)
    has no known item ID yet: read it in game and add it. In game: a first-aider's Briarthorn
    under Staying "your First Aid needs it (until skill 125)".
+12. In-game check of the tier check (2026-11-06): open each crafting profession on a character
+   that has one; `/mw report` shows "tier check: <name> <profession> <rank> read ... (N learned
+   recipes, C_TradeSkillUI)" with N about the window's learned recipe count (if the source says
+   "filtered list", clear the window's search and filters and reopen it). Each "tier check: X
+   still used by Y (colour) at skill N, table says done at M" line: confirm Y's colour in the
+   window, then raise X's row in `tools/tiers/data.py` and rerun `tools/tiers/build.py`. Until
+   then X shows under Staying "your <profession> needs it (Y still yellow)".
