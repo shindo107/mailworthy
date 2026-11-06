@@ -108,6 +108,28 @@ describe("mail window", function()
         WowStub.runTimers()
         assert.equal(0, #WowStub.state.sent)
         assert.truthy(ns.Mailer.Status():find("Send Mail tab", 1, true))
+        assert.equal("Open the Send Mail tab", text("MailworthyMailSend"), "the button says why it can't send")
+    end)
+
+    it("opened on the Inbox, follows the player to the Send Mail tab, where Send works", function()
+        SendMailFrame:Hide()
+        InboxFrame:Show()
+        _G.MailworthyInboxButton:Click()
+        assert.is_true(ns.MailWindow.OnInbox())
+        local watcher = _G.MailworthyTabWatcher
+        watcher.scripts.OnUpdate(watcher, 0.3)
+        assert.equal(InboxFrame, ns.MailWindow.Frame():GetParent(), "stays while the Inbox shows")
+        InboxFrame:Hide() -- the player clicks the Send Mail tab
+        SendMailFrame:Show()
+        watcher.scripts.OnUpdate(watcher, 0.3)
+        assert.equal(SendMailFrame, ns.MailWindow.Frame():GetParent())
+        assert.is_true(ns.MailWindow.Frame():IsVisible())
+        assert.is_false(ns.MailWindow.OnInbox())
+        assert.equal("Send to Roknua", text("MailworthyMailSend"))
+        _G.MailworthyMailSend:Click()
+        WowStub.runTimers()
+        assert.equal(1, #WowStub.state.sent)
+        for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("error", 1, true), line) end
     end)
 
     it("on the bank alt itself: nothing is sent", function()

@@ -82,7 +82,7 @@ describe("locked-item glow", function()
         _G.MailworthySettingsGlow:Click()
         assert.is_false(ns.Config.Flag("glowEverywhere"))
         assert.is_false(shown(combined.Items[2]), "the settings button refreshes the bags at once")
-        assert.equal("Locked items glow blue: at the mailbox only", _G.MailworthySettingsGlow:GetText())
+        assert.equal("Lock glow: mailbox only", _G.MailworthySettingsGlow:GetText())
     end)
 
     it("Blizzard's mail window being shown counts as a mailbox too", function()

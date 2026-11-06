@@ -31,8 +31,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   tooltips show today's verdict and why the item was mailed; the Mailworthy button (or
   `/mw summary`) sums it up.
 - **Bank alt on a second WoW account** (played on another monitor): mail crosses accounts,
-  saved settings don't. On your main, type the alt's name under "Or type it" in `/mw`
-  (press **Use name** twice: Mailworthy hasn't seen that character). On the alt's account
+  saved settings don't. On your main, press **Change...** in `/mw` and type the alt's name under
+  "Or type a name" (press **Use name** twice: Mailworthy hasn't seen that character). On the alt's account
   install Auctionator and Mailworthy, run an Auctionator scan there, open `/mw` and press
   **This character is my bank alt**: the tags, tooltips and summary come on. Each account
   keeps its own price scans, and the "Mailed for" tooltip line stays on the sending account.
@@ -57,6 +57,13 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   `/mw feature comms off` stops them), and the mail goes to **whichever of their characters
   has the profession**: the friend when they do, their crafter alt when they don't, and the
   friend when nothing is known. Never their bank alt. The window names the recipient.
+- **Stale auction prices** get a nudge at the mailbox: once your Auctionator prices are over
+  3 days old, the Mailworthy button gets a **!** and the window says so (past 7 days
+  Mailworthy stops trusting them, and those items stay in your bags). When another Mailworthy user in
+  your guild or group has scanned in the last 2 days, it says who, and one chat line tells
+  you at the mailbox. Only the day of each player's scan is shared (with the addon messages
+  above), never prices, and it never changes what gets mailed. `/mw feature staleNudge off`
+  hides it.
 - Profession tools (fishing poles, Mining Pick, Blacksmith Hammer, Skinning Knife, ...)
   always stay. Gold is never attached.
 - **Your professions' materials stay** (on by default, a setting turns it off): cloth for
@@ -114,6 +121,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Reagent bag (bag 5, `NUM_TOTAL_EQUIPPED_BAG_SLOTS`) scanned, locked (Alt+click, L3) and mailed like bags 0-4 | a white item in the reagent bag: `/mw scan` lists it, Send mails it | open (CurseForge user report, 2026-10-21; source-backed: `Enum.BagIndex.ReagentBag` = 5 in `Blizzard_FrameXMLBase/Constants.lua`) |
 | Guild members through `C_Club.GetGuildClubId` / `GetClubMembers` / `GetMemberInfo` (`name`, `presence`, `profession1ID` / `profession2ID` as skill line IDs, as Blizzard's Communities roster reads them on Forever; `GetGuildRosterInfo` fallback), party through `GetNumGroupMembers` / `GetUnitName(unit, true)` / `UnitIsConnected`, the roster asked for with `C_GuildInfo.GuildRoster()` | `/mw friends` lists guild and party members with "online" and their professions; a two-part name without a realm suffix lands in the binding and the mail arrives | open (2026-10-26) |
 | Addon messages between Mailworthys: `C_ChatInfo.RegisterAddonMessagePrefix("Mailworthy")`, `SendAddonMessage(prefix, text, "GUILD" / "PARTY" / "RAID")`, `CHAT_MSG_ADDON` (sender possibly "Name-Realm") | two guild members with Mailworthy: `/mw report` shows "mailworthy peer: <name> (<professions>; other characters: ...)" on each, `/mw friends` marks them "Mailworthy", and a binding for a profession only an alt of theirs has says "delivered to their ... character" | open (2026-10-26) |
+| Scan freshness: `Auctionator.API.v1.GetAuctionAgeByItemID(caller, itemID)` (read in Auctionator's source: days since seen, nil past 21 days; else the `item:ID` link form) over 12 everyday trade goods; the scan day sent as `F2\|<server day>` after each hello | a character that hasn't scanned for a week, in a guild with a Mailworthy user who just scanned: `/mw report` "price stamp: <name> scanned 0 day(s) ago", a **!** on the Mailworthy button and the chat line at the mailbox | open (2026-11-06) |
 | Lock glow only while a mailbox is open (`MAIL_SHOW` / `MAIL_CLOSED`, `MailFrame:IsShown()`), "always" setting; a new lock flashes 3 s anywhere | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: glow; close it: gone | open (CurseForge user report + operator, 2026-10-21) |
 
 ## Picking up the work

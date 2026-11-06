@@ -51,7 +51,7 @@ Per input:
 | Task | Controller | Keyboard / mouse |
 |---|---|---|
 | Start at the mailbox | Send Mail tab (R1), then **Triangle**, or D-pad to the **Mailworthy** button + Cross | click **Mailworthy** under the mail window (either tab) |
-| Preview: send / settings / close | D-pad + Cross on its buttons; Triangle closes | click |
+| Preview: send / settings (Circle, X or Escape close it) | D-pad + Cross on its buttons; Triangle closes | click |
 | Lock an item | **L3** on the item in your bags, or Cross on its row in the Mailworthy window | **Alt+click** the bag item, or click its row |
 | See locked items | blue quest-style glow in your bags | same |
 | Settings | the Mailworthy button (when not set up), the preview's Settings button | same, plus `/mw` and the minimap button |
@@ -84,7 +84,9 @@ Notes:
      soulbound, no price, not worth it);
    - totals: "14 items in 2 mails, about 3g 20s more than vendoring, postage 4s 20c";
    - buttons: **Send**, **Settings** (opens the settings panel on top of the
-     preview; the preview recalculates when it closes), **Close**.
+     preview; the preview recalculates when it closes); the X, Escape and Circle
+     close it. On the Inbox tab Send reads "Open the Send Mail tab" and the window
+     follows the player there (UX pass, 2026-11-06).
 4. **Send.** Mail 1 of N goes to the bank alt (12 items per mail), and each
    next mail follows on `MAIL_SEND_SUCCESS` without another press.
 5. **Vendor the rest.** Whatever stays in your bags is worth more at the vendor
@@ -349,7 +351,7 @@ bank alt's own, fresh Auctionator data** ([media/bank-alt-prototype.png](../medi
 - **As built:** no postage in the bank alt's verdicts (nothing is mailed from there);
   V = the vendor wins today; the Mailworthy button (Triangle) on the bank alt opens the
   summary, also `/mw summary` and the settings' "Bank alt summary" button; switches
-  `bankAltTags`, `tooltipLines`; setting "AH / DE / V tags: every character".
+  `bankAltTags`, `tooltipLines`; setting "Bag tags: every character".
 - **B (bank)** (2026-10-20): the fourth tag and summary row, for items the rule says to
   hold for a later phase (decision rule above); the tooltip says why and what listing
   it today would bring. Tags are advice: the bank alt can list a B item any time.
@@ -372,7 +374,7 @@ only in `## OptionalDeps`).
 | `Valuation.lua` | the decision rule: item facts + prices + settings -> mail-AH / mail-DE / keep + reason + gain | busted (pure, most tests live here) |
 | `Bags.lua` | bag scan -> item facts, applies locks and filters | busted with stubbed `C_Container` |
 | `Mailer.lua` | batch queue and state machine (attach, send, wait, next, stop); each run's timers die with it | busted with stubbed mail events |
-| `MailWindow.lua` | the window at the mailbox: recipient, mail / staying lists (rows lock / unlock), totals, Send / Settings / Close | busted + in game |
+| `MailWindow.lua` | the window at the mailbox: recipient, mail / staying lists (rows lock / unlock), totals, Send / Settings; fits its rows; follows Inbox -> Send Mail | busted + in game |
 | `MailButton.lua` | the Mailworthy button under the mail window (mouse; controller via Triangle, `PadKey.lua`; writes nothing into the controller UI) | busted + in game |
 | `Nav.lua` / `PadKey.lua` | Mailworthy's own controller highlight and override bindings for its windows | busted + in game |
 | `Locks.lua` / `Border.lua` | item locks (Alt+click, L3) and their blue glow | busted + in game |

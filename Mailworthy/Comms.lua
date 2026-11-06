@@ -9,6 +9,8 @@
 --   H2|<this character's crafting skill lines>|<other characters on this realm + faction
 --       that have a crafting profession: Name=333,197;Other Name=165>
 --   A2                                                   (ask: please say hello)
+--   F2|<server day of this character's freshest Auctionator scan>  (Stale.lua; right after
+--       a hello; Mailworthys before v0.15 drop it, as they drop any kind they don't know)
 --
 -- What arrives is data from other players, never instructions: names are
 -- cleaned and length-checked, professions must be crafting skill lines
@@ -96,11 +98,16 @@ function Comms.Encode(professions, characters)
 end
 
 --- Pure: a message from another Mailworthy, or nil. { kind = "hello", version, professions =
---- { ids }, characters = { { name, professions = { ids } }, ... } } or { kind = "ask", version }.
+--- { ids }, characters = { { name, professions = { ids } }, ... } }, { kind = "ask", version }
+--- or { kind = "fresh", version, day } (a scan day: Stale.lua).
 function Comms.Decode(text)
     if type(text) ~= "string" or #text > Comms.MAX_MESSAGE then return nil end
     local kind, version, rest = text:match("^(%a)(%d+)|?(.*)$")
     if kind == "A" then return { kind = "ask", version = tonumber(version) } end
+    if kind == "F" then
+        local day = rest:match("^(%d+)$")
+        return day and #day <= 7 and { kind = "fresh", version = tonumber(version), day = tonumber(day) } or nil
+    end
     if kind ~= "H" then return nil end
     local profs, chars = rest:match("^([%d,]*)|?([^|]*)$")
     if profs == nil then return nil end
@@ -149,7 +156,10 @@ function Comms.Announce(reason)
     end
     lastHello, pendingHello = now(), false
     ns.Log.Add("comms", "hello (%s)", tostring(reason))
-    return send(Comms.Encode(ns.Characters.Professions(), ns.Characters.Mailable()))
+    local sent = send(Comms.Encode(ns.Characters.Professions(), ns.Characters.Mailable()))
+    local fresh = ns.Stale and ns.Stale.Message()
+    if sent and fresh then send(fresh) end
+    return sent
 end
 
 --- Ask other Mailworthys to say hello (the friends window, throttled).
@@ -178,6 +188,9 @@ function Comms.Hear(sender, text)
     if msg.kind == "ask" then
         Comms.Announce("asked by " .. name)
         return msg
+    end
+    if msg.kind == "fresh" then
+        return ns.Stale and ns.Stale.Hear(name, msg.day) or nil
     end
     local characters = {}
     for _, c in ipairs(msg.characters) do

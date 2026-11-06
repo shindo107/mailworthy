@@ -2,7 +2,8 @@
 # Renders media/logo.svg to the CurseForge avatar (logo-512.png, logo-400.png)
 # and the in-game AddOns-list icon (Mailworthy/Textures/Icon.tga: 64x64,
 # uncompressed 32-bit, the TGA variant the WoW client loads reliably), and
-# media/ui-prototype.html, media/bank-alt-prototype.html and media/bindings-prototype.html to PNGs.
+# media/ui-prototype.html, media/bank-alt-prototype.html, media/bindings-prototype.html and
+# media/ux-pass-prototype.html to PNGs.
 # Needs Google Chrome (headless rendering) and Python 3 with Pillow.
 # Usage: tools/build-icons.sh
 set -euo pipefail
@@ -33,4 +34,5 @@ EOF
 render media/ui-prototype.html 900 640 media/ui-prototype.png
 render media/bank-alt-prototype.html 900 640 media/bank-alt-prototype.png
 render media/bindings-prototype.html 1180 850 media/bindings-prototype.png
-echo "media/ui-prototype.png, media/bank-alt-prototype.png, media/bindings-prototype.png"
+render media/ux-pass-prototype.html 1580 1290 media/ux-pass-prototype.png
+echo "media/ui-prototype.png, media/bank-alt-prototype.png, media/bindings-prototype.png, media/ux-pass-prototype.png"

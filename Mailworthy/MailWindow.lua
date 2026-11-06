@@ -1,7 +1,9 @@
--- The Mailworthy window at the mailbox (media/ui-prototype.png): who the mail
--- goes to, the bindings in force (a profession's materials to a friend, with
--- Skip once and Remove), what goes and why, what stays and why, the total gain,
--- and Send / Settings / Close. One press of Send mails everything (Mailer).
+-- The Mailworthy window at the mailbox (media/ux-pass-prototype.png): who the mail
+-- goes to, the bindings in force (only when there are any: a profession's materials
+-- to a friend, with Skip once and Remove), what goes and why, what stays and why,
+-- the total gain, and Send / Settings. One press of Send mails everything (Mailer).
+-- The window grows and shrinks to the rows it shows (UI.Layout); the X, Escape and
+-- the controller's Circle close it.
 --
 -- Mouse: click. Controller: Triangle at the mail window opens it, then the D-pad
 -- moves Mailworthy's own highlight, Cross presses, Circle closes (PadKey "window"
@@ -17,16 +19,13 @@ local UI = {}
 ns.MailWindow = UI
 
 UI.MAIL_ROWS, UI.STAY_ROWS, UI.ROUTE_ROWS = 8, 5, 3
-local WIDTH, MAIL_ROW, STAY_ROW, ROUTE_ROW = 520, 30, 20, 22
-local ROUTES_TOP = -74
-local MAIL_TOP = ROUTES_TOP - UI.ROUTE_ROWS * ROUTE_ROW - 34
-local HEIGHT = 196 - MAIL_TOP - 84 + UI.MAIL_ROWS * MAIL_ROW + UI.STAY_ROWS * STAY_ROW + 100
+local WIDTH, MAIL_ROW, STAY_ROW, ROUTE_ROW = 520, 30, 20, 24
 
 local W = ns.Widgets
 local money = function(c) return ns.Valuation.Money(c) end
 
-local frame, title, toName, toNote, mailCount, stayCount, mailPage, stayPage
-local totalLine, totalNote, sendButton, pricesLine, statusLine, legend
+local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
+local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine
 local mailRows, stayRows, routeRows = {}, {}, {}
 local friendsButton
 local result
@@ -60,6 +59,8 @@ function UI.StayReason(r)
     end
     if r.reason == "no price" then return "no auction price yet" end
     if r.reason == "locked" then return "locked (press to unlock)" end
+    if r.reason == "junk (no price data)" then return "junk: sell it at a vendor" end
+    if r.reason == "uncommon or better (no price data)" then return "uncommon: needs Auctionator prices" end
     return r.reason
 end
 
@@ -104,11 +105,10 @@ local function rowButton(name, parent, height)
     return b, bg
 end
 
-local function createMailRows(top)
+local function createMailRows()
     for i = 1, UI.MAIL_ROWS do
         local row = {}
         local b, bg = rowButton("MailworthyMailRow" .. i, frame, MAIL_ROW - 2)
-        b:SetPoint("TOP", 0, top - (i - 1) * MAIL_ROW)
         bg:SetColorTexture(1, 1, 1, i % 2 == 0 and 0.03 or 0.06)
         row.button = b
         row.icon = b:CreateTexture(nil, "ARTWORK")
@@ -133,11 +133,10 @@ local function createMailRows(top)
     end
 end
 
-local function createStayRows(top)
+local function createStayRows()
     for i = 1, UI.STAY_ROWS do
         local row = {}
         local b, bg = rowButton("MailworthyStayRow" .. i, frame, STAY_ROW - 1)
-        b:SetPoint("TOP", 0, top - (i - 1) * STAY_ROW)
         bg:SetColorTexture(1, 1, 1, i % 2 == 0 and 0.02 or 0.05)
         row.button = b
         row.name = W.Label(b, "GameFontHighlightSmall")
@@ -157,14 +156,16 @@ local function createStayRows(top)
     end
 end
 
--- Bindings (Routes): one row per binding with Skip once (this mailbox visit) and Remove,
--- then the way into the friends window. The mail list below shows where each item goes.
+-- Bindings (Routes): shown only while there are bindings. One row each with Skip once
+-- (this mailbox visit) and Remove, under a "Bindings" heading with the way into the
+-- friends window. The mail list below shows where each item goes.
 local function createRouteRows()
+    routesHead = W.Label(frame, "GameFontNormal")
+    routesHead:SetText("Bindings")
+    friendsButton = W.Button(frame, "Friends...", 90, function() ns.RoutesUI.Show() end, "MailworthyMailFriends")
     for i = 1, UI.ROUTE_ROWS do
         local row = {}
-        local y = ROUTES_TOP - (i - 1) * ROUTE_ROW
         row.text = W.Label(frame, "GameFontHighlightSmall")
-        row.text:SetPoint("TOPLEFT", 28, y - 5)
         row.text:SetWidth(300)
         row.text:SetJustifyH("LEFT")
         row.skip = W.Button(frame, "Skip once", 84, function()
@@ -172,56 +173,58 @@ local function createRouteRows()
             if ns.Routes.Skipped(row.key) then ns.Routes.Unskip(row.key) else ns.Routes.SkipOnce(row.key) end
             UI.Refresh()
         end, "MailworthyMailSkip" .. i)
-        row.skip:SetPoint("TOPRIGHT", -102, y)
         row.remove = W.Button(frame, "Remove", 74, function()
             if row.key and ns.Routes.Remove(row.key) then
                 ns.Print("Binding removed.")
                 UI.Refresh()
             end
         end, "MailworthyMailUnbind" .. i)
-        row.remove:SetPoint("TOPRIGHT", -20, y)
         row.text:Hide()
         row.skip:Hide()
         row.remove:Hide()
         routeRows[i] = row
     end
-    friendsButton = W.Button(frame, "Send materials to friends...", 200, function() ns.RoutesUI.Show() end,
-        "MailworthyMailFriends")
-    friendsButton:SetPoint("TOPLEFT", 24, ROUTES_TOP - UI.ROUTE_ROWS * ROUTE_ROW - 2)
 end
 
+--- Fill the binding rows; returns how many rows show (0: the block is hidden).
 local function fillRoutes()
     local list = ns.Routes.List()
+    local shown = 0
     for i, row in ipairs(routeRows) do
         local r = list[i]
         row.key = r and r.key or nil
         if r and i == UI.ROUTE_ROWS and #list > UI.ROUTE_ROWS then
-            row.text:SetText(string.format("|cffaaaaaa+ %d more bindings: press the button below|r", #list - UI.ROUTE_ROWS + 1))
+            row.text:SetText(string.format("|cffaaaaaa+ %d more: press Friends...|r", #list - UI.ROUTE_ROWS + 1))
             row.key = nil
-            row.text:Show()
             row.skip:Hide()
             row.remove:Hide()
         elseif r then
             local to, crafter = ns.Routes.Recipient(r)
             local skipped = ns.Routes.Skipped(r.key)
-            row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. to .. "|r"
-                .. (crafter and (" (" .. (tostring(r.to):match("^(%S+)") or r.to) .. "'s crafter)") or "")
-                .. (skipped and " |cff888888- skipped this time|r" or ""))
+            row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. firstName(to) .. "|r"
+                .. (crafter and (" |cff888888(" .. firstName(r.to) .. "'s crafter)|r") or "")
+                .. (skipped and " |cff888888skipped this time|r" or ""))
             row.skip:SetText(skipped and "Undo skip" or "Skip once")
-            row.text:Show()
             row.skip:Show()
             row.remove:Show()
-        elseif i == 1 then
-            row.text:SetText("|cff888888No bindings: everything goes by value to your bank alt.|r")
+        end
+        if r then
             row.text:Show()
-            row.skip:Hide()
-            row.remove:Hide()
+            shown = shown + 1
         else
             row.text:Hide()
             row.skip:Hide()
             row.remove:Hide()
         end
     end
+    if shown > 0 then
+        routesHead:Show()
+        friendsButton:Show()
+    else
+        routesHead:Hide()
+        friendsButton:Hide()
+    end
+    return shown
 end
 
 local function pageButton(name, list)
@@ -236,61 +239,52 @@ local function pageButton(name, list)
     return b
 end
 
+local function at(widget, x, y, point)
+    widget:ClearAllPoints()
+    widget:SetPoint(point or "TOPLEFT", frame, point or "TOPLEFT", x, y)
+end
+
 function UI.Create()
     if frame then return frame end
     local send = rawget(_G, "SendMailFrame")
-    frame = W.Window("MailworthyMailWindow", WIDTH, HEIGHT, type(send) == "table" and send or nil)
+    frame = W.Window("MailworthyMailWindow", WIDTH, 400, type(send) == "table" and send or nil)
     title = W.Label(frame, "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 22, -18)
     toName = W.Label(frame, "GameFontHighlightLarge")
-    toName:SetPoint("TOPLEFT", 24, -50)
+    toName:SetPoint("TOPLEFT", 24, -48)
     toNote = W.Label(frame, "GameFontDisableSmall")
-    toNote:SetPoint("TOPRIGHT", -26, -54)
+    toNote:SetPoint("TOPRIGHT", -26, -52)
+    staleLine = W.Label(frame, "GameFontHighlightSmall")
+    staleLine:SetWidth(WIDTH - 48)
+    staleLine:SetJustifyH("LEFT")
+    staleLine:Hide()
     createRouteRows()
 
-    local mailTop = MAIL_TOP
-    local h = W.Label(frame, "GameFontNormal")
-    h:SetPoint("TOPLEFT", 22, mailTop)
-    h:SetText("Mailing")
+    mailHead = W.Label(frame, "GameFontNormal")
+    mailHead:SetText("Mailing")
+    mailHint = W.Label(frame, "GameFontDisableSmall")
+    mailHint:SetText("press an item to keep it in your bags")
     mailCount = W.Label(frame, "GameFontHighlightSmall")
-    mailCount:SetPoint("TOPRIGHT", -24, mailTop - 2)
     mailPage = pageButton("MailworthyMailPage", "mail")
-    mailPage:SetPoint("TOPLEFT", 120, mailTop + 4)
-    createMailRows(mailTop - 18)
+    mailEmpty = W.Label(frame, "GameFontDisableSmall")
+    mailEmpty:SetText("Nothing worth mailing in your bags right now.")
+    createMailRows()
 
-    local stayTop = mailTop - 26 - UI.MAIL_ROWS * MAIL_ROW
-    local s = W.Label(frame, "GameFontNormal")
-    s:SetPoint("TOPLEFT", 22, stayTop)
-    s:SetText("Staying in your bags")
+    stayHead = W.Label(frame, "GameFontNormal")
+    stayHead:SetText("Staying in your bags")
     stayCount = W.Label(frame, "GameFontHighlightSmall")
-    stayCount:SetPoint("TOPRIGHT", -24, stayTop - 2)
     stayPage = pageButton("MailworthyStayPage", "stay")
-    stayPage:SetPoint("TOPLEFT", 200, stayTop + 4)
-    createStayRows(stayTop - 18)
+    createStayRows()
 
-    local totalTop = stayTop - 26 - UI.STAY_ROWS * STAY_ROW
     totalLine = W.Label(frame, "GameFontNormalLarge")
-    totalLine:SetPoint("TOPLEFT", 24, totalTop)
     totalLine:SetTextColor(0.6, 1, 0.5)
     totalNote = W.Label(frame, "GameFontHighlightSmall")
-    totalNote:SetPoint("TOPLEFT", 24, totalTop - 22)
+    totalNote:SetWidth(WIDTH - 48)
+    totalNote:SetJustifyH("LEFT")
 
-    local buttonsTop = totalTop - 48
-    sendButton = W.Button(frame, "Send", 170, function() UI.Send() end, "MailworthyMailSend")
-    sendButton:SetPoint("TOPLEFT", 20, buttonsTop)
-    W.Button(frame, "Settings", 110, function() ns.SettingsUI.Show() end, "MailworthyMailSettings")
-        :SetPoint("LEFT", sendButton, "RIGHT", 10, 0)
-    W.Button(frame, "Close", 110, function() frame:Hide() end, "MailworthyMailClose")
-        :SetPoint("TOPRIGHT", -20, buttonsTop)
-
-    statusLine = W.Label(frame, "GameFontHighlightSmall")
-    statusLine:SetPoint("TOPLEFT", 24, buttonsTop - 30)
-    statusLine:SetWidth(WIDTH - 48)
-    statusLine:SetJustifyH("LEFT")
-    pricesLine = W.Label(frame, "GameFontDisableSmall")
-    pricesLine:SetPoint("BOTTOMRIGHT", -24, 34)
+    sendButton = W.Button(frame, "Send", 190, function() UI.Send() end, "MailworthyMailSend")
+    settingsButton = W.Button(frame, "Settings", 110, function() ns.SettingsUI.Show() end, "MailworthyMailSettings")
     legend = W.Label(frame, "GameFontHighlightSmall")
-    legend:SetPoint("BOTTOMLEFT", 24, 16)
 
     frame:SetScript("OnHide", function(self)
         if type(send) == "table" and self:GetParent() ~= send then self:SetParent(send) end
@@ -300,38 +294,36 @@ function UI.Create()
     return frame
 end
 
-local function fillMail(items)
-    local first = (pages.mail - 1) * UI.MAIL_ROWS
-    for i, row in ipairs(mailRows) do
+--- Fill the shown rows of a list from its page; returns how many show.
+local function fillList(rows, items, page, perPage, fill)
+    local first = (page - 1) * perPage
+    local shown = 0
+    for i, row in ipairs(rows) do
         local item = items[first + i]
         row.item = item
         if item then
-            local chip = UI.CHIPS[item.result.route] or UI.CHIPS.common
-            row.icon:SetTexture(item.icon)
-            row.name:SetText(UI.ItemText(item.link, item.count, item.stacks))
-            row.chip:SetText(item.result.to and ("to " .. firstName(item.result.to)) or chip[1])
-            row.chipBg:SetColorTexture(chip[2], chip[3], chip[4], 0.9)
-            row.gain:SetText(item.result.gain and ("+" .. money(item.result.gain)) or "")
+            fill(row, item)
             row.button:Show()
+            shown = shown + 1
         else
             row.button:Hide()
         end
     end
+    return shown
 end
 
-local function fillStay(items)
-    local first = (pages.stay - 1) * UI.STAY_ROWS
-    for i, row in ipairs(stayRows) do
-        local item = items[first + i]
-        row.item = item
-        if item then
-            row.name:SetText(UI.ItemText(item.link, item.count))
-            row.reason:SetText(UI.StayReason(item.result))
-            row.button:Show()
-        else
-            row.button:Hide()
-        end
-    end
+local function fillMailRow(row, item)
+    local chip = UI.CHIPS[item.result.route] or UI.CHIPS.common
+    row.icon:SetTexture(item.icon)
+    row.name:SetText(UI.ItemText(item.link, item.count, item.stacks))
+    row.chip:SetText(item.result.to and ("to " .. firstName(item.result.to)) or chip[1])
+    row.chipBg:SetColorTexture(chip[2], chip[3], chip[4], 0.9)
+    row.gain:SetText(item.result.gain and ("+" .. money(item.result.gain)) or "")
+end
+
+local function fillStayRow(row, item)
+    row.name:SetText(UI.ItemText(item.link, item.count))
+    row.reason:SetText(UI.StayReason(item.result))
 end
 
 local function pageLabel(button, list, rows)
@@ -344,6 +336,63 @@ local function pageLabel(button, list, rows)
     button:Show()
 end
 
+--- Place everything top to bottom for the rows that show; returns the window height.
+--- `n` = { routes = , mail = , stay = } shown row counts; `n.stale` = the stale-prices line shows.
+function UI.Layout(n)
+    local y = -76
+    if n.stale then
+        at(staleLine, 24, y)
+        y = y - 32
+    end
+    if n.routes > 0 then
+        at(routesHead, 24, y)
+        at(friendsButton, -24, y + 4, "TOPRIGHT")
+        y = y - 22
+        for i, row in ipairs(routeRows) do
+            if i <= n.routes then
+                at(row.text, 28, y - 5)
+                at(row.skip, -102, y, "TOPRIGHT")
+                at(row.remove, -20, y, "TOPRIGHT")
+                y = y - ROUTE_ROW
+            end
+        end
+        y = y - 10
+    end
+
+    at(mailHead, 22, y)
+    at(mailHint, 90, y - 2)
+    at(mailCount, -24, y - 2, "TOPRIGHT")
+    at(mailPage, -150, y + 4, "TOPRIGHT")
+    y = y - 18
+    for i, row in ipairs(mailRows) do
+        row.button:SetPoint("TOP", frame, "TOP", 0, y - (i - 1) * MAIL_ROW)
+    end
+    if n.mail == 0 then
+        at(mailEmpty, 28, y - 4)
+        y = y - 22
+    end
+    y = y - n.mail * MAIL_ROW - 8
+
+    if n.stay > 0 then
+        at(stayHead, 22, y)
+        at(stayCount, -24, y - 2, "TOPRIGHT")
+        at(stayPage, -150, y + 4, "TOPRIGHT")
+        y = y - 18
+        for i, row in ipairs(stayRows) do
+            row.button:SetPoint("TOP", frame, "TOP", 0, y - (i - 1) * STAY_ROW)
+        end
+        y = y - n.stay * STAY_ROW - 8
+    end
+
+    at(totalLine, 24, y - 2)
+    at(totalNote, 24, y - 24)
+    y = y - 50
+    at(sendButton, 20, y)
+    at(settingsButton, 220, y)
+    at(legend, -24, y - 5, "TOPRIGHT")
+    return -(y - 22) + 18
+end
+
 --- Re-scan the bags (unless only paging) and redraw.
 function UI.Refresh(keepScan)
     if not frame then return end
@@ -351,7 +400,8 @@ function UI.Refresh(keepScan)
         if not ns.Mailer.Busy() then result = ns.Bags.Evaluate() end
     end
     if not result then return end
-    title:SetText("Mailworthy  " .. (ns.MailButton.GamepadUI() and ns.Gamepad.Glyph(ns.Gamepad.FACE_TOP) or ""))
+    local pad = ns.MailButton.GamepadUI()
+    title:SetText("Mailworthy  " .. (pad and ns.Gamepad.Glyph(ns.Gamepad.FACE_TOP) or ""))
     local bankAlt = ns.Config.BankAlt()
     local isBankAlt = ns.Config.IsBankAltHere()
     toName:SetText("|cffffd100To:|r " .. (bankAlt or "|cffff8040no bank alt set: press Settings|r"))
@@ -362,35 +412,52 @@ function UI.Refresh(keepScan)
         local items = result[list == "mail" and "mail" or "keep"]
         if pages[list] > math.max(1, math.ceil(#items / n)) then pages[list] = 1 end
     end
-    mailCount:SetText(string.format("%d items in %d mail%s", t.items, t.mails, t.mails == 1 and "" or "s"))
+    mailCount:SetText(string.format("%d item%s · %d mail%s", t.items, t.items == 1 and "" or "s",
+        t.mails, t.mails == 1 and "" or "s"))
     stayCount:SetText(string.format("%d item%s", #result.keep, #result.keep == 1 and "" or "s"))
-    fillRoutes()
-    fillMail(result.mail)
-    fillStay(result.keep)
+    local okStale, nudge = pcall(ns.Stale.Current)
+    local staleText = okStale and ns.Stale.Text(nudge) or nil
+    staleLine:SetText(staleText or "")
+    if staleText then staleLine:Show() else staleLine:Hide() end
+    local shown = {
+        stale = staleText ~= nil,
+        routes = fillRoutes(),
+        mail = fillList(mailRows, result.mail, pages.mail, UI.MAIL_ROWS, fillMailRow),
+        stay = fillList(stayRows, result.keep, pages.stay, UI.STAY_ROWS, fillStayRow),
+    }
     pageLabel(mailPage, result.mail, UI.MAIL_ROWS)
     pageLabel(stayPage, result.keep, UI.STAY_ROWS)
+    -- The hint gives way to the pager on a long list (they share the heading line).
+    if shown.mail > 0 and not mailPage:IsShown() then mailHint:Show() else mailHint:Hide() end
+    if shown.mail > 0 then mailEmpty:Hide() else mailEmpty:Show() end
+    for _, w in ipairs({ stayHead, stayCount }) do
+        if shown.stay > 0 then w:Show() else w:Hide() end
+    end
 
-    local friends = t.routed > 0 and string.format("; %d stack%s to friends", t.routed, t.routed == 1 and "" or "s") or ""
     if result.priced then
         totalLine:SetText("+" .. money(t.gain) .. " more than vendoring")
-        totalNote:SetText(string.format("after the %d%% auction cut, deposits (%dh listing) and postage (%s)%s",
+        totalNote:SetText(string.format("after the %d%% AH cut, %dh deposits and %s postage",
             math.floor(result.settings.cut * 100 + 0.5), ns.Valuation.DURATION_HOURS[result.settings.duration],
-            money(t.postage), friends))
+            money(t.postage)))
     else
         totalLine:SetText(string.format("%d common item%s to mail", t.items, t.items == 1 and "" or "s"))
-        totalNote:SetText("No Auctionator prices: mailing white items only. Postage " .. money(t.postage) .. "." .. friends)
+        totalNote:SetText("No Auctionator: only white items go. Postage " .. money(t.postage) .. ".")
     end
-    sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt))
-    local deAddon = ns.Prices.DisenchantAddon()
-    pricesLine:SetText(string.format("Prices: %s  ·  Disenchant values: %s",
-        result.priced and "Auctionator" or "none",
-        result.settings.disenchant and ("on" .. (deAddon and (" (" .. deAddon .. ")") or " (era tables)")) or "off"))
+    -- While sending (and after), the mailer's progress or problem takes the fees line.
     local status = ns.Mailer.Status()
-    if not status then
-        status = "Press an item to lock it (it stays in your bags); press a locked one to unlock it."
+    if status then totalNote:SetText(status) end
+    local sendText = ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt)
+    if UI.OnInbox() and not ns.Mailer.Busy() then
+        -- Mail goes out from the Send Mail tab only, and we never switch tabs ourselves
+        -- (MailFrameTab_OnClick taints the controller UI): say so on the button itself,
+        -- and follow the player to that tab (the watcher below).
+        sendText = "Open the Send Mail tab"
+        totalNote:SetText("|cffffd100Mail goes out from the Send Mail tab, under the mail window: this list follows you there.|r")
     end
-    statusLine:SetText(status)
-    legend:SetText(ns.MailButton.GamepadUI() and W.Legend(ns.Gamepad.Glyph(ns.Gamepad.FACE_TOP) .. " open / close") or "")
+    sendButton:SetText(sendText)
+    legend:SetText(pad and W.Legend() or "")
+    frame:SetHeight(UI.Layout(shown))
+    ns.Nav.Revalidate()
 end
 
 function UI.Send()
@@ -420,6 +487,26 @@ function UI.Show(tab)
     ns.Log.Add("ui", "mail window shown (%s tab): %d to mail, %d staying", tostring(tab), #result.mail, #result.keep)
 end
 
+--- True while the window sits on the Inbox tab (mouse/keyboard), where nothing can be sent.
+function UI.OnInbox()
+    local send, inbox = rawget(_G, "SendMailFrame"), rawget(_G, "InboxFrame")
+    return frame ~= nil and type(inbox) == "table" and frame:GetParent() == inbox
+        and not (type(send) == "table" and send:IsShown())
+end
+
+--- Opened on the Inbox and the player moved to Send Mail: move the window there too.
+--- (Opened on Send Mail and back from the Inbox needs nothing: it was hidden with its tab.)
+function UI.FollowTab()
+    local send, inbox = rawget(_G, "SendMailFrame"), rawget(_G, "InboxFrame")
+    if frame and frame:IsShown() and type(inbox) == "table" and frame:GetParent() == inbox
+        and type(send) == "table" and send:IsShown() then
+        ns.Log.Add("ui", "mail window follows to the Send Mail tab")
+        UI.Show("send")
+        return true
+    end
+    return false
+end
+
 function UI.Toggle(tab)
     if frame and frame:IsShown() then
         frame:Hide()
@@ -435,6 +522,17 @@ UI.RefreshIfShown = refreshIfShown
 
 ns.On("PLAYER_LOGIN", function()
     UI.Create()
+    -- Our own watcher frame (created at login, on UIParent): reads which tab shows, five
+    -- times a second, nothing more. Errors are logged, never raised every frame.
+    local watcher = CreateFrame("Frame", "MailworthyTabWatcher", UIParent)
+    local elapsed = 0
+    watcher:SetScript("OnUpdate", function(_, dt)
+        elapsed = elapsed + (dt or 0)
+        if elapsed < 0.2 then return end
+        elapsed = 0
+        local ok, err = pcall(UI.FollowTab)
+        if not ok then ns.Log.Add("ui", "tab watcher error: %s", tostring(err)) end
+    end)
     ns.Locks.OnChanged(refreshIfShown)
     -- While sending, redraw the status only; once it's done or stopped, re-scan: the bag
     -- update for the sent items may have come mid-send, when it was skipped (v0.4.0).
