@@ -56,20 +56,16 @@ Valuation.PROFESSION_MATS = {
         mats = "metal and stone, parts, explosives, devices" },
     [165] = { name = "Leatherworking", subclasses = { [6] = true }, mats = "leather and hides" },
     [197] = { name = "Tailoring", subclasses = { [5] = true }, mats = "cloth" },
-    -- On Forever First Aid also makes the healing potions (moved from Alchemy), Tourniquets
-    -- and Anti-Venoms (research 2026-11-06; operator: "Yes, keep them"): those exact items,
-    -- not all herbs or leather (nearly every character has First Aid). Poultice reagents
-    -- (Spider Ichor, Murloc Fin, Elemental Water, Essence of Water) stay mailable.
-    [129] = { name = "First Aid", subclasses = { [5] = true }, mats = "cloth, healing-potion herbs, venom sacs, leather",
-        items = {
-            [2447] = true, [2450] = true, [2453] = true, [3357] = true, [8838] = true, [13464] = true, -- herbs
-            [1475] = true, [1288] = true, [19441] = true, -- Small, Large, Huge Venom Sac
-            [4304] = true, [8170] = true,                 -- Thick, Rugged Leather (Tourniquets)
-        } },
+    [129] = { name = "First Aid", subclasses = { [5] = true }, mats = "cloth, healing-potion herbs, venom sacs, leather" },
     [171] = { name = "Alchemy", subclasses = { [9] = true }, mats = "herbs" },
     [333] = { name = "Enchanting", subclasses = { [12] = true }, mats = "dust, essences and shards" },
     [185] = { name = "Cooking", subclasses = { [8] = true }, mats = "meat and fish" },
 }
+
+-- Beyond the subclasses, the exact items each profession keeps (Tiers.KEEP, TierData.lua): on
+-- Forever First Aid also makes potions, Anti-Venoms and Tourniquets; a blacksmith's gems, an
+-- engineer's cloth, a cook's tea herbs ... while levelling (research and operator, 2026-11-06).
+for id, p in pairs(Valuation.PROFESSION_MATS) do p.items = ns.Tiers.KEEP[id] end
 
 -- What each gathering profession brings in, by skill line ID and trade-goods subclass. Used
 -- only by the "Sell what I gather" setting (sellGathered, off by default): a miner who is
@@ -128,15 +124,21 @@ end
 --- A profession whose skill (`rank` in a { skillLine, rank } entry) is past the item
 --- (Tiers: Linen Cloth is done for First Aid at 80) doesn't count, unless `tiers` is
 --- false. Second return: { name, skill } of the first profession past it, when none
---- needs it; third: the skill at which the needing profession will be done with it.
-function Valuation.NeededBy(item, professions, tiers)
+--- needs it; third: the skill at which the needing profession will be done with it; fourth:
+--- the conversion ({ into, count, name }) when it's past its own recipes but converting it pays
+--- (Tiers.WorthConverting with `priceOf`, an itemID -> unit auction price function).
+function Valuation.NeededBy(item, professions, tiers, priceOf)
     local outgrown
     for _, p in ipairs(type(professions) == "table" and professions or {}) do
         local id = tonumber(type(p) == "table" and p.skillLine or p)
         local known = Valuation.PROFESSION_MATS[id or -1]
         if Valuation.Uses(known, item) then
             local rank = type(p) == "table" and tonumber(p.rank) or nil
-            if tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank) then
+            local convert = tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank)
+                and ns.Tiers.WorthConverting(id, item.itemID, priceOf) or nil
+            if convert then
+                return known.name, nil, nil, convert
+            elseif tiers ~= false and ns.Tiers.Outgrown(id, item.itemID, rank) then
                 outgrown = outgrown or { name = known.name, skill = rank }
             else
                 return known.name, nil, tiers ~= false and ns.Tiers.Threshold(id, item.itemID) or nil
@@ -362,15 +364,16 @@ function Valuation.Evaluate(item, price, settings)
     if item.inUse then return keep("in use") end
     if Valuation.IsTool(item) then return keep("profession tool") end
     if settings.keepProfessionMats then
-        local profession, _, untilSkill = Valuation.NeededBy(item, settings.professions, settings.tiers)
+        local profession, _, untilSkill, convert = Valuation.NeededBy(item, settings.professions, settings.tiers,
+            settings.priceOf)
         -- "Sell what I gather": what a gathering profession brought in is valued like anything else.
         if profession and not (settings.sellGathered and Valuation.GatheredBy(item, settings.professions)) then
-            return keep("your " .. profession .. " needs it", { untilSkill = untilSkill })
+            return keep("your " .. profession .. " needs it", { untilSkill = untilSkill, convert = convert })
         end
     end
     local r = evaluate(item, price, settings)
     if settings.keepProfessionMats and r.reason ~= "item info not loaded yet" then
-        local _, outgrown = Valuation.NeededBy(item, settings.professions, settings.tiers)
+        local _, outgrown = Valuation.NeededBy(item, settings.professions, settings.tiers, settings.priceOf)
         r.outgrown = outgrown -- "your First Aid (80) is past it", in the workings
     end
     return r

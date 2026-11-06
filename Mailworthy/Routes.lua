@@ -114,15 +114,19 @@ end
 
 --- Pure: the item is a trade good the binding's profession uses, or, for Enchanting, a
 --- green or blue weapon or armor piece to disenchant. A material the bound player's skill
---- (`route.skill`, Routes.Skill) is past (Tiers) doesn't match, unless `tiers` is false;
+--- (`route.skill`, Routes.Skill) is past (Tiers) doesn't match, unless `tiers` is false or
+--- converting it still pays (Tiers.WorthConverting with `priceOf`: the friend converts it);
 --- the second return is then true.
-function Routes.Matches(route, item, tiers)
+function Routes.Matches(route, item, tiers, priceOf)
     if tonumber(route.profession) == Routes.ENCHANTING and Routes.GEAR_QUALITIES[tonumber(item.quality) or -1]
         and ns.Valuation.CanDisenchant(item) then
         return true
     end
     if not ns.Valuation.Uses(ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1], item) then return false end
-    if tiers ~= false and ns.Tiers.Outgrown(route.profession, item.itemID, route.skill) then return false, true end
+    if tiers ~= false and ns.Tiers.Outgrown(route.profession, item.itemID, route.skill)
+        and not ns.Tiers.WorthConverting(route.profession, item.itemID, priceOf) then
+        return false, true
+    end
     return true
 end
 
@@ -201,7 +205,7 @@ function Routes.Divert(item, verdict, price, settings, routes)
     if verdict and verdict.action == "keep" and Routes.HARD_KEEPS[verdict.reason] then return nil end
     local outgrown
     for _, route in ipairs(routes or {}) do
-        local matches, past = Routes.Matches(route, item, settings and settings.tiers)
+        local matches, past = Routes.Matches(route, item, settings and settings.tiers, settings and settings.priceOf)
         if past then outgrown = outgrown or route end
         if matches then
             local unit
@@ -530,11 +534,11 @@ function Routes.ReportLines()
     for _, r in ipairs(Routes.List()) do
         local to, crafter = Routes.Recipient(r)
         local skill = Routes.Skill(r)
-        local past = skill and ns.Tiers.OutgrownNames(r.profession, skill) or {}
+        local past = skill and ns.Tiers.PastText(r.profession, skill) or ""
         lines[#lines + 1] = string.format("binding: %s (%s, %s%s, skill %s%s%s)", Routes.Describe(r),
             r.scope == "character" and "this character" or "all my characters", Routes.CapText(r),
             crafter and (", delivered to their crafter " .. to) or "", skill and tostring(skill) or "unknown",
-            #past > 0 and (": past " .. table.concat(past, ", ")) or "",
+            past ~= "" and (": past " .. past) or "",
             skipped[r.key] and ", skipped this visit" or "")
     end
     return lines

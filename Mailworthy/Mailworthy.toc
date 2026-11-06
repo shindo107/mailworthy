@@ -19,6 +19,7 @@ Border.lua
 Prices.lua
 Disenchant.lua
 Tiers.lua
+TierData.lua
 Valuation.lua
 Config.lua
 Routes.lua
