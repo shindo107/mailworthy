@@ -105,7 +105,9 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   Cloth still used by Soft-soled Linen Boots (yellow) at skill 120, table says done at 115"),
   and it stays in your bags until the window shows that recipe grey. First Aid cloth is not
   checked (it is done when the next bandage can be learned, not when the old one turns grey).
-  Read only: nothing is clicked or changed in the profession window. `/mw feature tierCheck off`.
+  Read only: nothing is clicked or changed in the profession window. The same lines are saved in
+  Mailworthy's SavedVariables (`MailworthyDB.tierCheck`, written at `/reload` or logout), so
+  running `/mw report` is optional. `/mw feature tierCheck off`.
 - **Sell what I gather** (off by default, a setting turns it on): for a gatherer who also
   crafts with the same materials (a miner-blacksmith, an herbalist-alchemist, a
   skinner-leatherworker, a fisher-cook), what the gathering profession brings in is mailed

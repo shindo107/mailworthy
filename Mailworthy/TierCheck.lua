@@ -224,7 +224,9 @@ end
 
 local function charKey() return ns.Characters.Key(ns.Characters.Current()) end
 
---- The saved reads: MailworthyDB.tierCheck[character key][skill line] = { rank, at, recipes, source, reagents }.
+--- The saved reads: MailworthyDB.tierCheck[character key][skill line] = { rank, at, recipes, source, reagents,
+--- profession, skillLine, version, findings = { { itemID, name, doneAt, recipe, difficulty, color, via, text }, ... } }
+--- (findings: what the table, as of `version`, calls done that a non-grey recipe still uses; /mw report's lines).
 function TierCheck.Records()
     MailworthyDB.tierCheck = type(MailworthyDB.tierCheck) == "table" and MailworthyDB.tierCheck or {}
     return MailworthyDB.tierCheck
@@ -257,6 +259,15 @@ function TierCheck.Scan(craft)
     records[key] = type(records[key]) == "table" and records[key] or {}
     records[key][read.skillLine] = record
     local findings = TierCheck.Findings(read.skillLine, record)
+    -- The comparison is saved with the read, so the SavedVariables file holds the answer for a reader
+    -- outside the game (rl-companion) without the tier table or /mw report.
+    record.profession, record.skillLine, record.version = professionName(read.skillLine), read.skillLine, ns.VERSION
+    record.findings = {}
+    for _, f in ipairs(findings) do
+        record.findings[#record.findings + 1] = { itemID = f.itemID, name = f.name, doneAt = f.at, recipe = f.recipe,
+            difficulty = f.difficulty, color = TierCheck.COLORS[f.difficulty], via = f.via,
+            text = TierCheck.FindingText(f, record.rank) }
+    end
     local sig = string.format("%d:%d:%d", record.rank, record.recipes, #findings)
     if lastLogged[read.skillLine] ~= sig then
         lastLogged[read.skillLine] = sig

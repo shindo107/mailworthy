@@ -329,6 +329,10 @@ them) then I just keep going to the AH. Same methodology for all crafting materi
   rank that a non-grey recipe still uses (`TierCheck.Findings`), except First Aid cloth (its rule
   is the next bandage's learn skill). Those findings are evidence for `tools/tiers/data.py`; a
   human checks them (holiday recipes count here, not in the table). Meanwhile they are kept:
+  The comparison is saved with each read too (`findings`: `{ itemID, name, doneAt, recipe,
+  difficulty, color, via, text }`, plus `profession`, `skillLine` and the addon `version` whose
+  table it used), so a reader of the SavedVariables file outside the game (rl-companion) needs
+  neither the table nor `/mw report`; it reaches disk at `/reload` or logout.
   `Bags.Evaluate` gives this character's profession entries `stillUsed` (`TierCheck.Annotate`),
   and `Valuation.NeededBy` keeps an outgrown material listed there ("your Tailoring needs it
   (Soft-soled Linen Boots still yellow)") until a later read says only grey recipes use it.
