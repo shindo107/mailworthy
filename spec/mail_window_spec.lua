@@ -111,6 +111,74 @@ describe("mail window", function()
         assert.equal("Open the Send Mail tab", text("MailworthyMailSend"), "the button says why it can't send")
     end)
 
+    describe("the Inbox's 'Open the Send Mail tab' button", function()
+        local function open()
+            SendMailFrame:Hide()
+            InboxFrame:Show()
+            _G.MailworthyInboxButton:Click()
+            return ns.MailWindow.TabButton()
+        end
+
+        it("is a secure click on Blizzard's Send Mail tab, over Send, and no Mailworthy code clicks the tab", function()
+            local b = open()
+            assert.truthy(b.template:find("SecureActionButtonTemplate", 1, true))
+            assert.equal(UIParent, b:GetParent(), "on UIParent, not inside the window")
+            assert.equal("click", b:GetAttribute("type"))
+            assert.equal(_G.MailFrameTab2, b:GetAttribute("clickbutton"))
+            assert.is_nil(b.scripts.OnClick, "the template's secure OnClick, never one of ours")
+            assert.is_true(b:IsShown())
+            assert.is_false(_G.MailworthyMailSend:IsShown(), "it takes Send's place")
+            b:Click() -- in the stub nothing runs: in game Blizzard's SECURE_ACTIONS.click presses the tab
+            assert.equal(0, WowStub.tabClicks)
+            InboxFrame:Hide() -- the secure click switched tabs
+            SendMailFrame:Show()
+            _G.MailworthyTabWatcher.scripts.OnUpdate(_G.MailworthyTabWatcher, 0.3)
+            assert.is_false(b:IsShown())
+            assert.is_true(_G.MailworthyMailSend:IsShown())
+            assert.equal("Send to Roknua", text("MailworthyMailSend"))
+        end)
+
+        it("is hidden before combat starts and comes back after it", function()
+            local b = open()
+            ns.Fire("PLAYER_REGEN_DISABLED") -- runs before lockdown
+            WowStub.state.inCombat = true
+            assert.is_false(b:IsShown())
+            assert.is_true(_G.MailworthyMailSend:IsShown())
+            ns.MailWindow.Refresh()
+            assert.is_false(b:IsShown(), "never shown in combat")
+            WowStub.state.inCombat = false
+            ns.Fire("PLAYER_REGEN_ENABLED")
+            assert.is_true(b:IsShown())
+        end)
+
+        it("goes away with the window", function()
+            local b = open()
+            ns.MailWindow.Frame():Hide()
+            assert.is_false(b:IsShown())
+        end)
+
+        it("never with the controller UI (Cross presses are addon code)", function()
+            WowStub.state.gamepadUI = true
+            SendMailFrame:Hide()
+            InboxFrame:Show()
+            ns.MailWindow.Show("inbox")
+            assert.is_false(ns.MailWindow.TabButton():IsShown())
+        end)
+
+        it("/mw feature tabButton off: not created; Send only says what to do", function()
+            ns = loadAddon()
+            MailworthyDB.features = { tabButton = false }
+            ns.Fire("PLAYER_LOGIN")
+            ns.Config.SetBankAlt("Roknua Themicrulah")
+            assert.is_nil(ns.MailWindow.TabButton())
+            SendMailFrame:Hide()
+            InboxFrame:Show()
+            _G.MailworthyInboxButton:Click()
+            assert.equal("Open the Send Mail tab", text("MailworthyMailSend"))
+            assert.is_true(_G.MailworthyMailSend:IsShown())
+        end)
+    end)
+
     it("opened on the Inbox, follows the player to the Send Mail tab, where Send works", function()
         SendMailFrame:Hide()
         InboxFrame:Show()

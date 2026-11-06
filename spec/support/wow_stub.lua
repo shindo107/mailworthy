@@ -76,6 +76,11 @@ function WowStub.reset()
     _G.SendMailFrame = WowStub.newWidget("Frame", "SendMailFrame")
     _G.InboxFrame = WowStub.newWidget("Frame", "InboxFrame")
     _G.MailFrame = WowStub.newWidget("Frame", "MailFrame")
+    -- Blizzard's Send Mail tab: Mailworthy's code must never click it (specs check tabClicks stays 0).
+    _G.MailFrameTab2 = WowStub.newWidget("Button", "MailFrameTab2")
+    _G.MailFrameTab2.shown = true
+    _G.MailFrameTab2.scripts.OnClick = function() WowStub.tabClicks = WowStub.tabClicks + 1 end
+    WowStub.tabClicks = 0
     _G.ContainerFrameCombinedBags = WowStub.containerFrame()
     _G.ContainerFrameContainer = { ContainerFrames = { WowStub.containerFrame(), WowStub.containerFrame() } }
 end
@@ -144,6 +149,10 @@ local function newWidget(kind, name)
         if key == "Hide" then return function() self.shown = false; runHooks("OnHide") end end
         if key == "IsShown" then return function() return self.shown end end
         if key == "SetText" then return function(_, t) self.text = t end end
+        if key == "SetAttribute" then
+            return function(_, k, v) rawset(self, "attributes", rawget(self, "attributes") or {}); self.attributes[k] = v end
+        end
+        if key == "GetAttribute" then return function(_, k) return (rawget(self, "attributes") or {})[k] end end
         if key == "GetText" then return function() return self.text end end
         if key == "GetName" then return function() return self.name end end
         if key == "SetParent" then
@@ -180,8 +189,9 @@ local function newWidget(kind, name)
 end
 WowStub.newWidget = newWidget
 WowStub.frames = {}
-_G.CreateFrame = function(kind, name, parent)
+_G.CreateFrame = function(kind, name, parent, template)
     local w = newWidget(kind, name)
+    w.template = template
     w.parent = parent
     if type(parent) == "table" and parent.children then table.insert(parent.children, w) end
     if kind == "Frame" or kind == "Button" or kind == "EditBox" or kind == "ScrollFrame" then w.shown = true end
