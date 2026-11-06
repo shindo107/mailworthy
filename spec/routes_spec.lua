@@ -52,6 +52,29 @@ describe("bindings", function()
             assert.is_false(ns.Routes.Matches({ to = BOB, profession = 186 }, { classID = 7, subclassID = 7 }), "Mining binds nothing")
         end)
 
+        it("an Enchanting binding also takes green and blue weapons and armor to disenchant", function()
+            local route = { to = BOB, profession = ENCHANTING }
+            assert.is_true(ns.Routes.Matches(route, { classID = 4, subclassID = 2, quality = 2 }), "green armor")
+            assert.is_true(ns.Routes.Matches(route, { classID = 2, subclassID = 7, quality = 3 }), "blue weapon")
+            assert.is_false(ns.Routes.Matches(route, { classID = 4, subclassID = 2, quality = 1 }), "white armor doesn't disenchant")
+            assert.is_false(ns.Routes.Matches(route, { classID = 4, subclassID = 2, quality = 4 }), "epics stay on the normal rule")
+            assert.is_false(ns.Routes.Matches(route, { classID = 15, quality = 2 }), "a green that isn't gear")
+            assert.is_false(ns.Routes.Matches({ to = BOB, profession = TAILORING }, { classID = 4, subclassID = 1, quality = 2 }),
+                "only Enchanting takes gear")
+            local D = ns.Valuation.DEFAULTS
+            local cloak = { classID = 4, subclassID = 1, quality = 2, count = 1, stacks = 1, vendor = 120 }
+            local v = ns.Routes.Divert(cloak, { action = "mail", route = "de" }, { ah = 4900, age = 0 }, D,
+                { { to = BOB, profession = ENCHANTING, key = "k", cap = 50000 } })
+            assert.equal(BOB, v.to)
+            assert.is_nil(ns.Routes.Divert(cloak, { action = "keep", reason = "soulbound" }, nil, D,
+                { { to = BOB, profession = ENCHANTING, key = "k" } }), "soulbound gear never leaves")
+            local capped
+            v, capped = ns.Routes.Divert(cloak, { action = "mail", route = "ah" }, { ah = 60000, age = 0 }, D,
+                { { to = BOB, profession = ENCHANTING, key = "k", cap = 50000 } })
+            assert.is_nil(v, "6g on the auction house, over Bob's 5g cap: the bank alt lists it")
+            assert.truthy(capped)
+        end)
+
         it("diverts a matching item to the bound player, never a hard keep", function()
             local routes = { { to = BOB, profession = ENCHANTING, key = "333|bob surname", cap = 50000 } }
             local item = { classID = 7, subclassID = 12, count = 20, stacks = 1, vendor = 2 }
@@ -479,7 +502,8 @@ describe("bindings", function()
             assert.is_false(_G.MailworthyFriendsProfession1:IsShown())
             _G.MailworthyFriendsPick1:Click()
             assert.is_false(_G.MailworthyFriendsPick1:IsShown())
-            assert.truthy(_G.MailworthyFriendsProfession4:GetText():find("> Enchanting (dust, essences and shards) <", 1, true))
+            assert.truthy(_G.MailworthyFriendsProfession4:GetText()
+                :find("> Enchanting (dust, essences, shards, green and blue gear) <", 1, true))
             assert.equal("Alchemy (herbs)", _G.MailworthyFriendsProfession1:GetText())
             _G.MailworthyFriendsProfession4:Click()
             local r = ns.Routes.List()[1]

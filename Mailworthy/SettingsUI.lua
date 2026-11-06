@@ -275,11 +275,11 @@ local function createBagsAndMore()
     end)
     glowButton:SetPoint("TOPLEFT", 214, -320)
     heading(mainWidgets, "More", -356)
-    friendsButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.RoutesUI.Show() end,
+    friendsButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.RoutesUI.Show(frame) end,
         "MailworthySettingsFriends"))
     friendsButton:SetPoint("TOPLEFT", 24, -378)
     add(mainWidgets, W.Button(frame, "Bank alt summary...", 182, function()
-        if ns.BankAlt then ns.BankAlt.ShowWindow() end
+        if ns.BankAlt then ns.BankAlt.ShowWindow(frame) end
     end, "MailworthySettingsSummary")):SetPoint("TOPLEFT", 214, -378)
     minimapButton = toggle(182, "Minimap", function()
         ns.Config.Set("minimapHidden", ns.Config.MinimapShown())
@@ -415,8 +415,10 @@ function UI.Refresh()
 end
 
 --- Opens on the settings, or on the picker while no bank alt is set (there's nobody to mail yet).
-function UI.Show()
+--- `opener`: the Mailworthy window whose button opened it (placed beside that), or nil (centred).
+function UI.Show(opener)
     if not frame then UI.Create() end
+    W.PlaceBeside(frame, opener)
     setView(ns.Config.BankAlt() and "main" or "pick")
     UI.Refresh()
     frame:Show()

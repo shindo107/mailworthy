@@ -48,7 +48,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   materials to friends" button): pick a guild member, party member or one of your own
   characters (online players first; their professions are shown and suggested), then the
   profession. From then on everything that profession uses (dust, essences and shards for
-  an enchanter, cloth for a tailor, ...) is mailed to them, every time, for all your
+  an enchanter, plus green and blue weapons and armor for them to disenchant; cloth for a
+  tailor, ...) is mailed to them, every time, for all your
   characters on that realm and faction (or this character only). Each binding has a
   **price cap** (default 5g each): a material the market suddenly wants goes to your bank
   alt instead. The Mailworthy window lists the bindings with **Skip once** (this mailbox

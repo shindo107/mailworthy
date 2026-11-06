@@ -80,10 +80,20 @@ function Routes.Clean(name)
     return ns.Config.Clean(name)
 end
 
+-- An Enchanting binding also takes green and blue weapons and armor (operator, 2026-11-06:
+-- "the enchanter binding ... should also include green or blue items that can be used for
+-- disenchanting"): what the friend disenchants. The binding's price cap still sends a piece
+-- the auction house pays well for to the bank alt; soulbound gear never leaves (a hard keep).
+Routes.ENCHANTING = 333
+Routes.GEAR_QUALITIES = { [2] = true, [3] = true } -- uncommon (green), rare (blue)
+Routes.BINDING_MATS = { [333] = "dust, essences, shards, green and blue gear" } -- what a binding takes, when more
+
 --- The crafting professions a binding can name: { { id, name, mats }, ... } by name.
 function Routes.Professions()
     local list = {}
-    for id, p in pairs(ns.Valuation.PROFESSION_MATS) do list[#list + 1] = { id = id, name = p.name, mats = p.mats } end
+    for id, p in pairs(ns.Valuation.PROFESSION_MATS) do
+        list[#list + 1] = { id = id, name = p.name, mats = Routes.BINDING_MATS[id] or p.mats }
+    end
     table.sort(list, function(a, b) return a.name < b.name end)
     return list
 end
@@ -102,8 +112,13 @@ function Routes.Key(profession, to)
     return tostring(profession) .. "|" .. tostring(to):lower()
 end
 
---- Pure: the item is a trade good the binding's profession uses.
+--- Pure: the item is a trade good the binding's profession uses, or, for Enchanting, a
+--- green or blue weapon or armor piece to disenchant.
 function Routes.Matches(route, item)
+    if tonumber(route.profession) == Routes.ENCHANTING and Routes.GEAR_QUALITIES[tonumber(item.quality) or -1]
+        and ns.Valuation.CanDisenchant(item) then
+        return true
+    end
     if item.classID ~= ns.Valuation.TRADE_GOODS then return false end
     local p = ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1]
     return p ~= nil and p.subclasses[item.subclassID] == true

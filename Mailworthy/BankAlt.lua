@@ -355,8 +355,10 @@ function BankAlt.RefreshWindow()
     end
 end
 
-function BankAlt.ShowWindow()
+--- `opener`: the Mailworthy window whose button opened it (placed beside that), or nil (centred).
+function BankAlt.ShowWindow(opener)
     if not frame then BankAlt.CreateWindow() end
+    ns.Widgets.PlaceBeside(frame, opener)
     BankAlt.Invalidate()
     BankAlt.RefreshWindow()
     frame:Show()

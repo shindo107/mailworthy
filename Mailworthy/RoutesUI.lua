@@ -355,8 +355,10 @@ function UI.Bind(i)
     ns.MailWindow.RefreshIfShown()
 end
 
-function UI.Show()
+--- `opener`: the Mailworthy window whose button opened it (placed beside that), or nil (centred).
+function UI.Show(opener)
     if not frame then UI.Create() end
+    W.PlaceBeside(frame, opener)
     picked = nil
     view = ns.Routes.Count() == 0 and "add" or "list"
     pages.bind, pages.cand = 1, 1

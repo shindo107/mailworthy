@@ -163,7 +163,7 @@ end
 local function createRouteRows()
     routesHead = W.Label(frame, "GameFontNormal")
     routesHead:SetText("Bindings")
-    friendsButton = W.Button(frame, "Friends...", 90, function() ns.RoutesUI.Show() end, "MailworthyMailFriends")
+    friendsButton = W.Button(frame, "Friends...", 90, function() ns.RoutesUI.Show(frame) end, "MailworthyMailFriends")
     for i = 1, UI.ROUTE_ROWS do
         local row = {}
         row.text = W.Label(frame, "GameFontHighlightSmall")
@@ -284,7 +284,7 @@ function UI.Create()
     totalNote:SetJustifyH("LEFT")
 
     sendButton = W.Button(frame, "Send", 190, function() UI.Send() end, "MailworthyMailSend")
-    settingsButton = W.Button(frame, "Settings", 110, function() ns.SettingsUI.Show() end, "MailworthyMailSettings")
+    settingsButton = W.Button(frame, "Settings", 110, function() ns.SettingsUI.Show(frame) end, "MailworthyMailSettings")
     legend = W.Label(frame, "GameFontHighlightSmall")
 
     frame:SetScript("OnHide", function(self)
