@@ -25,7 +25,7 @@ local W = ns.Widgets
 local money = function(c) return ns.Valuation.Money(c) end
 
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
-local routesHead, totalLine, totalNote, sendButton, settingsButton, legend
+local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine
 local mailRows, stayRows, routeRows = {}, {}, {}
 local friendsButton
 local result
@@ -254,6 +254,10 @@ function UI.Create()
     toName:SetPoint("TOPLEFT", 24, -48)
     toNote = W.Label(frame, "GameFontDisableSmall")
     toNote:SetPoint("TOPRIGHT", -26, -52)
+    staleLine = W.Label(frame, "GameFontHighlightSmall")
+    staleLine:SetWidth(WIDTH - 48)
+    staleLine:SetJustifyH("LEFT")
+    staleLine:Hide()
     createRouteRows()
 
     mailHead = W.Label(frame, "GameFontNormal")
@@ -333,9 +337,13 @@ local function pageLabel(button, list, rows)
 end
 
 --- Place everything top to bottom for the rows that show; returns the window height.
---- `n` = { routes = , mail = , stay = } shown row counts.
+--- `n` = { routes = , mail = , stay = } shown row counts; `n.stale` = the stale-prices line shows.
 function UI.Layout(n)
     local y = -76
+    if n.stale then
+        at(staleLine, 24, y)
+        y = y - 32
+    end
     if n.routes > 0 then
         at(routesHead, 24, y)
         at(friendsButton, -24, y + 4, "TOPRIGHT")
@@ -407,7 +415,12 @@ function UI.Refresh(keepScan)
     mailCount:SetText(string.format("%d item%s · %d mail%s", t.items, t.items == 1 and "" or "s",
         t.mails, t.mails == 1 and "" or "s"))
     stayCount:SetText(string.format("%d item%s", #result.keep, #result.keep == 1 and "" or "s"))
+    local okStale, nudge = pcall(ns.Stale.Current)
+    local staleText = okStale and ns.Stale.Text(nudge) or nil
+    staleLine:SetText(staleText or "")
+    if staleText then staleLine:Show() else staleLine:Hide() end
     local shown = {
+        stale = staleText ~= nil,
         routes = fillRoutes(),
         mail = fillList(mailRows, result.mail, pages.mail, UI.MAIL_ROWS, fillMailRow),
         stay = fillList(stayRows, result.keep, pages.stay, UI.STAY_ROWS, fillStayRow),
