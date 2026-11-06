@@ -1,6 +1,7 @@
 -- The settings window (media/ux-pass-prototype.png), one task at a time:
 --   main view: the bank alt on one row with Change..., then "What gets mailed"
---     (minimum gain, listing length, disenchant, profession materials), "In your
+--     (minimum gain, listing length, disenchant, profession materials, sell what I
+--     gather), "In your
 --     bags" (tags, lock glow) and "More" (friends, bank alt summary, minimap button);
 --   pick view (Change..., and straight away while no bank alt is set): the known
 --     characters, "This character is my bank alt" (a main on another WoW account),
@@ -20,11 +21,12 @@ local UI = {}
 ns.SettingsUI = UI
 
 UI.MAX_CHOICES = 6
-local WIDTH, MAIN_HEIGHT, ROW = 420, 470, 26
+local WIDTH, MAIN_HEIGHT, ROW = 420, 496, 26
 
 local frame, nameBox, nameHint, current, emptyHint, legend, pricesLine, changeButton
 local choiceRows = {}
 local amountLabel, pctLabel, disenchantButton, minimapButton, tagsButton, glowButton, matsButton, hereButton, friendsButton
+local gatherButton
 local durationButtons = {}
 local mainWidgets, pickWidgets = {}, {}
 local typedLabel, useNameButton, backButton
@@ -253,38 +255,43 @@ local function createRule()
         if ns.BankAlt then ns.BankAlt.Redraw() end
     end)
     matsButton:SetPoint("TOPLEFT", 24, -236)
+    gatherButton = toggle(372, "Gather", function()
+        ns.Config.Set("sellGathered", not ns.Config.Get("sellGathered"))
+        if ns.BankAlt then ns.BankAlt.Redraw() end
+    end)
+    gatherButton:SetPoint("TOPLEFT", 24, -262)
 end
 
 local function createBagsAndMore()
-    heading(mainWidgets, "In your bags", -272)
+    heading(mainWidgets, "In your bags", -298)
     tagsButton = toggle(182, "Tags", function()
         ns.Config.Set("tagsEverywhere", not ns.Config.Flag("tagsEverywhere"))
         if ns.BankAlt then ns.BankAlt.Redraw() end
     end)
-    tagsButton:SetPoint("TOPLEFT", 24, -294)
+    tagsButton:SetPoint("TOPLEFT", 24, -320)
     glowButton = toggle(182, "Glow", function()
         ns.Config.Set("glowEverywhere", not ns.Config.Flag("glowEverywhere"))
         if ns.Border then ns.Border.RefreshAll() end
     end)
-    glowButton:SetPoint("TOPLEFT", 214, -294)
-    heading(mainWidgets, "More", -330)
+    glowButton:SetPoint("TOPLEFT", 214, -320)
+    heading(mainWidgets, "More", -356)
     friendsButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.RoutesUI.Show() end,
         "MailworthySettingsFriends"))
-    friendsButton:SetPoint("TOPLEFT", 24, -352)
+    friendsButton:SetPoint("TOPLEFT", 24, -378)
     add(mainWidgets, W.Button(frame, "Bank alt summary...", 182, function()
         if ns.BankAlt then ns.BankAlt.ShowWindow() end
-    end, "MailworthySettingsSummary")):SetPoint("TOPLEFT", 214, -352)
+    end, "MailworthySettingsSummary")):SetPoint("TOPLEFT", 214, -378)
     minimapButton = toggle(182, "Minimap", function()
         ns.Config.Set("minimapHidden", ns.Config.MinimapShown())
         if ns.MinimapButton then ns.MinimapButton.Refresh() end
     end)
-    minimapButton:SetPoint("TOPLEFT", 24, -378)
+    minimapButton:SetPoint("TOPLEFT", 24, -404)
     pricesLine = add(mainWidgets, W.Label(frame, "GameFontDisableSmall"))
-    pricesLine:SetPoint("TOPLEFT", 28, -420)
+    pricesLine:SetPoint("TOPLEFT", 28, -446)
     pricesLine:SetWidth(270)
     pricesLine:SetJustifyH("LEFT")
     add(mainWidgets, W.Button(frame, "Done", 100, function() frame:Hide() end, "MailworthySettingsDone"))
-        :SetPoint("TOPRIGHT", -24, -414)
+        :SetPoint("TOPRIGHT", -24, -440)
 end
 
 function UI.Create()
@@ -374,6 +381,10 @@ local function fillMain(bankAlt, here, choices)
     for _, p in ipairs(ns.Valuation.CraftingProfessions(ns.Characters.Professions())) do crafting[#crafting + 1] = p.name end
     matsButton:SetText(string.format("Keep my professions' materials: %s (%s)", v.keepProfessionMats and "on" or "off",
         #crafting > 0 and table.concat(crafting, ", ") or "no crafting profession here"))
+    local gathering = {}
+    for _, p in ipairs(ns.Valuation.GatheringProfessions(ns.Characters.Professions())) do gathering[#gathering + 1] = p.name end
+    gatherButton:SetText(string.format("Sell what I gather: %s (%s)", v.sellGathered and "on" or "off",
+        #gathering > 0 and table.concat(gathering, ", ") or "no gathering profession here"))
     tagsButton:SetText("Bag tags: " .. (ns.Config.Flag("tagsEverywhere") and "every character" or "bank alt only"))
     glowButton:SetText("Lock glow: " .. (ns.Config.Flag("glowEverywhere") and "always" or "mailbox only"))
     local bindings = ns.Routes.Count()

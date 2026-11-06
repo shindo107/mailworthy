@@ -194,7 +194,14 @@ function Bags.ProfessionMatsText(settings)
     if not settings.keepProfessionMats then return "mailed" end
     local names = {}
     for _, p in ipairs(ns.Valuation.CraftingProfessions(settings.professions)) do names[#names + 1] = p.name end
-    return #names > 0 and ("kept for " .. table.concat(names, ", ")) or "kept (no crafting profession here)"
+    local text = #names > 0 and ("kept for " .. table.concat(names, ", ")) or "kept (no crafting profession here)"
+    if settings.sellGathered and #names > 0 then
+        local gathered = {}
+        for _, p in ipairs(ns.Valuation.GatheringProfessions(settings.professions)) do gathered[#gathered + 1] = p.name end
+        text = text .. (#gathered > 0 and ("; what " .. table.concat(gathered, ", ") .. " gathers is mailed")
+            or "; sell what I gather: on (no gathering profession here)")
+    end
+    return text
 end
 
 function Bags.Report(result)

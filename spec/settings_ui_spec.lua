@@ -149,6 +149,10 @@ describe("settings window", function()
         assert.is_false(ns.Config.Get("keepProfessionMats"))
         assert.equal("Keep my professions' materials: off (Enchanting)",
             _G.MailworthySettingsMats:GetText())
+        assert.equal("Sell what I gather: off (Mining)", _G.MailworthySettingsGather:GetText(), "the stub character mines")
+        _G.MailworthySettingsGather:Click()
+        assert.is_true(ns.Config.Get("sellGathered"))
+        assert.equal("Sell what I gather: on (Mining)", _G.MailworthySettingsGather:GetText())
     end)
 
     it("the minimap button toggles the window", function()
