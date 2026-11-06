@@ -4,6 +4,18 @@
 -- FrameControlsManager:GetActiveFrame() and SmartNavigation:GetCurrentButton().
 local loadAddon = require("spec.support.load_addon")
 
+describe("no mail tab switching from Mailworthy's code", function()
+    it("never calls MailFrameTab_OnClick or clicks a mail tab (the Inbox button is a secure click)", function()
+        for _, file in ipairs({ "MailWindow", "MailButton", "Mailer", "Nav", "PadKey", "Core", "SettingsUI", "RoutesUI" }) do
+            local source = assert(io.open("Mailworthy/" .. file .. ".lua")):read("*a")
+            local code = source:gsub("%-%-[^\n]*", "") -- comments may name it
+            assert.is_nil(code:find("MailFrameTab_OnClick", 1, true), file)
+            assert.is_nil(code:find("MailFrameTab%d*[:.]Click"), file)
+            assert.is_nil(code:find("PanelTemplates_SetTab", 1, true), file)
+        end
+    end)
+end)
+
 describe("no writes into the controller UI", function()
     local saved
     before_each(function()

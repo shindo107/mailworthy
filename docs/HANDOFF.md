@@ -67,7 +67,7 @@ must never break the game.
 | `Config.lua` | saved settings (`MailworthyDB.settings` only what the player touched, `bankAlts[realm|faction]` set by a pick or by the bank alt itself via `SetBankAltHere`, `names` history); flags `minimapHidden`, `tagsEverywhere`, `glowEverywhere`; choices, auto-complete, steppers |
 | `Widgets.lua` | window / button / label / legend helpers shared by all windows |
 | `Mailer.lua` | sending: plan 12 stacks per mail, re-check each slot, attach, zero money/COD, `SendMail`, chain on `MAIL_SEND_SUCCESS`; stops on failure / close / combat / 10 s; a run id kills a stopped run's timers; records `MailworthyDB.mailed` (30 days) |
-| `MailWindow.lua` | the window at the mailbox (`media/ux-pass-prototype.png`): To, binding rows (only while there are bindings: Skip once / Remove, Friends...), Mailing rows (chip + gain), Staying rows (reason), total (its second line: fees, or the mailer's status), Send / Settings (no Close: X, Escape, Circle); `UI.Layout` sizes the window to the rows shown; rows toggle item locks; pages of 8 / 5. Opened on the Inbox (mouse), Send reads "Open the Send Mail tab" and `MailworthyTabWatcher` moves the window to Send Mail when the player goes there (never switches tabs itself) |
+| `MailWindow.lua` | the window at the mailbox (`media/ux-pass-prototype.png`): To, binding rows (only while there are bindings: Skip once / Remove, Friends...), Mailing rows (chip + gain), Staying rows (reason), total (its second line: fees, or the mailer's status), Send / Settings (no Close: X, Escape, Circle); `UI.Layout` sizes the window to the rows shown; rows toggle item locks; pages of 8 / 5. Opened on the Inbox (mouse), Send's place goes to `MailworthyOpenSendTab`, a secure "click" button on `MailFrameTab2` (v0.16.1 fix: v0.14.0's button only said what to do; switch `tabButton`), and `MailworthyTabWatcher` moves the window to Send Mail when the player goes there (Mailworthy's code never switches tabs) |
 | `BankAlt.lua` | bank alt view: verdicts with no postage (`Verdict`: ah / de / v), tags on bag buttons (a `Border` decorator), tooltip lines via `TooltipDataProcessor`, summary window (`/mw summary`, mail button on the bank alt); switches `bankAltTags`, `tooltipLines`; setting `tagsEverywhere` |
 | `SettingsUI.lua` | settings window, two views (`UI.View`): main (bank alt row with Change..., "What gets mailed": steppers, 2/8/24h, disenchant, profession materials; "In your bags": tags, glow; "More": friends, summary, minimap; the prices source) and pick (opened by Change..., and first while no bank alt is set: known characters, "This character is my bank alt" for a second account, optional typed name with "not seen" second press, Back); a pick returns to main; controller via `PadKey` set `settings` (works away from the mailbox) |
 | `MinimapButton.lua` | LedgerLink's minimap button (click: settings; drag: move); feature `minimapButton` |
@@ -141,7 +141,12 @@ Safe (verified or source-backed): own override bindings on our own frame
 listen to `UPDATE_BINDINGS`); `hooksecurefunc` post-hooks; textures / font strings
 on Blizzard frames kept in our own weak tables; read-only `GetActiveFrame`,
 `GetCurrentButton`, `InputUtil.IsGamepadUIEnabled`; mail API calls from timers;
-tooltip lines (Auctionator adds them, never blamed).
+tooltip lines (Auctionator adds them, never blamed); source-backed, not yet seen in game:
+a `SecureActionButtonTemplate` button with `type` = "click" and `clickbutton` = `MailFrameTab2`
+pressed by the player's **mouse** (Blizzard's `SECURE_ACTIONS.click` presses the tab, like a
+`/click` macro; `MailWindow.PlaceTabButton`: out of combat, mouse UI only, never via `Nav`,
+whose Cross press is addon code). `no_gamepad_taint_spec` checks no Mailworthy file calls
+`MailFrameTab_OnClick`, `PanelTemplates_SetTab` or a tab's `Click`.
 
 **Unsolved:** plain buttons under `SendMailFrame` should be in smart navigation's
 "Send Mail" group (`Utility.FindButtonGroups` walks all descendants, no bounds

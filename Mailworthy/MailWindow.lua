@@ -27,6 +27,7 @@ local money = function(c) return ns.Valuation.Money(c) end
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
 local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine
 local mailRows, stayRows, routeRows = {}, {}, {}
+local tabButton
 local friendsButton
 local result
 local pages = { mail = 1, stay = 1 }
@@ -288,7 +289,9 @@ function UI.Create()
 
     frame:SetScript("OnHide", function(self)
         if type(send) == "table" and self:GetParent() ~= send then self:SetParent(send) end
+        UI.PlaceTabButton()
     end)
+    UI.CreateTabButton()
     ns.Nav.Attach(frame)
     ns.Log.Add("ui", "mail window created%s", type(send) == "table" and " under SendMailFrame" or "")
     return frame
@@ -452,11 +455,13 @@ function UI.Refresh(keepScan)
         -- (MailFrameTab_OnClick taints the controller UI): say so on the button itself,
         -- and follow the player to that tab (the watcher below).
         sendText = "Open the Send Mail tab"
-        totalNote:SetText("|cffffd100Mail goes out from the Send Mail tab, under the mail window: this list follows you there.|r")
+        totalNote:SetText("|cffffd100Mail goes out from the Send Mail tab: press the button below (or the tab under the "
+            .. "mail window), and this list follows you there.|r")
     end
     sendButton:SetText(sendText)
     legend:SetText(pad and W.Legend() or "")
     frame:SetHeight(UI.Layout(shown))
+    UI.PlaceTabButton()
     ns.Nav.Revalidate()
 end
 
@@ -484,7 +489,64 @@ function UI.Show(tab)
     pages.mail, pages.stay = 1, 1
     UI.Refresh()
     frame:Show()
+    UI.PlaceTabButton() -- needs the window visible
     ns.Log.Add("ui", "mail window shown (%s tab): %d to mail, %d staying", tostring(tab), #result.mail, #result.keep)
+end
+
+-- The Inbox's "Open the Send Mail tab" button (operator, 2026-11-06: "open send mail tab
+-- button doesnt work": v0.14.0's Send button only said what to do). Mailworthy never
+-- switches tabs from its own code (MailFrameTab_OnClick writes MailFrame.activeSubFrame,
+-- which the controller focus code reads: taint). This button is a SecureActionButtonTemplate
+-- with type "click" and clickbutton = MailFrameTab2: the player's own mouse click makes
+-- Blizzard's secure code (SecureTemplates.lua SECURE_ACTIONS.click) press the Send Mail tab,
+-- the same path as a /click macro, so no Mailworthy code runs on the way. Created at login
+-- on UIParent; shown over the Send button only on the Inbox, with the mouse UI, out of
+-- combat (hidden and unanchored at PLAYER_REGEN_DISABLED, before lockdown); never driven
+-- by Nav (whose Cross press is addon code). Switch: /mw feature tabButton off (the Send
+-- button then only says what to do, as in v0.14.0).
+function UI.CreateTabButton()
+    if tabButton or not ns.Features.On("tabButton") then return tabButton end
+    local ok, b = pcall(CreateFrame, "Button", "MailworthyOpenSendTab", UIParent,
+        "UIPanelButtonTemplate,SecureActionButtonTemplate")
+    if not ok or not b then
+        ns.Log.Add("ui", "send-tab button not created: %s", tostring(b))
+        return nil
+    end
+    b:SetSize(190, 22)
+    b:SetText("Open the Send Mail tab")
+    b:RegisterForClicks("AnyUp", "AnyDown") -- the action fires on down or up, per ActionButtonUseKeyDown
+    b:SetAttribute("type", "click")
+    b:Hide()
+    tabButton = b
+    return b
+end
+
+function UI.TabButton() return tabButton end
+
+local function tabButtonWanted()
+    local tab = rawget(_G, "MailFrameTab2")
+    return tabButton ~= nil and frame ~= nil and frame:IsVisible() and UI.OnInbox() and type(tab) == "table"
+        and not ns.MailButton.GamepadUI() and not ns.Mailer.Busy() and not InCombatLockdown()
+end
+
+--- Show the secure button over Send while on the Inbox; otherwise hide and unanchor it.
+--- Out of combat only (a protected frame can't be shown, hidden or moved in combat).
+function UI.PlaceTabButton(entering)
+    if not tabButton or (InCombatLockdown() and not entering) then return end
+    if not entering and tabButtonWanted() then
+        tabButton:SetAttribute("clickbutton", rawget(_G, "MailFrameTab2"))
+        tabButton:SetFrameStrata(frame:GetFrameStrata())
+        tabButton:SetFrameLevel(frame:GetFrameLevel() + 10)
+        tabButton:ClearAllPoints()
+        tabButton:SetAllPoints(sendButton)
+        if not tabButton:IsShown() then ns.Log.Add("ui", "send-tab button shown on the Inbox") end
+        tabButton:Show()
+        sendButton:Hide()
+    else
+        tabButton:Hide()
+        tabButton:ClearAllPoints()
+        if sendButton then sendButton:Show() end
+    end
 end
 
 --- True while the window sits on the Inbox tab (mouse/keyboard), where nothing can be sent.
@@ -544,6 +606,9 @@ ns.On("PLAYER_LOGIN", function()
     local friends = ns.RoutesUI.Frame()
     if friends then friends:HookScript("OnHide", refreshIfShown) end
 end)
+-- PLAYER_REGEN_DISABLED runs before combat lockdown: the last moment to hide the secure button.
+ns.On("PLAYER_REGEN_DISABLED", function() UI.PlaceTabButton(true) end)
+ns.On("PLAYER_REGEN_ENABLED", function() if frame and frame:IsShown() then UI.PlaceTabButton() end end)
 ns.On("BAG_UPDATE_DELAYED", function()
     if not ns.Mailer.Busy() then refreshIfShown() end
 end)
