@@ -35,6 +35,7 @@ must never break the game.
 | **Target release UI** (mailbox window) | [media/ui-prototype.html](../media/ui-prototype.html) -> [.png](../media/ui-prototype.png) |
 | **Target bank alt view** (tags + tooltip + summary) | [media/bank-alt-prototype.html](../media/bank-alt-prototype.html) -> [.png](../media/bank-alt-prototype.png) |
 | **Bindings UI** (binding rows in the mail window, the friends window) | [media/bindings-prototype.html](../media/bindings-prototype.html) -> [.png](../media/bindings-prototype.png) |
+| **UX pass** (current layout of the mailbox, settings and friends windows, 2026-11-06) | [media/ux-pass-prototype.html](../media/ux-pass-prototype.html) -> [.png](../media/ux-pass-prototype.png) |
 | CurseForge description (paste into the project page) | [media/curseforge-description.html](../media/curseforge-description.html) |
 | Rebuild icon/avatar/TGA/screenshots | [tools/build-icons.sh](../tools/build-icons.sh) (Chrome headless + Pillow) |
 | Package layout check (CI) | [tools/check-package-layout.sh](../tools/check-package-layout.sh) |
@@ -66,14 +67,14 @@ must never break the game.
 | `Config.lua` | saved settings (`MailworthyDB.settings` only what the player touched, `bankAlts[realm|faction]` set by a pick or by the bank alt itself via `SetBankAltHere`, `names` history); flags `minimapHidden`, `tagsEverywhere`, `glowEverywhere`; choices, auto-complete, steppers |
 | `Widgets.lua` | window / button / label / legend helpers shared by all windows |
 | `Mailer.lua` | sending: plan 12 stacks per mail, re-check each slot, attach, zero money/COD, `SendMail`, chain on `MAIL_SEND_SUCCESS`; stops on failure / close / combat / 10 s; a run id kills a stopped run's timers; records `MailworthyDB.mailed` (30 days) |
-| `MailWindow.lua` | the window at the mailbox (`media/ui-prototype.png`): To, Mailing rows (chip + gain), Staying rows (reason), total, Send / Settings / Close; rows toggle item locks; pages of 8 / 5 |
+| `MailWindow.lua` | the window at the mailbox (`media/ux-pass-prototype.png`): To, binding rows (only while there are bindings: Skip once / Remove, Friends...), Mailing rows (chip + gain), Staying rows (reason), total (its second line: fees, or the mailer's status), Send / Settings (no Close: X, Escape, Circle); `UI.Layout` sizes the window to the rows shown; rows toggle item locks; pages of 8 / 5. Opened on the Inbox (mouse), Send reads "Open the Send Mail tab" and `MailworthyTabWatcher` moves the window to Send Mail when the player goes there (never switches tabs itself) |
 | `BankAlt.lua` | bank alt view: verdicts with no postage (`Verdict`: ah / de / v), tags on bag buttons (a `Border` decorator), tooltip lines via `TooltipDataProcessor`, summary window (`/mw summary`, mail button on the bank alt); switches `bankAltTags`, `tooltipLines`; setting `tagsEverywhere` |
-| `SettingsUI.lua` | settings window (bank alt buttons, "This character is my bank alt" for a second account, optional typed name with "not seen" second press, steppers, disenchant, 2/8/24h, minimap toggle); controller via `PadKey` set `settings` (works away from the mailbox) |
+| `SettingsUI.lua` | settings window, two views (`UI.View`): main (bank alt row with Change..., "What gets mailed": steppers, 2/8/24h, disenchant, profession materials; "In your bags": tags, glow; "More": friends, summary, minimap; the prices source) and pick (opened by Change..., and first while no bank alt is set: known characters, "This character is my bank alt" for a second account, optional typed name with "not seen" second press, Back); a pick returns to main; controller via `PadKey` set `settings` (works away from the mailbox) |
 | `MinimapButton.lua` | LedgerLink's minimap button (click: settings; drag: move); feature `minimapButton` |
 | `Report.lua` | `/mw report` (one copyable report: build, controller, switches, bank alt, settings, locks, last send, bindings, peers, blocked actions, log), the copy box `/mw scan` uses, and the AH sale-mail reader (house cut). Replaced the discovery self-test in Phase 5 |
 | `Routes.lua` | **bindings** (2026-10-26): a crafting profession's materials to one player (`MailworthyDB.routes[realm\|faction]` for all the account's characters, `MailworthyCharDB.routes` for this one; this character's win). Pure `Divert(item, verdict, price, settings, routes)`: route `friend`, `to`, `what`; never over a hard keep; at or above the binding's `cap` (copper per unit, `CAP_STEPS`, 5g default, nil = none) the normal verdict stands with `capped`. `SkipOnce` per mailbox visit. `Candidates()`: party / raid units, guild via `C_Club` (`GetGuildRosterInfo` fallback), known characters, peers; `Clean` drops "-Realm". Pure `Crafter(route, peer)` / `Recipient(route)`: the bound player, or the character of theirs that has the profession (from their hello) |
 | `Comms.lua` | hellos between Mailworthys (`C_ChatInfo`, prefix `Mailworthy`): `H2\|<own crafting skill lines>\|<Name=ids;...>` (the account's other crafters here) / `A2`; peers in `MailworthyDB.peers[realm\|faction]` (60 days); throttled; everything received is validated data. Switch `comms` |
-| `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button): binding rows (cap stepper, scope, Remove; names the crafter the mail goes to), then pick a player (online first, professions suggested), then the profession |
+| `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), two views (`UI.View`): list (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step); opens on add while there are no bindings; a binding returns to the list |
 
 Tests: `spec/` (busted on LuaJIT, 207 specs) with a WoW stub in
 `spec/support/wow_stub.lua` (bags, mail send tab, postage, timers with delays,
@@ -240,6 +241,18 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   own call. With Auctionator alone the tables still work ("era tables"); only the default of the
   checkbox depends on a disenchant addon being installed.
 
+- UX pass (operator, 2026-11-06: "simplify the ui and ux while still keeping functionality";
+  prototype `media/ux-pass-prototype.png` approved first): every window shows one task at a time
+  and hides what doesn't apply; nothing was removed except the mailbox window's Close button (the
+  X, Escape and Circle close it). Mailbox window: the bindings block only with bindings (Friends
+  is in Settings otherwise), the lock hint on the Mailing heading, the fees line doubles as the
+  mailer's status, the prices source moved to Settings, the window fits its rows. Settings: bank
+  alt on one row + Change... (the picker is its own view, and the first-run view). Friends: list
+  and add views. `Nav.Revalidate` moves the controller highlight off a button that a view switch
+  hid. Also from the operator that day: Send on the **Inbox** tab "didn't do anything, it felt
+  like a bug" (the status said why, too quietly): the button now reads "Open the Send Mail tab"
+  and the window follows the player to that tab (we still never switch tabs ourselves).
+
 - Bindings (operator, 2026-10-26: "send my enchanting mats to a guild member and bind that,
   until cancelled; easy to X on each send and to remove; few settings; an insane market high
   still goes to my alt"): `Routes.lua` / `RoutesUI.lua` / `Comms.lua`, PLAN "Bindings". Chosen:
@@ -296,3 +309,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    Skip once / Remove; two Mailworthy users see each other in `/mw report` ("mailworthy peer"
    with their other crafters) and a binding for a profession only an alt of theirs has shows
    "delivered to their ... character" and arrives there.
+8. In-game check of the UX pass (2026-11-06), mouse and controller: the mailbox window's
+   height follows its rows (no gaps, nothing overlapping on the Mailing heading line), the
+   bindings block appears only with a binding; opened on the Inbox, Send reads "Open the Send
+   Mail tab" and the window follows to Send Mail, where Send works; settings open on the picker
+   with no bank alt, Change... / Back, and the D-pad reaches every button in both views; the
+   friends window's list and add views, Back from step 2 and step 1; long button texts fit
+   ("Keep my professions' materials: on (Tailoring, Enchanting)").

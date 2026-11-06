@@ -31,8 +31,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   tooltips show today's verdict and why the item was mailed; the Mailworthy button (or
   `/mw summary`) sums it up.
 - **Bank alt on a second WoW account** (played on another monitor): mail crosses accounts,
-  saved settings don't. On your main, type the alt's name under "Or type it" in `/mw`
-  (press **Use name** twice: Mailworthy hasn't seen that character). On the alt's account
+  saved settings don't. On your main, press **Change...** in `/mw` and type the alt's name under
+  "Or type a name" (press **Use name** twice: Mailworthy hasn't seen that character). On the alt's account
   install Auctionator and Mailworthy, run an Auctionator scan there, open `/mw` and press
   **This character is my bank alt**: the tags, tooltips and summary come on. Each account
   keeps its own price scans, and the "Mailed for" tooltip line stays on the sending account.
