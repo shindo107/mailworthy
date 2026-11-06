@@ -130,6 +130,12 @@ function Nav.Stop()
     Nav.Select(nil)
 end
 
+--- After a window changed what it shows (a view switch, rows hidden): while the
+--- controller is navigating and its button went away, start again at the top-left.
+function Nav.Revalidate()
+    if current and not (current:IsVisible() and entryFor(current, Nav.Candidates())) then Nav.Reset() end
+end
+
 --- Close the window the controller is in (Circle).
 function Nav.CloseTop()
     local root = Nav.Root()
