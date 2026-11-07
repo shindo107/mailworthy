@@ -104,15 +104,23 @@ function Border.OnLockChanged(itemID, locked)
     Border.RefreshAll()
 end
 
+--- Every button of one container frame. Forever's EnumerateValidItems (BaseContainerFrameMixin)
+--- runs to GetBagSize() and yields `index, Items[index]` even when that button is nil: the
+--- combined bags' size counts every bag's slots, Items only the buttons laid out so far (v0.22.0
+--- logged "Border.lua:113: attempt to index local 'button'" at every login). Missing buttons are
+--- skipped; the ones after them are still drawn.
 function Border.RefreshFrame(frame)
     if type(frame) ~= "table" or type(frame.EnumerateValidItems) ~= "function" then return end
     local ok, iter, state, start = pcall(frame.EnumerateValidItems, frame)
     if not ok or type(iter) ~= "function" then return end
     local wanted = Border.Wanted()
     for _, button in iter, state, start do
-        local okBag, bag = pcall(button.GetBagID, button)
-        local okSlot, slot = pcall(button.GetID, button)
-        Border.RefreshButton(button, okBag and okSlot and bag or nil, okBag and okSlot and slot or nil, nil, wanted)
+        if type(button) == "table" then
+            local okBag, bag = pcall(button.GetBagID, button)
+            local okSlot, slot = pcall(button.GetID, button)
+            Border.RefreshButton(button, okBag and okSlot and bag or nil, okBag and okSlot and slot or nil, nil,
+                wanted)
+        end
     end
 end
 

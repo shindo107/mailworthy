@@ -54,6 +54,11 @@ local function fillBags()
         local bag, slot = i <= 4 and 1 or 2, i <= 4 and i or i - 4
         put(bag, slot, item(3000 + i, "Ore " .. i, { count = 5, sell = 5, class = 7, subclass = 7 }), 500)
     end
+    -- The game's combined bags as Forever has them (v0.22.0 errored on this at every login and
+    -- mailbox visit): buttons for the slots laid out so far, a size that counts every slot.
+    local combined = ContainerFrameCombinedBags
+    combined.Items = { WowStub.itemButton(0, 1), WowStub.itemButton(0, 2), WowStub.itemButton(0, 4) }
+    combined.size = 36
     return prices
 end
 

@@ -110,6 +110,26 @@ describe("locked-item glow", function()
         assert.is_false(shown(combined.Items[1]))
     end)
 
+    -- v0.22.0 on Forever 1.60.1 (2026-11-07): "Border.lua:113: attempt to index local 'button'
+    -- (a nil value)" at every login, bag update and mailbox visit. The combined bags' size counts
+    -- every bag's slots while Items holds only the buttons laid out so far, so Blizzard's
+    -- iterator yields nil buttons, and the error stopped the bank alt tags' redraw with it.
+    it("skips the missing buttons Forever's iterator yields, and still draws the rest", function()
+        MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
+        combined.Items = { WowStub.itemButton(0, 1), nil, WowStub.itemButton(1, 1) }
+        combined.size = 20
+        ns.Fire("BAG_UPDATE_DELAYED")
+        ns.Fire("MAIL_SHOW")
+        ns.Border.RefreshAll()
+        combined:UpdateItems()
+        for _, line in ipairs(MailworthyDB.log or {}) do
+            assert.is_nil(line:find("%[error%]"), line)
+            assert.is_nil(line:find("refresh error"), line)
+        end
+        assert.is_false(shown(combined.Items[1]))
+        assert.is_true(shown(combined.Items[3]), "a button after the hole still glows")
+    end)
+
     it("covers the individual bag frames too", function()
         local bag = ContainerFrameContainer.ContainerFrames[1]
         bag.Items = { WowStub.itemButton(1, 1) }

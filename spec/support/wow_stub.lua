@@ -105,17 +105,20 @@ function WowStub.itemButton(bag, slot)
 end
 
 --- A container frame: UpdateItems (hookable) and EnumerateValidItems over its pooled buttons.
+--- EnumerateValidItems is Forever's (Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua,
+--- BaseContainerFrameMixin): it runs to GetBagSize() and yields `index, Items[index]` even when
+--- that button is nil (the combined bags' size is every bag's slots; Items is only rebuilt when
+--- the frame lays itself out). `size` sets the bag size; by default it is #Items.
 function WowStub.containerFrame()
     local f = { Items = {} }
     function f.UpdateItems() end
     function f.CreateFontString() return WowStub.newWidget("FontString") end -- PadKey's L3 hint
-    function f.EnumerateValidItems(self)
-        local i = 0
-        return function()
-            i = i + 1
-            if self.Items[i] then return i, self.Items[i] end
-        end
+    function f.GetBagSize(self) return self.size or #self.Items end
+    local function iterator(container, index)
+        index = index + 1
+        if index <= container:GetBagSize() then return index, container.Items[index] end
     end
+    function f.EnumerateValidItems(self) return iterator, self, 0 end
     return f
 end
 
