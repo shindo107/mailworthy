@@ -116,7 +116,7 @@ the same pattern that made the More-menu entry taint gamepad input (alpha2).
 | Bank alt (mail recipient) | none; the mailbox button opens settings until it's set | account, per realm + faction |
 | Keep my professions' materials | **on**: trade goods this character's crafting professions use stay in the bags (cloth for Tailoring / First Aid, leather for Leatherworking, metal & stone for Blacksmithing, those plus parts / explosives / devices for Engineering, herbs for Alchemy, dust / essences / shards for Enchanting, meat and fish for Cooking; `Valuation.PROFESSION_MATS` by skill line ID and trade-goods subclass; gathering professions need nothing; elementals stay mailable). Operator, 2026-10-22 | account |
 | Include disenchant value | **on if Siz DisenchantValue (or Disenchantry) is installed**, otherwise off. The default applies only until the player touches the checkbox; after that their choice persists | account |
-| Minimum gain over vendor | **5s and 25%** (both must hold); two steppers in the settings window (gold/silver amount, percent), changeable any time, including from the preview's Settings button | account |
+| Minimum gain over vendor | **1s and 25%** (both must hold; operator 2026-11-07, was 5s); two steppers in the settings window (gold/silver amount, percent), changeable any time, including from the preview's Settings button | account |
 | Max price age | 7 days (Auctionator `GetAuctionAgeByItemLink`, confirmed on Forever) | account |
 | AH cut | 5% | account |
 | Listing length, relist factor | **24h** (duration 3), 1.0 (operator, 2026-10-13). Deposit = floor(vendor value of the stack x 5%) x 1 / 4 / 12 for 2h / 8h / 24h (measured; the game labels durations 1/2/3 "2 / 8 / 24 Hours"), so the default is **x12** | account |

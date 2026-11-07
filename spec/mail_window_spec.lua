@@ -18,6 +18,7 @@ describe("mail window", function()
 
     before_each(function()
         ns = loadAddon()
+        ns.Valuation.DEFAULTS.minGain = 500 -- these fixtures were built on the old 5s default (1s since 2026-11-07)
         ns.Fire("PLAYER_LOGIN")
         ns.Config.SetBankAlt("Roknua Themicrulah")
         prices = {}

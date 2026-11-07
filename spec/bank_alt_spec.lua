@@ -23,6 +23,7 @@ describe("bank alt view", function()
 
     before_each(function()
         ns = loadAddon()
+        ns.Valuation.DEFAULTS.minGain = 500 -- these fixtures were built on the old 5s default (1s since 2026-11-07)
         prices, postCalls, tooltipLines = {}, {}, {}
         _G.Auctionator = { API = { v1 = {
             GetAuctionPriceByItemLink = function(_, l) return prices[l] and prices[l].ah end,
@@ -70,7 +71,7 @@ describe("bank alt view", function()
         local item
         for _, i in ipairs(ns.BankAlt.Refresh().mail) do if i.itemID == 2770 then item = i end end
         assert.equal(0, item.result.postage)
-        assert.equal(826 - 6 - 25, item.result.gain)
+        assert.equal(826 - 50 - 25, item.result.gain, "half of the 1s minimum deposit")
     end)
 
     it("B: bank it for a later phase, with the tooltip and a summary row", function()
@@ -82,10 +83,10 @@ describe("bank alt view", function()
         assert.equal("B", tagOf(combined.Items[5]))
         local text = hover(WowStub.link(10940, "Strange Dust"), 10940)
         assert.truthy(text:find("Mailworthy  |cffffffff[Bank]|r", 1, true), text)
-        -- no postage here: 950 - 6 (half the deposit) - 20 vendor = 9s 24c
+        -- no postage here: 950 - 50 (half the 1s minimum deposit) - 20 vendor = 8s 80c
         assert.truthy(text:find("Bank it, don't list it yet: enchanting materials sell once raids open (launch day 35). "
-            .. "Listed today it would bring 1s each, 9s 24c more than a vendor.", 1, true), text)
-        assert.same({ stacks = 1, items = 10, gain = 924 }, ns.BankAlt.Summary(ns.BankAlt.Refresh()).b)
+            .. "Listed today it would bring 1s each, 8s 80c more than a vendor.", 1, true), text)
+        assert.same({ stacks = 1, items = 10, gain = 880 }, ns.BankAlt.Summary(ns.BankAlt.Refresh()).b)
         ns.HandleSlash("summary")
         assert.is_true(MailworthySummaryFrame:IsShown())
     end)
@@ -129,7 +130,7 @@ describe("bank alt view", function()
             .. ", from Tilda Quickfoot", 1, true), text)
         text = hover(WowStub.link(2770, "Copper Ore"), 2770)
         assert.truthy(text:find("Auction price today: 1s 74c each (scanned today). After the 5% cut and the 24h deposit: "
-            .. "7s 95c more than a vendor.", 1, true), text)
+            .. "7s 51c more than a vendor.", 1, true), text)
         assert.is_nil(text:find("Mailed for", 1, true), "never mailed: no such line")
     end)
 
@@ -146,7 +147,7 @@ describe("bank alt view", function()
     it("summary: stacks to list, items to disenchant, what's now better at a vendor", function()
         MailworthyDB.mailed = { [2589] = { route = "ah", at = WowStub.state.serverTime } }
         local s = ns.BankAlt.Summary(ns.BankAlt.Refresh())
-        assert.same({ stacks = 1, items = 5, gain = 795 }, s.ah)
+        assert.same({ stacks = 1, items = 5, gain = 751 }, s.ah)
         assert.same({ stacks = 1, items = 1, gain = 950 }, s.de)
         assert.same({ stacks = 1, items = 20, vendor = 200, wasAuction = 1 }, s.v)
         MailworthyDB.mailed = { [2589] = { route = "bank", listRoute = "ah", at = WowStub.state.serverTime } }
@@ -171,6 +172,7 @@ describe("bank alt view", function()
 
     it("switches: no tags and no tooltip hook when off", function()
         local ns2 = loadAddon() -- a fresh client: new bags and bag frames
+        ns2.Valuation.DEFAULTS.minGain = 500
         WowStub.setBag(0, 1, WowStub.item(2770, "Copper Ore", { count = 5, sell = 5 }))
         local button = WowStub.itemButton(0, 1)
         ContainerFrameCombinedBags.Items = { button }
@@ -199,6 +201,7 @@ describe("vendor tags on a main after sending", function()
 
     before_each(function()
         ns = loadAddon()
+        ns.Valuation.DEFAULTS.minGain = 500 -- these fixtures were built on the old 5s default (1s since 2026-11-07)
         prices = {}
         _G.Auctionator = { API = { v1 = {
             GetAuctionPriceByItemLink = function(_, l) return prices[l] end,
@@ -313,6 +316,7 @@ describe("bank alt on a second account (never sent, no pick from a main)", funct
 
     before_each(function()
         ns = loadAddon()
+        ns.Valuation.DEFAULTS.minGain = 500 -- these fixtures were built on the old 5s default (1s since 2026-11-07)
         prices, postCalls, tooltipLines = {}, {}, {}
         _G.Auctionator = { API = { v1 = {
             GetAuctionPriceByItemLink = function(_, l) return prices[l] and prices[l].ah end,
@@ -360,11 +364,11 @@ describe("bank alt on a second account (never sent, no pick from a main)", funct
         _G.MailworthySettingsHere:Click()
         local text = hover(WowStub.link(2770, "Copper Ore"), 2770)
         assert.truthy(text:find("Mailworthy  |cffffffff[Auction]|r", 1, true), text)
-        assert.truthy(text:find("7s 95c more than a vendor.", 1, true), text)
+        assert.truthy(text:find("7s 51c more than a vendor.", 1, true), text)
         assert.is_nil(text:find("Mailed for", 1, true), "no record: no such line")
         assert.is_nil(MailworthyDB.mailed, "hovering writes nothing")
         local s = ns.BankAlt.Summary(ns.BankAlt.Refresh())
-        assert.same({ stacks = 1, items = 5, gain = 795 }, s.ah)
+        assert.same({ stacks = 1, items = 5, gain = 751 }, s.ah)
         assert.same({ stacks = 1, items = 20, vendor = 200, wasAuction = 0 }, s.v)
         ns.HandleSlash("summary")
         assert.is_true(MailworthySummaryFrame:IsShown())
