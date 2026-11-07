@@ -15,10 +15,14 @@
 -- is ever listed as owing you. Kept as running totals, so they outlive the log's pruning.
 --
 -- Values, "captured at the time of send": what you send is valued with your own prices when it
--- goes. What you receive takes the sender's value when their Mailworthy told yours (a "V2"
--- whisper right after the send, or as soon as they hear from you later), else your own price
--- when you take it. A sender's value counts at most PRICE_CAP times your own price, so a
--- made-up value can't run up a debt. Without a price an item is listed by count only.
+-- goes, with the age of that Auctionator scan. What you receive: when the sender's Mailworthy
+-- told yours its value and scan age (a "V2" whisper right after the send, or as soon as they
+-- hear from you later), the more up-to-date of the two at the time of send wins (operator,
+-- 2026-11-07: "we should trust the more up to date value at time of send"): your own price as
+-- it stood that day (your last scan then, or that day in Auctionator's history) against theirs;
+-- a tie or an unknown age keeps the sender's. A sender's value counts at most PRICE_CAP times
+-- your own, so a made-up value can't run up a debt. Without their value, your own price when
+-- you take it. Without any price an item is listed by count only.
 --
 -- How it sees mail: hooksecurefunc post-hooks on SendMail, TakeInboxItem, AutoLootMailItem and
 -- TakeInboxMoney (AGENTS: post-hooks are allowed), confirmed by MAIL_SEND_SUCCESS and
@@ -107,21 +111,51 @@ function Ledger.Owner(name)
 end
 
 --- This account's own value of one unit (copper): the price the decision rule uses (the last
---- scan, capped by the recent median), or nil without one.
+--- scan, capped by the recent median), or nil without one; and the scan's age in days (nil
+--- when Auctionator doesn't say).
 function Ledger.UnitValue(link)
     local price = link and ns.Prices.Lookup(link)
     if type(price) ~= "table" or price.ah == nil then return nil end
     local unit = ns.Valuation.SmoothedPrice(price)
-    return unit and math.floor(unit + 0.5) or nil
+    if not unit then return nil end
+    local age = tonumber(price.age)
+    return math.floor(unit + 0.5), age and math.max(0, math.floor(age)) or nil
 end
 
---- Pure: a sender's value checked against our own: { value, source = "sender" / "capped" /
---- "mine" }. `claimed` and `own` are totals for the stack (copper or nil).
-function Ledger.Choose(claimed, own, cap)
+--- Pure: our own price for one unit as it stood `daysAgo` days ago, and how old its scan was then.
+--- `price` = Prices.Lookup's table, `unit` = today's value of it (Ledger.UnitValue). Our last scan
+--- was already in when it is at least `daysAgo` old; a scan since then is newer than that day,
+--- so the day comes from Auctionator's history (the latest scanned day up to it, its lowest
+--- price seen), or nil when the history doesn't reach back.
+function Ledger.PriceThen(price, unit, daysAgo)
+    if type(price) ~= "table" or not unit then return nil end
+    local age = tonumber(price.age)
+    if age == nil then return unit, nil end
+    age = math.max(0, math.floor(age))
+    daysAgo = math.max(0, math.floor(daysAgo or 0))
+    if age >= daysAgo then return unit, age - daysAgo end
+    local history = type(price.history) == "table" and price.history or {}
+    if not history[1] or not tonumber(history[1].day) then return nil end
+    local thatDay = history[1].day + age - daysAgo
+    for _, row in ipairs(history) do -- newest first
+        if tonumber(row.day) and row.day <= thatDay and tonumber(row.minSeen) then
+            return math.floor(row.minSeen + 0.5), thatDay - row.day
+        end
+    end
+    return nil
+end
+
+--- Pure: the value of a received stack from the sender's (`claimed`, its scan `claimedAge` days
+--- old at the time of send) and ours as it stood then (`mine`, `mineAge`); totals in copper.
+--- The more up-to-date scan wins; a tie or an unknown age keeps the sender's, which counts at
+--- most `cap` times ours. Returns value, source ("sender" / "capped" / "fresher" / "mine"), age.
+function Ledger.Pick(claimed, claimedAge, mine, mineAge, cap)
     cap = cap or Ledger.PRICE_CAP
-    if claimed == nil then return own, own and "mine" or nil end
-    if own ~= nil and claimed > own * cap then return own * cap, "capped" end
-    return claimed, "sender"
+    if claimed == nil then return mine, mine and "mine" or nil, mineAge end
+    if mine == nil then return claimed, "sender", claimedAge end
+    if claimedAge ~= nil and mineAge ~= nil and mineAge < claimedAge then return mine, "fresher", mineAge end
+    if claimed > mine * cap then return mine * cap, "capped", mineAge end
+    return claimed, "sender", claimedAge
 end
 
 --- Pure: the priced total of an entry's items plus its gold, and how many items had no price.
@@ -281,8 +315,9 @@ end
 
 -- Values between Mailworthys --------------------------------------------------------------
 
---- Pure: the value messages for one sent mail: "V2|<from>|<to>|<at>|<itemID>:<count>:<copper>;..."
---- split to fit Comms.MAX_MESSAGE; priced items only.
+--- Pure: the value messages for one sent mail: "V2|<from>|<to>|<at>|<itemID>:<count>:<copper>[:<scan
+--- age in days>];..." split to fit Comms.MAX_MESSAGE; priced items only. (v0.25.0 sent no age, and
+--- reads these as before: its pattern skips the fourth number.)
 function Ledger.EncodeValues(from, to, at, items)
     local head = string.format("V%d|%s|%s|%d|", ns.Comms.VERSION, tostring(from), tostring(to), math.floor(at))
     local messages, parts = {}, {}
@@ -293,6 +328,7 @@ function Ledger.EncodeValues(from, to, at, items)
     for _, it in ipairs(items or {}) do
         if it.value and it.itemID then
             local part = string.format("%d:%d:%d", it.itemID, it.count or 1, math.floor(it.value))
+                .. (tonumber(it.age) and (":" .. math.floor(it.age)) or "")
             if #head + #table.concat(parts, ";") + #part + 1 > ns.Comms.MAX_MESSAGE then flush() end
             parts[#parts + 1] = part
         end
@@ -302,16 +338,18 @@ function Ledger.EncodeValues(from, to, at, items)
 end
 
 --- Pure: the body of a "V" message (after "V2|"), or nil: { from, to, at, items = { { itemID,
---- count, value } } }. Every field is checked; anything odd drops the message.
+--- count, value, age (nil when not sent) } } }. Every field is checked; anything odd drops it.
 function Ledger.DecodeValues(rest)
     local from, to, at, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
     from, to = from and clean(from), to and clean(to)
     if not from or not to or #from > ns.Comms.MAX_NAME or #to > ns.Comms.MAX_NAME or #at > 12 then return nil end
     local items = {}
-    for id, count, value in list:gmatch("(%d+):(%d+):(%d+)") do
-        id, count, value = tonumber(id), tonumber(count), tonumber(value)
+    for part in list:gmatch("[^;]+") do
+        local id, count, value, age = part:match("^(%d+):(%d+):(%d+):?(%d*)$")
+        if not id or #age > 3 then return nil end
+        id, count, value, age = tonumber(id), tonumber(count), tonumber(value), tonumber(age)
         if id < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER then return nil end
-        items[#items + 1] = { itemID = id, count = count, value = value }
+        items[#items + 1] = { itemID = id, count = count, value = value, age = age }
         if #items > Ledger.RECEIVE_SLOTS then return nil end
     end
     if #items == 0 then return nil end
@@ -388,21 +426,23 @@ function Ledger.HearValues(sender, msg)
     local key = msg.from:lower()
     expect[key] = tableOr(expect[key])
     for _, it in ipairs(msg.items) do
-        table.insert(expect[key], { at = msg.at, to = msg.to, itemID = it.itemID, count = it.count, value = it.value })
+        table.insert(expect[key], { at = msg.at, to = msg.to, itemID = it.itemID, count = it.count, value = it.value,
+            age = it.age })
     end
     while #expect[key] > Ledger.MAX_EXPECT do table.remove(expect[key], 1) end
     ns.Log.Add("ledger", "values from %s: %d item(s) mailed to %s", msg.from, #msg.items, msg.to)
     return msg
 end
 
---- The sender's value for `count` of `itemID` from `from`, used once (the oldest match), or nil.
+--- The sender's value for `count` of `itemID` from `from`, used once (the oldest match), or nil:
+--- { value, age (their scan's age at send, or nil), at (when they sent it) }.
 function Ledger.Claim(from, itemID, count)
     local list = store().expect[tostring(clean(from)):lower()]
     if type(list) ~= "table" then return nil end
     for i, e in ipairs(list) do
         if e.itemID == itemID and e.count == count then
             table.remove(list, i)
-            return tonumber(e.value)
+            return tonumber(e.value) and { value = tonumber(e.value), age = tonumber(e.age), at = tonumber(e.at) } or nil
         end
     end
     return nil
@@ -434,10 +474,10 @@ local function valued(items)
     local out = {}
     for _, it in ipairs(items or {}) do
         local link = it.link or (it.itemID and ("item:" .. it.itemID)) or nil
-        local unit = Ledger.UnitValue(link)
+        local unit, age = Ledger.UnitValue(link)
         out[#out + 1] = { itemID = tonumber(it.itemID), name = it.name or Ledger.NameOf(it.link) or ("item " .. tostring(it.itemID)),
             count = tonumber(it.count) or 1, value = unit and unit * (tonumber(it.count) or 1) or nil,
-            source = unit and "mine" or nil }
+            source = unit and "mine" or nil, age = unit and age or nil }
     end
     return out
 end
@@ -540,12 +580,18 @@ local function commit(take)
     local h = take.h
     local items = {}
     if take.item then
-        local own = Ledger.UnitValue(take.item.link or ("item:" .. take.item.itemID))
-        own = own and own * take.item.count or nil
-        local claimed = not h.returned and Ledger.Claim(h.sender, take.item.itemID, take.item.count) or nil
-        local value, source = Ledger.Choose(claimed, own)
+        local link, count = take.item.link or ("item:" .. take.item.itemID), take.item.count
+        local unit, age = Ledger.UnitValue(link)
+        local value, source = unit and unit * count or nil, unit and "mine" or nil
+        local claim = not h.returned and Ledger.Claim(h.sender, take.item.itemID, count) or nil
+        if claim then -- their value and ours, each as it stood when the mail went
+            local daysAgo = math.floor((now() - (claim.at or now())) / 86400)
+            local mine, mineAge = Ledger.PriceThen(unit and ns.Prices.Lookup(link), unit, daysAgo)
+            value, source, age = Ledger.Pick(claim.value, claim.age, mine and mine * count or nil, mineAge)
+        end
         items[1] = { itemID = take.item.itemID, name = take.item.name or Ledger.NameOf(take.item.link)
-            or ("item " .. tostring(take.item.itemID)), count = take.item.count, value = value, source = source }
+            or ("item " .. tostring(take.item.itemID)), count = count, value = value, source = source,
+            age = value and age or nil }
     end
     local entry = Ledger.Add({ dir = "received", other = h.sender, subject = h.subject, items = items,
         money = take.money or 0, cod = h.cod, returned = h.returned or nil, system = h.system or nil, via = "mail" })
@@ -591,7 +637,11 @@ function Ledger.Pending() return #pendingTakes, pendingSend ~= nil end
 local function itemText(it)
     local value = it.value and money(it.value) or "no price"
     if it.source == "sender" then value = value .. ", sender's value"
-    elseif it.source == "capped" then value = value .. ", capped at " .. Ledger.PRICE_CAP .. "x my price" end
+    elseif it.source == "capped" then value = value .. ", capped at " .. Ledger.PRICE_CAP .. "x my price"
+    elseif it.source == "fresher" then value = value .. ", my price: my scan was more up to date" end
+    if it.value and tonumber(it.age) then
+        value = value .. string.format(", scan %d day%s old", it.age, it.age == 1 and "" or "s")
+    end
     return string.format("%dx %s (item %s, %s)", it.count or 1, tostring(it.name), tostring(it.itemID), value)
 end
 

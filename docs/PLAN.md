@@ -525,6 +525,14 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   the whisperer or one of their listed characters, and uses the oldest match (item and count)
   when the item is taken, **at most 3x its own price** (a made-up value can't run up a debt).
   Otherwise its own price when taken. No price: listed by count, not in gold.
+- **The more up-to-date scan wins** (operator, 2026-11-07: "we should trust the more up to date
+  value at time of send"): each value carries its Auctionator scan's age in days
+  (`<itemID>:<count>:<copper>:<age>`; v0.25.0 sent none and still reads the new form). On
+  receipt, the receiver's own price as it stood the day the mail went (`Ledger.PriceThen`: its
+  last scan when that was already in, else that day in Auctionator's history, its lowest price
+  seen) is compared with the sender's: the fresher scan at the time of send wins; a tie, an
+  unknown age or no price of ours that day keeps the sender's (still capped at 3x ours). The
+  export shows each value's source and scan age.
 - Not built: face-to-face trades (Mark paid covers them), a shared "who owes whom" view (on
   purpose), merging characters of a player who doesn't run Mailworthy.
 - Switch `/mw feature ledger off` (no hooks, nothing logged).

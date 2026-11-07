@@ -119,6 +119,86 @@ describe("mail ledger", function()
         assert.truthy(ns.Ledger.ExportText():find("capped at 3x my price", 1, true))
     end)
 
+    describe("the more up-to-date scan at the time of send wins (operator, 2026-11-07)", function()
+        local ages, rows
+
+        --- Bob's values for 20 Linen Cloth mailed `daysAgo` days ago, his scan `theirAge` days old then.
+        local function bobSent(value, theirAge, daysAgo)
+            local item = { itemID = LINEN.id, count = 20, value = value, age = theirAge }
+            local m = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", WowStub.state.serverTime - daysAgo * 86400, { item })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+            inboxMail(LINEN, 20, { subject = "mats " .. #ns.Ledger.Store().log }) -- a new mail each time
+            take(LINEN.id)
+            return ns.Ledger.Store().log[#ns.Ledger.Store().log].items[1]
+        end
+
+        before_each(function()
+            ages, rows = {}, {}
+            local api = _G.Auctionator.API.v1
+            api.GetAuctionAgeByItemLink = function(_, l) return ages[l] end
+            _G.Auctionator.Database = { GetPriceHistory = function(_, key) return rows[key] end }
+            _G.Auctionator.Utilities = { BasicDBKeyFromLink = function(l) return l end }
+        end)
+
+        it("their scan is fresher: their value", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 5 -- ours: 50c each, 5 days old
+            local it = bobSent(1400, 0, 0)
+            assert.equal(1400, it.value)
+            assert.equal("sender", it.source)
+            assert.equal(0, it.age)
+        end)
+
+        it("ours is fresher: our value, even under theirs", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 1 -- ours: 50c each, a day old
+            local it = bobSent(1400, 6, 0)
+            assert.equal(1000, it.value)
+            assert.equal("fresher", it.source)
+            assert.truthy(ns.Ledger.ExportText():find("my scan was more up to date, scan 1 day old", 1, true))
+        end)
+
+        it("ours as it stood that day: a scan since the send doesn't count, Auctionator's history does", function()
+            local l = WowStub.link(LINEN.id, LINEN.name)
+            ages[l] = 0 -- scanned today, after Bob's mail two days ago
+            rows[l] = { { rawDay = 100, minSeen = 40, maxSeen = 45 }, { rawDay = 97, minSeen = 30, maxSeen = 35 } }
+            local it = bobSent(1400, 3, 2) -- that day (raw day 98), our latest scan was day 97: 1 day old
+            assert.equal(600, it.value, "20 at day 97's 30c")
+            assert.equal("fresher", it.source)
+            assert.equal(1, it.age)
+            rows[l] = nil
+            local again = bobSent(1400, 3, 2)
+            assert.equal(1400, again.value, "no history back to that day: theirs")
+        end)
+
+        it("a tie, or a sender's value without an age (v0.25.0), keeps theirs", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 2
+            assert.equal("sender", bobSent(1400, 2, 0).source)
+            assert.equal("sender", bobSent(1400, nil, 0).source)
+        end)
+
+        it("the age goes in the message, and v0.25.0's reader still gets the values", function()
+            local m = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", 1, {
+                { itemID = LINEN.id, count = 20, value = 1000, age = 3 }, { itemID = ORE.id, count = 20, value = 1200 } })
+            assert.equal("V2|Bob Surname|Rettana Quilwrit|1|2589:20:1000:3;2770:20:1200", m[1])
+            local decoded = ns.Comms.Decode(m[1]).values.items
+            assert.equal(3, decoded[1].age)
+            assert.is_nil(decoded[2].age)
+            local old = {}
+            for id, count, value in m[1]:match("|([%d:;]+)$"):gmatch("(%d+):(%d+):(%d+)") do
+                old[#old + 1] = id .. "x" .. count .. "=" .. value
+            end
+            assert.same({ "2589x20=1000", "2770x20=1200" }, old)
+            assert.is_nil(ns.Comms.Decode("V2|Bob|Rettana|1|2589:20:5:1234"))
+        end)
+
+        it("pure: the fresher scan, the cap on theirs, either side missing", function()
+            local Pick = ns.Ledger.Pick
+            assert.same({ 900, "fresher", 1 }, { Pick(5000, 4, 900, 1) })
+            assert.same({ 2700, "capped", 4 }, { Pick(5000, 4, 900, 4) })
+            assert.same({ 5000, "sender", 2 }, { Pick(5000, 2, nil, nil) })
+            assert.same({ 900, "mine", 1 }, { Pick(nil, nil, 900, 1) })
+        end)
+    end)
+
     it("value messages: only whispers, only for this account's characters, only from the mail's sender", function()
         local function hear(from, to, channel, sender)
             local m = ns.Ledger.EncodeValues(from, to, WowStub.state.serverTime, { { itemID = LINEN.id, count = 20, value = 9000 } })
@@ -163,7 +243,8 @@ describe("mail ledger", function()
         end
         assert.equal(1, #whispers, "the values go once Bob is heard from")
         assert.equal(BOB, whispers[1].target)
-        assert.equal("V2|Rettana Quilwrit|Bob Surname|" .. WowStub.state.serverTime .. "|10940:20:60", whispers[1].message)
+        assert.equal("V2|Rettana Quilwrit|Bob Surname|" .. WowStub.state.serverTime .. "|10940:20:60:0", whispers[1].message,
+            "value and scan age (0 days)")
         assert.is_nil(next(ns.Ledger.Store().outbox))
     end)
 
@@ -213,8 +294,10 @@ describe("mail ledger", function()
         inboxMail(LINEN, 20)
         take(LINEN.id)
         local text = ns.Ledger.ExportText()
-        local sent = text:find("SENT      Rettana Quilwrit -> Bob Surname  \"for you\"  20x Copper Ore (item 2770, 12s)", 1, true)
-        local got = text:find("RECEIVED  Bob Surname -> Rettana Quilwrit  \"mats\"  20x Linen Cloth (item 2589, 10s)", 1, true)
+        local sent = text:find("SENT      Rettana Quilwrit -> Bob Surname  \"for you\"  "
+            .. "20x Copper Ore (item 2770, 12s, scan 0 days old)", 1, true)
+        local got = text:find("RECEIVED  Bob Surname -> Rettana Quilwrit  \"mats\"  "
+            .. "20x Linen Cloth (item 2589, 10s, scan 0 days old)", 1, true)
         assert.truthy(sent, text)
         assert.truthy(got, text)
         assert.is_true(sent < got)
