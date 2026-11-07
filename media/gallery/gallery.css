@@ -1,0 +1,191 @@
+/* CurseForge gallery images (media/gallery/*.html -> *.png, tools/build-icons.sh).
+   Authored at 1280x720 CSS px, rendered at 1.25x = 1600x900. The windows follow the
+   shipped UI (the UX pass of 2026-11-06 plus later changes); their text is the addon's
+   own strings. Names are made up. */
+:root {
+  --gold: #ffd100; --text: #f2e8d0; --dim: #b9ad92; --edge: #8a6a2a; --edge-hi: #e0b44c;
+  --panel: #15110c; --row: #221b12; --row-alt: #1c160f; --green: #1eff00; --white: #ffffff;
+  --mint: #33ff99; --note: #9ec7ff; --lock: #4da6ff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1280px; height: 720px; overflow: hidden; }
+body {
+  position: relative;
+  font: 13px/1.35 "Trebuchet MS", "Segoe UI", Arial, sans-serif; color: var(--text);
+  background: radial-gradient(ellipse at 70% 35%, #34432f 0%, #1a2219 50%, #0b0f0b 100%);
+}
+body.dusk { background: radial-gradient(ellipse at 65% 35%, #36364a 0%, #1b1b26 50%, #0b0b11 100%); }
+
+/* The headline: what this picture shows, in a sentence. */
+.headline { position: absolute; left: 48px; top: 34px; width: 560px; }
+.headline .brand { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 14px; letter-spacing: .4px; }
+.headline .brand img { width: 26px; height: 26px; }
+.headline h1 { margin: 8px 0 8px; font: bold 34px/1.12 Georgia, "Times New Roman", serif; color: var(--gold);
+  text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+.headline p { margin: 0; font-size: 16px; line-height: 1.45; color: var(--text); opacity: .88; }
+.points { margin: 18px 0 0; padding: 0; list-style: none; }
+.points li { position: relative; padding-left: 20px; margin: 7px 0; font-size: 14.5px; color: var(--text); opacity: .9; }
+.points li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 8px; height: 8px; border-radius: 2px;
+  background: var(--gold); transform: rotate(45deg); }
+
+/* Windows */
+.frame {
+  position: absolute; background: var(--panel); border: 3px solid var(--edge); border-radius: 10px;
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 1px var(--edge-hi), 0 16px 40px rgba(0,0,0,.65);
+}
+.title {
+  height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+  font: bold 15px Georgia, "Times New Roman", serif; color: var(--gold);
+  background: linear-gradient(#3b2d18, #241a0d); border-bottom: 2px solid var(--edge); border-radius: 7px 7px 0 0;
+}
+.title img { width: 22px; height: 22px; }
+.title .x { margin-left: auto; width: 18px; height: 18px; border-radius: 50%; background: #8b1a1a;
+  color: #fff; font: bold 12px Arial; display: grid; place-items: center; border: 1px solid #d9a; }
+.content { padding: 10px 16px 14px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 70px; height: 26px; padding: 0 12px;
+  font: bold 12px "Trebuchet MS", Arial, sans-serif; color: var(--gold);
+  background: linear-gradient(#9b1c1c, #5c0d0d); border: 1px solid var(--edge-hi); border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25); white-space: nowrap;
+}
+.btn.grey { background: linear-gradient(#4a4036, #2b241c); }
+.btn.small { min-width: 0; height: 22px; padding: 0 9px; font-size: 11px; }
+.btn.step { min-width: 24px; width: 24px; padding: 0; }
+.btn.wide { width: 100%; justify-content: flex-start; height: 24px; }
+.btn .val { color: var(--white); font-weight: normal; }
+.btn .meta { color: var(--dim); font-weight: normal; }
+.btn .on { color: var(--mint); }
+.nav { outline: 2px solid var(--gold); outline-offset: 3px; box-shadow: 0 0 12px rgba(255,209,0,.55), inset 0 1px 0 rgba(255,255,255,.25); }
+h3 { margin: 12px 0 5px; font: bold 13px Georgia, serif; color: var(--gold); display: flex; align-items: baseline; gap: 8px; }
+h3 small { color: var(--dim); font: 12px "Trebuchet MS", Arial, sans-serif; }
+h3 .right { margin-left: auto; color: var(--text); font: 12px "Trebuchet MS", Arial, sans-serif; }
+.hint { color: var(--dim); font-size: 11px; font-weight: normal; font-family: "Trebuchet MS", Arial, sans-serif; }
+.locked { color: var(--lock); }
+
+table { width: 100%; border-collapse: collapse; }
+td { padding: 4px 8px; vertical-align: middle; }
+tr:nth-child(odd) td { background: var(--row); }
+tr:nth-child(even) td { background: var(--row-alt); }
+.icon { width: 24px; height: 24px; border-radius: 3px; border: 1px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+.q0 { color: #9d9d9d; } .q1 { color: var(--white); } .q2 { color: var(--green); }
+.count { color: #aaaaaa; }
+.stacks { color: #888; }
+.why { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+.why.ah { background: #2d4a6b; color: #cfe6ff; }
+.why.de { background: #4b2d6b; color: #ead7ff; }
+.why.common { background: #555; color: #eee; }
+.why.bank { background: #1f5c52; color: #c9fff2; }
+.why.v { background: #4a4036; color: #ffd36b; }
+.why.friend { background: #8c5a1e; color: #ffe8c2; }
+.gain { text-align: right; white-space: nowrap; }
+.money i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 4px 0 2px; vertical-align: -1px; }
+.g { background: radial-gradient(#fff3a0, #d4a017); } .s { background: radial-gradient(#ffffff, #9a9a9a); }
+.c { background: radial-gradient(#ffcf9a, #a0582a); }
+.kept td { padding: 3px 8px; color: var(--dim); font-size: 12px; }
+.kept .tag { color: var(--note); }
+.kept .tag.locked { color: var(--lock); }
+
+/* Mailbox window */
+.to { padding: 4px 10px; background: var(--row); border: 1px solid #3a2e1c; border-radius: 4px; }
+.to .line { display: flex; align-items: baseline; gap: 8px; height: 24px; }
+.to b { color: var(--gold); }
+.to .who { color: var(--white); font-weight: bold; font-size: 14px; }
+.to .who.more { font-size: 13px; padding-left: 30px; }
+.to .note { margin-left: auto; color: var(--dim); font-size: 12px; }
+.routes { margin-top: 6px; border: 1px solid #3a2e1c; border-radius: 4px; background: var(--row-alt); padding: 2px 8px 4px; }
+.routes .head { display: flex; align-items: center; height: 26px; font-size: 13px; color: var(--gold); font-family: Georgia, serif; font-weight: bold; }
+.routes .head .btn { margin-left: auto; }
+.route { display: flex; align-items: center; gap: 6px; height: 27px; font-size: 12px; }
+.route .toname { color: var(--gold); }
+.route .crafter, .route .skipped { color: #888; }
+.route .buttons { margin-left: auto; display: flex; gap: 6px; }
+.total { margin-top: 10px; padding: 7px 10px; background: #1d2a1d; border: 1px solid #3f6b3f; border-radius: 4px; }
+.total .big { font-size: 15px; font-weight: bold; color: #b6ff9a; }
+.total .sub { color: var(--dim); font-size: 12px; }
+.actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+.actions .btn { height: 30px; font-size: 13px; min-width: 110px; }
+.actions .send { min-width: 180px; }
+.legend { margin-left: auto; color: var(--text); font-size: 12px; white-space: nowrap; display: flex; gap: 12px; align-items: center; }
+.pad { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: #111;
+  border: 1px solid #777; font: bold 11px Arial; margin-right: 4px; vertical-align: -3px; }
+.pad.cross { color: #7fa8ff; } .pad.circle { color: #ff6f7f; } .pad.tri { color: #4fe0a8; } .pad.sq { color: #f08fd0; }
+
+/* The game's Send Mail window (simplified) */
+.mail .body { padding: 14px; color: #3b2a12; }
+.parchment { background: linear-gradient(#efe0bb, #d9c28c); border-radius: 4px; padding: 10px; border: 1px solid #a8864a; }
+.field { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 12px; }
+.field b { width: 52px; color: #5a3c10; }
+.field span { flex: 1; height: 20px; background: #fff7e0; border: 1px solid #a8864a; border-radius: 3px; }
+.slots { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 14px; }
+.slots i { height: 34px; background: #2a2116; border: 1px solid #6b5228; border-radius: 3px; }
+.mail .buttons { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+.tabs { position: absolute; left: 14px; bottom: -27px; display: flex; gap: 4px; }
+.tab { padding: 4px 14px; background: #241a0d; border: 2px solid var(--edge); border-top: 0;
+  border-radius: 0 0 6px 6px; color: var(--dim); font-size: 12px; }
+.tab.on { color: var(--gold); background: #3b2d18; }
+
+/* Settings */
+.set { display: flex; align-items: center; gap: 6px; min-height: 26px; margin: 3px 0; }
+.set .label { flex: 1; }
+.set .label b { color: var(--white); }
+.stack { display: flex; flex-direction: column; gap: 4px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pair .btn { width: 100%; }
+.current { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--row);
+  border: 1px solid #3a2e1c; border-radius: 4px; }
+.current .who { color: var(--mint); font-weight: bold; }
+.current .detail { color: #aaa; }
+.current .btn { margin-left: auto; }
+.foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.foot .hint { flex: 1; font-size: 12px; }
+.padlegend { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 12px; }
+
+/* Friends */
+.sub { color: var(--dim); font-size: 12px; }
+.binding { border: 1px solid #3a2e1c; border-radius: 4px; background: var(--row); padding: 6px 10px; margin-bottom: 6px; }
+.binding .line1 { display: flex; align-items: center; gap: 8px; }
+.binding .line1 .toname { color: var(--gold); font-weight: bold; }
+.binding .line1 .btn { margin-left: auto; }
+.binding .line2 { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--dim); }
+.binding .line2 .captext { width: 200px; }
+.binding .line2 .scope { margin-left: auto; }
+.binding .via { color: var(--dim); font-size: 12px; margin-top: 3px; }
+
+/* Bags */
+.bag .grid { display: grid; grid-template-columns: repeat(8, 40px); gap: 5px; padding: 14px 14px 8px; }
+.slot { position: relative; width: 40px; height: 40px; border-radius: 4px; background: #241d14;
+  border: 1px solid #5a4422; box-shadow: inset 0 0 6px #000; }
+.slot .ic { position: absolute; inset: 3px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+.slot .n { position: absolute; right: 3px; bottom: 1px; font: bold 11px Arial; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+.slot.q2 { border-color: #1eff00; }
+.slot.glow { border-color: #6fc0ff; box-shadow: 0 0 0 2px #2f8cff, 0 0 12px 3px rgba(77,166,255,.85), inset 0 0 6px #000; }
+.slot.focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tagb { position: absolute; left: -2px; top: -4px; padding: 0 3px; height: 13px; border-radius: 3px;
+  font: bold 9px/13px Arial; letter-spacing: .3px; border: 1px solid #000; }
+.tagb.ah { background: #2d6bb0; color: #fff; } .tagb.de { background: #7a3fb5; color: #fff; }
+.tagb.b { background: #1f8a78; color: #fff; } .tagb.v { background: #4a4036; color: #ffd36b; }
+.bagfoot { display: flex; justify-content: space-between; align-items: center; padding: 0 14px 10px; color: var(--dim); font-size: 12px; }
+.bagfoot .key { display: flex; gap: 10px; align-items: center; }
+.bagfoot .key .tagb { position: static; display: inline-block; margin-right: 3px; }
+
+/* Tooltip */
+.tip { position: absolute; padding: 10px 12px; background: rgba(8, 10, 28, .96); border: 2px solid #8f8fa8;
+  border-radius: 6px; box-shadow: 0 10px 28px rgba(0,0,0,.65); }
+.tip .name { font-size: 15px; color: #fff; margin-bottom: 2px; }
+.tip .line { color: #fff; }
+.tip .gray { color: #9d9d9d; }
+.tip .gap { height: 10px; }
+.tip .mw { color: var(--gold); }
+.tip .mw .label { color: #fff; }
+.tip .verdict { color: #fff; font-size: 12.5px; }
+.tip .was { color: #8cbfff; font-size: 12.5px; margin-top: 3px; }
+
+/* Bank alt summary */
+.summary .r { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 4px; }
+.summary .r:nth-child(odd) { background: var(--row); }
+.summary .r .why { margin-right: 8px; }
+
+/* A short caption beside a window */
+.callout { position: absolute; color: var(--text); font-size: 14px; line-height: 1.4; opacity: .92; }
+.callout b { color: var(--gold); font-family: Georgia, serif; font-size: 15px; display: block; margin-bottom: 3px; }

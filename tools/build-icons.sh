@@ -3,7 +3,8 @@
 # and the in-game AddOns-list icon (Mailworthy/Textures/Icon.tga: 64x64,
 # uncompressed 32-bit, the TGA variant the WoW client loads reliably), and
 # media/ui-prototype.html, media/bank-alt-prototype.html, media/bindings-prototype.html and
-# media/ux-pass-prototype.html to PNGs.
+# media/ux-pass-prototype.html to PNGs, and the CurseForge gallery (media/gallery/*.html,
+# authored at 1280x720 and rendered at 1.25x = 1600x900).
 # Needs Google Chrome (headless rendering) and Python 3 with Pillow.
 # Usage: tools/build-icons.sh
 set -euo pipefail
@@ -13,8 +14,8 @@ chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-render() { # <source> <width> <height> <out.png>
-  "$chrome" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+render() { # <source> <width> <height> <out.png> [scale]
+  "$chrome" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor="${5:-1}" \
     --default-background-color=00000000 --window-size="$2,$3" \
     --screenshot="$4" "file://$PWD/$1" >/dev/null 2>&1
 }
@@ -36,3 +37,7 @@ render media/bank-alt-prototype.html 900 640 media/bank-alt-prototype.png
 render media/bindings-prototype.html 1180 850 media/bindings-prototype.png
 render media/ux-pass-prototype.html 1580 1290 media/ux-pass-prototype.png
 echo "media/ui-prototype.png, media/bank-alt-prototype.png, media/bindings-prototype.png, media/ux-pass-prototype.png"
+for page in media/gallery/*.html; do
+  render "$page" 1280 720 "${page%.html}.png" 1.25
+done
+echo "media/gallery/*.png (1600x900)"
