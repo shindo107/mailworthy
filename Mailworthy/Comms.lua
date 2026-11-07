@@ -21,6 +21,9 @@
 --   V2|<mail's sender>|<recipient>|<server time>|<itemID>:<count>:<copper>;...   (Ledger.lua: what a
 --       mail to another player was worth when it went; WHISPER only, to the recipient or one of their
 --       characters once they are heard from; older Mailworthys drop it)
+--   R2|<recipient>|<mail's sender>|<the mail's time>|<itemID>:<count>:<copper>;...   (Ledger.lua: the value
+--       the recipient settled on when it differs from the V2 one, so the sender's log matches; WHISPER
+--       only, held until the sender is heard from)
 --
 -- What arrives is data from other players, never instructions: names are
 -- cleaned and length-checked, professions must be crafting skill lines
@@ -189,6 +192,10 @@ function Comms.Decode(text)
         local values = ns.Ledger and ns.Ledger.DecodeValues(rest)
         return values and { kind = "values", version = tonumber(version), values = values } or nil
     end
+    if kind == "R" then
+        local answers = ns.Ledger and ns.Ledger.DecodeAnswers(rest)
+        return answers and { kind = "answers", version = tonumber(version), answers = answers } or nil
+    end
     if kind == "F" then
         local day = rest:match("^(%d+)$")
         return day and #day <= 7 and { kind = "fresh", version = tonumber(version), day = tonumber(day) } or nil
@@ -301,6 +308,12 @@ function Comms.Hear(sender, text, channel)
         local values = ns.Ledger.HearValues(name, msg.values)
         ns.Ledger.Heard(name)
         return values
+    end
+    if msg.kind == "answers" then
+        if channel ~= "WHISPER" or not ns.Ledger then return nil end
+        local changed = ns.Ledger.HearAnswers(name, msg.answers)
+        ns.Ledger.Heard(name)
+        return changed
     end
     if ns.Ledger then pcall(ns.Ledger.Heard, name) end -- online: values waiting for them go now
     if msg.kind == "ask" then

@@ -190,6 +190,46 @@ describe("mail ledger", function()
             assert.is_nil(ns.Comms.Decode("V2|Bob|Rettana|1|2589:20:5:1234"))
         end)
 
+        local function whispers(from)
+            local out = {}
+            for i = from + 1, #WowStub.state.addonMessages do
+                local m = WowStub.state.addonMessages[i]
+                if m.channel == "WHISPER" then out[#out + 1] = m end
+            end
+            return out
+        end
+
+        it("answer back: a value that differs from the sender's goes back to them", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 1
+            local before = #WowStub.state.addonMessages
+            bobSent(1400, 6, 0) -- ours is fresher: 10s, not their 14s
+            local sent = whispers(before)
+            assert.equal(1, #sent, "Bob was just heard from: the answer goes at once")
+            assert.equal(BOB, sent[1].target)
+            assert.equal("R2|Rettana Quilwrit|Bob Surname|" .. WowStub.state.serverTime .. "|2589:20:1000", sent[1].message)
+            before = #WowStub.state.addonMessages
+            bobSent(1400, 0, 0) -- theirs is fresher: nothing to answer
+            assert.equal(0, #whispers(before))
+        end)
+
+        it("answer back while the sender is offline: held until their Mailworthy is heard from", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 1
+            local at = WowStub.state.serverTime - 3600
+            ns.Ledger.Store().expect["bob surname"] = { -- their values came in an earlier session
+                { at = at, to = "Rettana Quilwrit", itemID = LINEN.id, count = 20, value = 1400, age = 6 } }
+            local before = #WowStub.state.addonMessages
+            inboxMail(LINEN, 20)
+            take(LINEN.id)
+            assert.equal(1000, (ns.Ledger.Net(BOB)))
+            assert.equal(0, #whispers(before), "never a whisper to someone not heard from")
+            assert.equal(1, #ns.Ledger.Store().outbox["bob surname"])
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB) -- Bob logs in
+            local sent = whispers(before)
+            assert.equal(1, #sent)
+            assert.equal("R2|Rettana Quilwrit|Bob Surname|" .. at .. "|2589:20:1000", sent[1].message)
+            assert.is_nil(ns.Ledger.Store().outbox["bob surname"])
+        end)
+
         it("pure: the fresher scan, the cap on theirs, either side missing", function()
             local Pick = ns.Ledger.Pick
             assert.same({ 900, "fresher", 1 }, { Pick(5000, 4, 900, 1) })
@@ -197,6 +237,29 @@ describe("mail ledger", function()
             assert.same({ 5000, "sender", 2 }, { Pick(5000, 2, nil, nil) })
             assert.same({ 900, "mine", 1 }, { Pick(nil, nil, 900, 1) })
         end)
+    end)
+
+    it("the sender takes the receiver's answer: its log and balance match theirs", function()
+        sendByHand(BOB, ORE, 20) -- 12s by our prices
+        local at = ns.Ledger.Store().log[1].at
+        local function answer(value, sender, when)
+            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", when or at, { { itemID = ORE.id, count = 20, value = value } })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", sender or BOB)
+        end
+        answer(300) -- under a third of ours: ignored
+        answer(900, "Carl Other") -- not Bob or his character: dropped
+        answer(900, BOB, at - 60) -- no such mail
+        assert.equal(-1200, (ns.Ledger.Net(BOB)))
+        answer(900)
+        assert.equal(-900, (ns.Ledger.Net(BOB)), "Bob's value now, as on his side")
+        local it = ns.Ledger.Store().log[1].items[1]
+        assert.equal("agreed", it.source)
+        assert.equal(1200, it.mine)
+        assert.truthy(ns.Ledger.ExportText():find("9s, agreed with Bob Surname (mine said 12s)", 1, true))
+        answer(1100) -- once agreed, an item stays agreed
+        assert.equal(-900, (ns.Ledger.Net(BOB)))
+        assert.is_nil(ns.Comms.Decode("R2|Bob|Rettana|1|2770:20"))
+        assert.is_nil(ns.Comms.Decode("R2|Bob|Rettana|1|2770:20:5:1"))
     end)
 
     it("value messages: only whispers, only for this account's characters, only from the mail's sender", function()

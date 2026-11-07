@@ -533,6 +533,16 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   seen) is compared with the sender's: the fresher scan at the time of send wins; a tie, an
   unknown age or no price of ours that day keeps the sender's (still capped at 3x ours). The
   export shows each value's source and scan age.
+- **Answer back** (operator, same day, so both players see the same value): when the receiver
+  settles on a value other than the sender's (its scan was fresher, or the cap), it queues
+  `R2|<recipient>|<mail's sender>|<the mail's time>|<itemID>:<count>:<copper>;...` for the
+  sender, held in `outbox` like the values (WHISPER only, sent once the sender or a character
+  their hello lists is heard from, 30 days at most). The sender finds that mail in its log
+  (sender, recipient, time), takes the value (`agreed`, the old one kept as `mine`) and moves
+  its balance by the difference; an answer under a third or over 3x its own value is ignored,
+  and an item takes one answer. Until the answer arrives, the sender shows its own value.
+  Still unmatched: a mail whose values never reached the receiver before it was taken (the
+  receiver then used its own price and has nothing to answer to).
 - Not built: face-to-face trades (Mark paid covers them), a shared "who owes whom" view (on
   purpose), merging characters of a player who doesn't run Mailworthy.
 - Switch `/mw feature ledger off` (no hooks, nothing logged).
