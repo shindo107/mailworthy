@@ -14,8 +14,11 @@ local function tocFiles()
     return files
 end
 
-return function()
+--- `saved` (optional): SavedVariables as an older build left them,
+--- { db = MailworthyDB, charDB = MailworthyCharDB }, in place before the files load.
+return function(saved)
     WowStub.reset()
+    if saved then _G.MailworthyDB, _G.MailworthyCharDB = saved.db, saved.charDB end
     local ns = {}
     for _, file in ipairs(tocFiles()) do
         local chunk = assert(loadfile(ROOT .. file))

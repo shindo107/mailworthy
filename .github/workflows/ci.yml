@@ -2,7 +2,10 @@ name: ci
 
 on:
   push:
+    branches: ["**"] # tags run it through release.yml instead (once, not twice)
   pull_request:
+  # release.yml runs this whole workflow first: a tag publishes only if it passes.
+  workflow_call:
 
 jobs:
   lua:
@@ -17,9 +20,13 @@ jobs:
       - name: Install rocks
         run: |
           for rock in luacheck busted; do sudo luarocks --lua-version=5.1 install "$rock"; done
+      # The shipping gate first, on its own, so a red build says "mailing is broken"
+      # before anything else (spec/critical_path_spec.lua; AGENTS.md "Critical path").
+      - name: critical path (mailing)
+        run: busted --lua=luajit spec/critical_path_spec.lua
       - name: luacheck
         run: luacheck .
-      - name: busted (LuaJIT)
+      - name: busted (LuaJIT, all specs)
         run: busted --lua=luajit
 
   package:
