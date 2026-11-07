@@ -32,6 +32,7 @@ Routes.CAP_STEPS = { 5000, 10000, 20000, 50000, 100000, 250000, 500000, 1000000 
 Routes.DEFAULT_CAP = 50000  -- 5g each: "an insane market high" while levelling (operator, 2026-10-26)
 Routes.MAX = 12             -- bindings per scope
 Routes.SCOPES = { account = "All my characters", character = "This character" }
+Routes.SCOPE_REPORT = { account = "all my characters", character = "this character", guild = "guild template" }
 Routes.ROUTE = "friend"     -- the verdict route of a diverted item
 
 -- Verdicts a binding never overrides (AGENTS safety: never a locked item, and
@@ -243,10 +244,15 @@ local function withKeys(list, scope)
 end
 
 --- Every binding that applies to this character: this character's first, then the
---- account's for this realm + faction. Each carries `scope` and `key`.
+--- account's for this realm + faction, then the guild template's rules while the player has
+--- them on (Guild.Rules: personal bindings and this character's professions come first).
+--- Each carries `scope` ("character" / "account" / "guild") and `key`.
 function Routes.List()
     local list = withKeys(charList(), "character")
     for _, r in ipairs(withKeys(accountList(), "account")) do list[#list + 1] = r end
+    if ns.Guild then
+        for _, r in ipairs(ns.Guild.Rules(list)) do list[#list + 1] = r end
+    end
     return list
 end
 
@@ -368,7 +374,9 @@ end
 -- Skip once (this mailbox visit) --------------------------------------------------
 
 function Routes.SkipOnce(key)
-    if find(key) then skipped[key] = true end
+    for _, r in ipairs(Routes.List()) do
+        if r.key == key then skipped[key] = true end
+    end
 end
 
 function Routes.Unskip(key) skipped[key] = nil end
@@ -536,7 +544,7 @@ function Routes.ReportLines()
         local skill = Routes.Skill(r)
         local past = skill and ns.Tiers.PastText(r.profession, skill) or ""
         lines[#lines + 1] = string.format("binding: %s (%s, %s%s, skill %s%s%s)", Routes.Describe(r),
-            r.scope == "character" and "this character" or "all my characters", Routes.CapText(r),
+            Routes.SCOPE_REPORT[r.scope] or tostring(r.scope), Routes.CapText(r),
             crafter and (", delivered to their crafter " .. to) or "", skill and tostring(skill) or "unknown",
             past ~= "" and (": past " .. past) or "",
             skipped[r.key] and ", skipped this visit" or "")

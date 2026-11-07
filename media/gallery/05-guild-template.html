@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mailworthy gallery: guild template</title>
+<!-- CurseForge gallery image 5 (tools/build-icons.sh -> 05-guild-template.png). The guild
+     template (Guild.lua, RoutesUI.lua's guild view): the guild master's rules with Publish to
+     guild, and a member's friends window with the guild line and its one-press switch. -->
+<link rel="stylesheet" href="gallery.css">
+<style>
+  .editor { left: 40px; top: 22px; width: 540px; }
+  .member { left: 628px; top: 318px; width: 600px; }
+  .stepline { font-size: 14px; margin: 2px 0 6px; }
+  .stepline b { color: var(--gold); font-family: Georgia, serif; }
+  .guild { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin: 8px 0 8px;
+    background: #1b2230; border: 1px solid #3b5170; border-radius: 4px; font-size: 13px; }
+  .guild .from { color: var(--gold); font-weight: bold; }
+  .guild .btn { margin-left: auto; }
+  .btn.blue { background: linear-gradient(#2f4f7a, #1a2e4a); color: var(--mint); }
+  .binding.g { background: #182030; border-color: #33465f; }
+  .binding .tagline { color: var(--note); }
+  .chat { position: absolute; left: 628px; top: 578px; width: 600px; padding: 7px 10px; background: rgba(0,0,0,.55);
+    border-radius: 4px; font-size: 12.5px; }
+  .chat .mw { color: var(--mint); }
+</style>
+</head>
+<body>
+  <div class="frame editor">
+    <div class="title"><img src="../logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+    <div class="content">
+      <div class="stepline"><b>Guild template</b> for The Ledger Keepers</div>
+      <div class="sub" style="margin-bottom:10px">Members who turn the guild rules on mail each profession's materials to the
+        player named. Their own bindings and professions come first.</div>
+      <div class="binding">
+        <div class="line1">Alchemy materials <span class="toname">to Ann Fernwhistle</span><span class="btn small grey">Remove</span></div>
+        <div class="line2"><span class="captext">5g each or more: to my bank alt</span>
+          <span class="btn small step grey">-</span><span class="btn small step grey">+</span></div>
+      </div>
+      <div class="binding">
+        <div class="line1">Enchanting materials <span class="toname">to Bob Thornfield</span><span class="btn small grey">Remove</span></div>
+        <div class="line2"><span class="captext">10g each or more: to my bank alt</span>
+          <span class="btn small step grey">-</span><span class="btn small step grey">+</span></div>
+      </div>
+      <div class="binding">
+        <div class="line1">Leatherworking materials <span class="toname">to Mara Quill</span><span class="btn small grey">Remove</span></div>
+        <div class="line2"><span class="captext">2g each or more: to my bank alt</span>
+          <span class="btn small step grey">-</span><span class="btn small step grey">+</span></div>
+      </div>
+      <div class="binding">
+        <div class="line1">Tailoring materials <span class="toname">to Sela Brightloom</span><span class="btn small grey">Remove</span></div>
+        <div class="line2"><span class="captext">no price cap</span>
+          <span class="btn small step grey">-</span><span class="btn small step grey">+</span></div>
+      </div>
+      <div class="foot">
+        <span class="btn grey">Add a rule...</span>
+        <span class="btn nav">Publish to guild</span>
+        <span class="hint"></span>
+        <span class="btn grey">Back</span>
+        <span class="btn">Done</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="headline" style="left: 628px; top: 40px; width: 600px">
+    <div class="brand"><img src="../logo-512.png" alt="">MAILWORTHY</div>
+    <h1>One template for the whole guild</h1>
+    <p>The guild master or an officer sets who gets each profession's materials. Herbs to the alchemist, dust to
+      the enchanter: every guildmate's mailbox follows it.</p>
+    <ul class="points">
+      <li>Members turn it on once; one press turns it off</li>
+      <li>Their own bindings and professions always come first</li>
+    </ul>
+  </div>
+
+  <div class="frame member">
+    <div class="title"><img src="../logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+    <div class="content">
+      <div class="guild"><span>Guild template from <span class="from">Garrick Stonehelm</span>: 4 rules</span>
+        <span class="btn small blue">Guild rules: on</span></div>
+      <div class="binding g">
+        <div class="line1">Alchemy materials <span class="toname">to Ann Fernwhistle</span></div>
+        <div class="line2">5g each or more: to my bank alt &nbsp;<span class="tagline">(guild template)</span></div>
+      </div>
+      <div class="binding g">
+        <div class="line1">Enchanting materials <span class="toname">to Bob Thornfield</span>
+          <span class="hint" style="font-size:12px">(delivered to Tilda Marrow)</span></div>
+        <div class="line2">10g each or more: to my bank alt &nbsp;<span class="tagline">(guild template)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat"><span class="mw">Mailworthy:</span> Guild rules updated by Garrick Stonehelm: Alchemy to Ann Fernwhistle,
+    Enchanting to Bob Thornfield, Leatherworking to Mara Quill, Tailoring to Sela Brightloom.</div>
+</body>
+</html>

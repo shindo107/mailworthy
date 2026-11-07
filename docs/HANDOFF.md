@@ -36,8 +36,10 @@ must never break the game.
 | **Target bank alt view** (tags + tooltip + summary) | [media/bank-alt-prototype.html](../media/bank-alt-prototype.html) -> [.png](../media/bank-alt-prototype.png) |
 | **Bindings UI** (binding rows in the mail window, the friends window) | [media/bindings-prototype.html](../media/bindings-prototype.html) -> [.png](../media/bindings-prototype.png) |
 | **UX pass** (current layout of the mailbox, settings and friends windows, 2026-11-06) | [media/ux-pass-prototype.html](../media/ux-pass-prototype.html) -> [.png](../media/ux-pass-prototype.png) |
-| **CurseForge gallery** (4 images of the shipped UI, 2026-11-07; keep them in step when a window changes) | [media/gallery/](../media/gallery/) (`*.html` -> `*.png`, 1600x900) |
+| **Guild template UI** (member and guild master views, 2026-11-07) | [media/guild-template-prototype.html](../media/guild-template-prototype.html) -> [.png](../media/guild-template-prototype.png) |
+| **CurseForge gallery** (5 images of the shipped UI, 2026-11-07; keep them in step when a window changes) | [media/gallery/](../media/gallery/) (`*.html` -> `*.png`, 1600x900) |
 | CurseForge description (paste into the project page) | [media/curseforge-description.html](../media/curseforge-description.html) |
+| Wiki pages carried with a PR (copied into the GitHub wiki after merge) | [docs/wiki/](wiki/README.md) |
 | Rebuild icon/avatar/TGA/screenshots | [tools/build-icons.sh](../tools/build-icons.sh) (Chrome headless + Pillow) |
 | Package layout check (CI) | [tools/check-package-layout.sh](../tools/check-package-layout.sh) |
 | Agent rules | [AGENTS.md](../AGENTS.md) (CLAUDE.md includes it) |
@@ -78,8 +80,9 @@ must never break the game.
 | `Tiers.lua` | **material tiers** (2026-11-06): the rules over `TierData.lua`'s tables; pure `Threshold`, `Outgrown`, `OutgrownNames`, `PastText`, `Step`, `WorthConverting` (a leather past its recipes stays while converting it pays at the AH). First Aid cloth: the next bandage's learn skill; the rest: the last recipe's grey, through the profession's own parts. No row = never outgrown. Used by `Valuation.NeededBy` (own rank) and `Routes.Matches` (the recipient's `route.skill`). Switch `tiers`; all of it only while `keepProfessionMats` is on |
 | `TierCheck.lua` | **tier check** (2026-11-06): reads the player's own profession window when it opens or its list changes (`C_TradeSkillUI`: learned recipes' `relativeDifficulty` and schematic reagents; Classic globals as a fallback; linked / guild / NPC windows skipped), saves `MailworthyDB.tierCheck[char key][skill line]` (rank, time, recipe count, source, per reagent the hardest non-grey recipe using it, through the profession's own trade-goods and consumable parts, or false; and `findings`, the comparison with the table as `/mw report` prints it, item by item, so the SavedVariables file alone answers it for rl-companion). Pure `Summarize`, `Findings` (table says done, window says still used; First Aid cloth exempt), `FindingText`; `ReportLines` for `/mw report`; `Annotate` gives `Bags.Evaluate`'s profession entries `stillUsed`, which `Valuation.NeededBy` keeps. No frames, no hooks. Switch `tierCheck` |
 | `Comms.lua` | hellos between Mailworthys (`C_ChatInfo`, prefix `Mailworthy`): `H2\|<own crafting skill lines>\|<Name=ids;...>` (the account's other crafters here) / `A2` / `S2\|<id:rank,...>\|<Name=id:rank;...>` (skill ranks after each hello, and again at the mailbox after a skill-up crosses a tier: `Steps`); peers in `MailworthyDB.peers[realm\|faction]` (60 days); throttled; everything received is validated data. Switch `comms` |
+| `Guild.lua` | **guild template** (2026-11-07): rules (one per crafting profession, each a binding to one guild member) published by the guild master or the rank below (`PUBLISHER_RANK` 1) over Comms on GUILD only: `T2\|<rev>\|<author>\|<i>/<n>\|<skill line>=<Name>:<cap>` per rule, `Q2\|<rev held>` asks; any holder passes a copy on (`answerSoon`: 1 s for an officer, 2-6 s otherwise, cancelled when another copy as new goes out). Receiver needs the sender in its roster and the author at rank 0-1 (`RankOf`: C_Club `guildRankOrder` - 1, `GetGuildRosterInfo` fallback; an unknown name waits for `GUILD_ROSTER_UPDATE`), drops rules for non-members, newest revision wins (never > 10 min ahead); an author hearing a revision in its name missing from `guildPublished` republishes (`correct`). `MailworthyDB.guildTemplates[realm\|faction\|guild]` = { rev, from, rules, use = nil/true/false }; drafts in `guildDrafts`. Opt-in once (`use`), one-press off (`SetUse` / `ToggleUse`). `Rules(personal)` = what `Routes.List` appends (scope "guild", key "guild\|..."): none while off, minus professions this character has, professions bound personally, rules naming this character. Everyone asks at login (12 s) with the revision held. Switch `guildTemplate` |
 | `Stale.lua` | stale auction prices (2026-11-06): freshness = days since Auctionator saw the freshest of 12 everyday trade goods (`WATCH`, `GetAuctionAgeByItemID`); the scan day goes out as `F2\|<server day>` after each hello (Comms; older Mailworthys drop unknown kinds) and peers' days are kept in `MailworthyDB.fresh[realm\|faction]` (60 days; separate from `peers`, so bindings data is untouched). Pure `Nudge(ownAge, freshest, today, maxAgeDays, nudgeDays)`: nil up to `NUDGE_DAYS` (3, operator 2026-11-06), "self" past that (`ignored` past `maxAgeDays`, 7: those items stay in the bags), "peer" when someone heard in 14 days scanned within 2 days. Shown as "!" on the mail buttons, a line at the top of the Mailworthy window, and (peer only) one chat line at `MAIL_SHOW`; logging in stale sends an ask so fresh peers answer. Display only. Switch `staleNudge` |
-| `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), two views (`UI.View`): list (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step); opens on add while there are no bindings; a binding returns to the list |
+| `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), three views (`UI.View`): list (the guild template line first, when there is one or this character can publish: "Guild rules: on / off / Use guild rules" one press, Edit... / Create...; guild rules as rows without buttons) (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step; `UI.Target()` "guild": guild members only, the rule goes to the draft) and guild (guild master / officers: the draft's rules with cap and Remove, Add a rule..., Publish to guild); opens on add while there are no bindings and no guild line; a binding returns to the list |
 
 Tests: `spec/` (busted on LuaJIT, 298 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
 `spec/support/wow_stub.lua` (bags, mail send tab, postage, timers with delays,
@@ -346,6 +349,21 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   the account's characters on the realm + faction. Not built: a slider widget, a never-mail
   list, typed names in the friends window (candidates only).
 
+- Guild template (operator, 2026-11-07: "the guild master ... can setup a template for the rest
+  of the guild members ... send enchanting to this person, send herbs here"; then "a 1 click
+  disable as well"): `Guild.lua`, PLAN "Guild template". Chosen with the operator: **opt-in
+  once** (nothing is mailed until the member presses Use guild rules; later updates apply on
+  their own with a chat line), **GM and officers** publish (rank index 0 and 1, checked in the
+  receiver's own roster), **personal wins** (own bindings first; a rule for a profession this
+  character has is left out; Skip once at the mailbox). Rules are profession bindings (herbs =
+  Alchemy), one per profession; "Guild rules: on" in Friends and on the mailbox window's Bindings
+  heading turns them all off. Copies from anyone (operator, same day: "whoever is online gets the
+  copy, and it can be copied from them by any member"): each copy names its author, whose rank
+  the receiver checks; rules for non-members are dropped; one holder answers each ask; a copy in
+  an author's name that they never published is corrected by their Mailworthy (PLAN "Guild
+  template" on why a copy can't be signed). Not built: per-rule opt-out (Skip once covers a visit), several
+  recipients per profession, publisher ranks other than 0 and 1.
+
 ## 7. State right now
 
 - alpha5's in-game check passed (DISCOVERY-SESSION-2.md "Results of the alpha5 run");
@@ -443,3 +461,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    then X shows under Staying "your <profession> needs it (Y still yellow)". `/mw report` is
    optional: after opening the windows, `/reload` or log out and the same lines are in
    `Mailworthy.lua` (SavedVariables) under `MailworthyDB.tierCheck[...][skill line].findings`.
+13. In-game check of the guild template (2026-11-07), mouse and controller: the guild master's
+   `/mw report` says "guild: <guild>, rank 0, can publish"; Friends shows "No guild template
+   yet" with Create...; add Enchanting to a member and Alchemy to another, Publish to guild. A
+   second guild member with Mailworthy online gets the chat line, Friends shows "Guild template
+   from <GM>: 2 rules (new)" and Use guild rules; after it the Mailworthy window lists the rules
+   with "(guild)" and the mail arrives; "Guild rules: on" on the Bindings heading turns them off.
+   An officer (rank 1) can publish too; a rank 2 member's Friends has no Edit.

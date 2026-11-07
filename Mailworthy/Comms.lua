@@ -11,6 +11,9 @@
 --   A2                                                   (ask: please say hello)
 --   F2|<server day of this character's freshest Auctionator scan>  (Stale.lua; right after
 --       a hello; Mailworthys before v0.15 drop it, as they drop any kind they don't know)
+--   T2|<revision>|<author>|<i>/<n>|<skill line>=<Name>:<cap>   (a guild template rule: Guild.lua;
+--       GUILD only; any member passes a copy on)
+--   Q2|<revision held>                    (ask: whoever holds a newer guild template sends it)
 --   S2|<this character's crafting skills: 129:80,197:130>|<other characters here:
 --       Name=197:150,333:120;Other Name=165:90>   (right after a hello, for the material
 --       tiers: a binding stops taking what the bound player's skill is past; Mailworthys
@@ -159,6 +162,14 @@ function Comms.Decode(text)
     if type(text) ~= "string" or #text > Comms.MAX_MESSAGE then return nil end
     local kind, version, rest = text:match("^(%a)(%d+)|?(.*)$")
     if kind == "A" then return { kind = "ask", version = tonumber(version) } end
+    if kind == "Q" then
+        local rev = rest:match("^(%d*)$")
+        return rev and #rev <= 10 and { kind = "templateAsk", version = tonumber(version), rev = tonumber(rev) or 0 } or nil
+    end
+    if kind == "T" then
+        local part = ns.Guild.DecodePart(rest)
+        return part and { kind = "template", version = tonumber(version), part = part } or nil
+    end
     if kind == "S" then
         local own, chars = rest:match("^([%d:,]*)|?([^|]*)$")
         if own == nil then return nil end
@@ -214,6 +225,16 @@ local function send(message)
     return sent
 end
 
+--- Send one message to the guild only (Guild.lua's template and asks).
+function Comms.SendGuild(message)
+    if not Comms.On() or call(IsInGuild) ~= true then return false end
+    local chat = rawget(_G, "C_ChatInfo")
+    if type(chat) ~= "table" then return false end
+    local ok, result = pcall(chat.SendAddonMessage, Comms.PREFIX, message, "GUILD")
+    ns.Log.Add("comms", "%s on GUILD: %s", message:sub(1, 2), ok and tostring(result) or ("error " .. tostring(result)))
+    return ok
+end
+
 --- Say hello to the guild and group (throttled; the next tick sends a hello that was throttled).
 function Comms.Announce(reason)
     if not Comms.On() then return false end
@@ -251,8 +272,8 @@ function Comms.Peer(name)
     return name and store()[name:lower()] or nil
 end
 
---- Record a hello from `sender` (a name, possibly with a realm suffix).
-function Comms.Hear(sender, text)
+--- Record a hello from `sender` (a name, possibly with a realm suffix) on `channel`.
+function Comms.Hear(sender, text, channel)
     local msg = Comms.Decode(text)
     local name = ns.Routes.Clean(sender)
     if not msg or not name or #name > Comms.MAX_NAME or name:find("%c") then return nil end
@@ -263,6 +284,9 @@ function Comms.Hear(sender, text)
     end
     if msg.kind == "fresh" then
         return ns.Stale and ns.Stale.Hear(name, msg.day) or nil
+    end
+    if msg.kind == "template" or msg.kind == "templateAsk" then
+        return ns.Guild and ns.Guild.Hear(name, msg, channel) or nil
     end
     local old = store()[name:lower()]
     if msg.kind == "skills" then
@@ -365,9 +389,9 @@ function Comms.Register()
     ns.Log.Add("comms", "prefix registered: %s", ok and tostring(result) or ("error " .. tostring(result)))
 end
 
-ns.On("CHAT_MSG_ADDON", function(prefix, text, _, sender)
+ns.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     if prefix ~= Comms.PREFIX or not Comms.On() then return end
-    Comms.Hear(sender, text)
+    Comms.Hear(sender, text, channel)
 end)
 
 ns.On("PLAYER_LOGIN", function()

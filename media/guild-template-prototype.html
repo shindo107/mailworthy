@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mailworthy guild template prototype</title>
+<!-- Prototype of the guild template (operator, 2026-11-07): the guild master or an officer
+     publishes profession rules; members turn them on once and off in one press. Top row: a
+     member; bottom row: the guild master. Same look as ux-pass-prototype.html. Rendered to
+     media/guild-template-prototype.png by tools/build-icons.sh. The names are made up. -->
+<style>
+  :root {
+    --gold: #ffd100; --text: #f2e8d0; --dim: #b9ad92; --edge: #8a6a2a; --edge-hi: #e0b44c;
+    --panel: #15110c; --row: #221b12; --row-alt: #1c160f; --green: #1eff00; --white: #ffffff;
+    --mint: #33ff99; --note: #9ec7ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1760px; height: 1300px; overflow: hidden; }
+  body {
+    font: 13px/1.35 "Trebuchet MS", "Segoe UI", Arial, sans-serif; color: var(--text);
+    background: radial-gradient(ellipse at 30% 20%, #3a4a3a 0%, #1d241c 45%, #0d110d 100%);
+  }
+  .page { padding: 18px 24px; }
+  .banner { display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; }
+  .banner h1 { margin: 0; font: bold 20px Georgia, serif; color: var(--gold); }
+  .banner span { color: var(--dim); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 540px 540px 540px; column-gap: 40px; row-gap: 22px; align-items: start; }
+  .cap { margin: 0 0 8px; }
+  .cap b { color: var(--gold); font: bold 14px Georgia, serif; }
+  .cap .size { float: right; color: var(--mint); font-size: 12px; font-weight: bold; }
+  .cap ul { margin: 4px 0 0; padding-left: 18px; color: var(--dim); font-size: 12px; }
+  .cap li { margin: 1px 0; }
+
+  .frame {
+    position: relative; background: var(--panel); border: 3px solid var(--edge);
+    border-radius: 10px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px var(--edge-hi), 0 12px 30px rgba(0,0,0,.6);
+  }
+  .title {
+    height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    font: bold 15px Georgia, "Times New Roman", serif; color: var(--gold);
+    background: linear-gradient(#3b2d18, #241a0d); border-bottom: 2px solid var(--edge); border-radius: 7px 7px 0 0;
+  }
+  .title img { width: 22px; height: 22px; }
+  .title .x { margin-left: auto; width: 18px; height: 18px; border-radius: 50%; background: #8b1a1a;
+    color: #fff; font: bold 12px Arial; display: grid; place-items: center; border: 1px solid #d9a; }
+  .content { padding: 10px 16px 14px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 70px; height: 26px; padding: 0 12px;
+    font: bold 12px "Trebuchet MS", Arial, sans-serif; color: var(--gold);
+    background: linear-gradient(#9b1c1c, #5c0d0d); border: 1px solid #e0b44c; border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.25); white-space: nowrap;
+  }
+  .btn.grey { background: linear-gradient(#4a4036, #2b241c); }
+  .btn.small { min-width: 0; height: 22px; padding: 0 9px; font-size: 11px; }
+  .btn.step { min-width: 24px; width: 24px; padding: 0; }
+  .btn.wide { width: 100%; justify-content: flex-start; height: 24px; }
+  .btn.on { color: var(--mint); }
+  .btn .val { color: var(--white); font-weight: normal; }
+  .btn .meta { color: var(--dim); font-weight: normal; }
+  .nav { outline: 2px solid var(--gold); outline-offset: 3px; }
+  h3 { margin: 12px 0 5px; font: bold 13px Georgia, serif; color: var(--gold); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  h3 small { color: var(--dim); font: 12px "Trebuchet MS", Arial, sans-serif; }
+  h3 .right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .hint { color: var(--dim); font-size: 11px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 4px 8px; vertical-align: middle; }
+  tr:nth-child(odd) td { background: var(--row); }
+  tr:nth-child(even) td { background: var(--row-alt); }
+  .icon { width: 24px; height: 24px; border-radius: 3px; border: 1px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+  .q1 { color: var(--white); } .q2 { color: var(--green); }
+  .count { color: var(--dim); }
+  .why { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+  .why.ah { background: #2d4a6b; color: #cfe6ff; }
+  .why.de { background: #4b2d6b; color: #ead7ff; }
+  .why.friend { background: #8c5a1e; color: #ffe8c2; }
+  .gain { text-align: right; white-space: nowrap; }
+  .money i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 4px 0 2px; }
+  .g { background: radial-gradient(#fff3a0, #d4a017); } .s { background: radial-gradient(#ffffff, #9a9a9a); }
+  .c { background: radial-gradient(#ffcf9a, #a0582a); }
+  .kept td { padding: 3px 8px; color: var(--dim); font-size: 12px; }
+  .kept .tag { color: var(--note); }
+
+  /* Mailbox window */
+  .to { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--row);
+    border: 1px solid #3a2e1c; border-radius: 4px; }
+  .to b { color: var(--gold); }
+  .to .who { color: var(--white); font-weight: bold; font-size: 14px; }
+  .to .note { color: var(--dim); font-size: 12px; }
+  .routes { margin-top: 6px; border: 1px solid #3a2e1c; border-radius: 4px; background: var(--row-alt); padding: 2px 8px 4px; }
+  .routes .head { display: flex; align-items: center; height: 24px; font-size: 12px; color: var(--dim); }
+  .routes .head .btn { margin-left: auto; }
+  .route { display: flex; align-items: center; gap: 6px; height: 26px; font-size: 12px; }
+  .route .toname { color: var(--gold); font-weight: bold; }
+  .route .crafter, .route .skipped { color: #888; }
+  .route .buttons { margin-left: auto; display: flex; gap: 6px; }
+  .total { margin-top: 10px; padding: 7px 10px; background: #1d2a1d; border: 1px solid #3f6b3f; border-radius: 4px; }
+  .total .big { font-size: 15px; font-weight: bold; color: #b6ff9a; }
+  .total .sub { color: var(--dim); font-size: 12px; }
+  .total.plain { background: var(--row); border-color: #3a2e1c; }
+  .total.plain .big { color: var(--white); }
+  .actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .actions .btn { height: 30px; font-size: 13px; min-width: 110px; }
+  .actions .send { min-width: 180px; }
+  .actions .legend { white-space: nowrap; }
+  .actions .legend { margin-left: auto; }
+
+  /* Settings */
+  .set { display: flex; align-items: center; gap: 6px; min-height: 26px; margin: 3px 0; }
+  .set .label { flex: 1; }
+  .set .label b { color: var(--white); }
+  .stack { display: flex; flex-direction: column; gap: 4px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .pair .btn { width: 100%; }
+  .current { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--row);
+    border: 1px solid #3a2e1c; border-radius: 4px; }
+  .current .who { color: var(--mint); font-weight: bold; }
+  .current .btn { margin-left: auto; }
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .foot .hint { flex: 1; }
+  .typed { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--dim); }
+  .box { width: 170px; height: 22px; background: #0c0a07; border: 1px solid #6b5a3a; border-radius: 3px; }
+
+  /* Friends */
+  .sub { color: var(--dim); font-size: 12px; }
+  .binding { border: 1px solid #3a2e1c; border-radius: 4px; background: var(--row); padding: 6px 10px; margin-bottom: 6px; }
+  .binding .line1 { display: flex; align-items: center; gap: 8px; }
+  .binding .line1 .toname { color: var(--gold); font-weight: bold; }
+  .binding .line1 .btn { margin-left: auto; }
+  .binding .line2 { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--dim); }
+  .binding .line2 .captext { width: 210px; }
+  .binding .line2 .scope { margin-left: auto; }
+  .binding .via { color: var(--dim); font-size: 12px; margin-top: 3px; }
+  .stepline { font-size: 13px; margin: 4px 0 8px; display: flex; align-items: center; gap: 8px; }
+  .stepline b { color: var(--gold); }
+  .stepline .n { color: var(--dim); font-size: 12px; }
+  .profs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .profs .btn { width: 100%; justify-content: flex-start; height: 24px; }
+  .chosen { padding: 6px 10px; background: var(--row); border: 1px solid #3a2e1c; border-radius: 4px; font-size: 12px; margin-bottom: 8px; }
+  .chosen b { color: var(--white); }
+  .chosen .on { color: #7dff7d; }
+
+  /* Guild template */
+  .guild { display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin: 8px 0 2px;
+    background: #1b2230; border: 1px solid #3b5170; border-radius: 4px; }
+  .guild .gname { color: var(--white); }
+  .guild .from { color: var(--gold); font-weight: bold; }
+  .guild .new { color: var(--mint); font-weight: bold; }
+  .guild .btns { margin-left: auto; display: flex; gap: 6px; }
+  .btn.blue { background: linear-gradient(#2f4f7a, #1a2e4a); }
+  .binding.g { background: #182030; border-color: #33465f; }
+  .binding.g .tagline { color: var(--note); }
+  .route .gtag { color: var(--note); }
+  .route .gap { width: 64px; }
+  .chat { margin-top: 8px; padding: 6px 10px; background: rgba(0,0,0,.55); border-radius: 4px; font-size: 12px; }
+  .chat .mw { color: var(--mint); }
+  .to2 { padding: 4px 10px; background: var(--row); border: 1px solid #3a2e1c; border-radius: 4px; }
+  .to2 .l { display: flex; align-items: baseline; gap: 8px; height: 20px; }
+  .to2 b { color: var(--gold); width: 26px; }
+  .to2 .who { color: var(--white); font-weight: bold; }
+  .to2 .note { margin-left: auto; color: var(--dim); font-size: 12px; }
+  .why.gld { background: #2a4a6b; color: #d6ecff; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="banner"><h1>Mailworthy guild template</h1>
+    <span>The guild master sets who gets each profession's materials; members turn it on once, and off in one press.</span></div>
+
+  <div class="grid">
+    <!-- ============ Row 1: a member ============ -->
+
+    <!-- Friends, a template just arrived -->
+    <div>
+      <div class="cap"><b>Member · a template just arrived</b><span class="size">nothing mailed yet</span>
+        <ul><li>One chat line when it arrives; Friends opens on the list with the guild line on top</li>
+          <li>Nothing goes to the guild until <b>Use guild rules</b> is pressed (opt-in once)</li>
+          <li>Their own bindings stay as they are</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="sub">Each binding mails a profession's materials to one player, every time, until you remove it.</div>
+          <div class="guild"><span>Guild template from <span class="from">Garrick Stonehelm</span>: 3 rules <span class="new">(new)</span></span>
+            <span class="btns"><span class="btn blue small nav">Use guild rules</span></span></div>
+          <h3>Bindings <small class="right">1</small></h3>
+          <div class="binding">
+            <div class="line1"><span>Cooking materials</span><span class="toname">to Harl Grubb</span><span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="captext">no price cap</span><span class="btn grey small step">-</span><span class="btn grey small step">+</span>
+              <span class="btn grey small scope">All my characters</span></div>
+          </div>
+          <div class="foot"><span class="btn grey">Add a binding...</span><span class="hint"></span><span class="btn">Done</span></div>
+        </div>
+      </div>
+      <div class="chat"><span class="mw">Mailworthy:</span> Garrick Stonehelm shared a guild template (Alchemy to Ann Fernwhistle,
+        Enchanting to Bob Thornfield, Tailoring to Sela Brightloom). Open Friends (/mw friends) to use it.</div>
+    </div>
+
+    <!-- Friends, guild rules on -->
+    <div>
+      <div class="cap"><b>Member · guild rules on</b><span class="size">one press turns them off</span>
+        <ul><li>The guild's rules are cards too, without buttons: the guild master sets them</li>
+          <li><b>Guild rules: on</b> turns every guild rule off at once (and back on)</li>
+          <li>This character is a tailor, so the Tailoring rule is left out: they keep their cloth</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="sub">Each binding mails a profession's materials to one player, every time, until you remove it.</div>
+          <div class="guild"><span>Guild template from <span class="from">Garrick Stonehelm</span>: 3 rules</span>
+            <span class="btns"><span class="btn blue small on nav">Guild rules: on</span></span></div>
+          <h3>Bindings <small class="right">3</small></h3>
+          <div class="binding">
+            <div class="line1"><span>Cooking materials</span><span class="toname">to Harl Grubb</span><span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="captext">no price cap</span><span class="btn grey small step">-</span><span class="btn grey small step">+</span>
+              <span class="btn grey small scope">All my characters</span></div>
+          </div>
+          <div class="binding g">
+            <div class="line1"><span>Alchemy materials</span><span class="toname">to Ann Fernwhistle</span></div>
+            <div class="line2"><span>5g each or more: to my bank alt &nbsp;<span class="tagline">(guild template)</span></span></div>
+          </div>
+          <div class="binding g">
+            <div class="line1"><span>Enchanting materials</span><span class="toname">to Bob Thornfield</span></div>
+            <div class="via">delivered to Tilda Marrow, Bob's enchanter</div>
+            <div class="line2"><span>10g each or more: to my bank alt &nbsp;<span class="tagline">(guild template)</span></span></div>
+          </div>
+          <div class="foot"><span class="btn grey">Add a binding...</span><span class="hint"></span><span class="btn">Done</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mailbox, guild rules on -->
+    <div>
+      <div class="cap"><b>Member · at the mailbox</b><span class="size">every recipient shown before Send</span>
+        <ul><li><b>Guild rules: on</b> on the Bindings heading: one press and the guild's rows go</li>
+          <li>Guild rows say "(guild)" and have Skip once, no Remove</li>
+          <li>One "To:" line per recipient; the Mailing list says who gets what</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Mailworthy</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="to2">
+            <div class="l"><b>To:</b><span class="who">Penny Ledgerwick</span><span class="note">your bank alt · 1 mail</span></div>
+            <div class="l"><b></b><span class="who">Ann Fernwhistle</span><span class="note">Alchemy materials · 1 mail</span></div>
+            <div class="l"><b></b><span class="who">Tilda Marrow</span><span class="note">Enchanting materials · 1 mail</span></div>
+          </div>
+          <div class="routes">
+            <div class="head">Bindings<span class="btn blue small on nav" style="margin-left:auto">Guild rules: on</span><span class="btn grey small" style="margin-left:6px">Friends...</span></div>
+            <div class="route"><span>Cooking materials</span><span class="toname">to Harl</span>
+              <span class="buttons"><span class="btn grey small">Skip once</span><span class="btn grey small">Remove</span></span></div>
+            <div class="route"><span>Alchemy materials</span><span class="toname">to Ann</span><span class="gtag">(guild)</span>
+              <span class="buttons"><span class="btn grey small">Skip once</span><span class="gap"></span></span></div>
+            <div class="route"><span>Enchanting materials</span><span class="toname">to Tilda</span><span class="crafter">(Bob's crafter)</span><span class="gtag">(guild)</span>
+              <span class="buttons"><span class="btn grey small">Skip once</span><span class="gap"></span></span></div>
+          </div>
+
+          <h3>Mailing <small>click an item to keep it in your bags</small><small class="right">5 items · 3 mails</small></h3>
+          <table>
+            <tr><td style="width:32px"><div class="icon" style="background:linear-gradient(135deg,#e0874a,#7a3e1a)"></div></td>
+              <td><span class="q1">Copper Ore</span> <span class="count">x13</span></td><td><span class="why ah">Auction</span></td>
+              <td class="gain money">+29<i class="s"></i>80<i class="c"></i></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#9fd77a,#3d6b2a)"></div></td>
+              <td><span class="q1">Peacebloom</span> <span class="count">x18</span></td><td><span class="why gld">to Ann</span></td>
+              <td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#9fd77a,#4d6b2a)"></div></td>
+              <td><span class="q1">Silverleaf</span> <span class="count">x11</span></td><td><span class="why gld">to Ann</span></td>
+              <td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#a9c5ff,#3d4f8a)"></div></td>
+              <td><span class="q1">Strange Dust</span> <span class="count">x20</span></td><td><span class="why gld">to Tilda</span></td>
+              <td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#c97b3d,#6b3a18)"></div></td>
+              <td><span class="q2">Bandit Cloak</span></td><td><span class="why gld">to Tilda</span></td>
+              <td class="gain"></td></tr>
+          </table>
+
+          <h3>Staying in your bags <small class="right">2 items</small></h3>
+          <table class="kept">
+            <tr><td>Linen Cloth x20</td><td class="tag">your Tailoring needs it</td></tr>
+            <tr><td>Raw Brilliant Smallfish x9</td><td class="tag">locked: click to mail it again</td></tr>
+          </table>
+
+          <div class="total">
+            <div class="big money">+29<i class="s"></i>80<i class="c"></i> more than vendoring</div>
+            <div class="sub">after the 5% AH cut, 24h deposits and 1s 50c postage</div>
+          </div>
+          <div class="actions"><span class="btn send">Send to Penny, Ann +1</span><span class="btn grey">Settings</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Row 2: the guild master ============ -->
+
+    <!-- Friends, guild master list -->
+    <div>
+      <div class="cap"><b>Guild master · the list</b><span class="size">officers (the rank below) too</span>
+        <ul><li>Before the first template: "No guild template yet" and <b>Create...</b></li>
+          <li>After publishing, their own copy is on; <b>Edit...</b> opens the template</li>
+          <li>Other ranks never see Edit or Create</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="sub">Each binding mails a profession's materials to one player, every time, until you remove it.</div>
+          <div class="guild"><span>Guild template from <span class="from">Garrick Stonehelm</span>: 3 rules</span>
+            <span class="btns"><span class="btn grey small nav">Edit...</span><span class="btn blue small on">Guild rules: on</span></span></div>
+          <h3>Bindings <small class="right">2</small></h3>
+          <div class="binding g">
+            <div class="line1"><span>Alchemy materials</span><span class="toname">to Ann Fernwhistle</span></div>
+            <div class="line2"><span>5g each or more: to my bank alt &nbsp;<span class="tagline">(guild template)</span></span></div>
+          </div>
+          <div class="binding g">
+            <div class="line1"><span>Tailoring materials</span><span class="toname">to Sela Brightloom</span></div>
+            <div class="line2"><span>no price cap &nbsp;<span class="tagline">(guild template)</span></span></div>
+          </div>
+          <div class="foot"><span class="btn grey">Add a binding...</span><span class="hint">Garrick is an enchanter: the Enchanting rule is left out for him.</span><span class="btn">Done</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Friends, guild editor -->
+    <div>
+      <div class="cap"><b>Guild master · editing the template</b><span class="size">changes go out on Publish</span>
+        <ul><li>One rule per profession: a second for the same profession replaces it</li>
+          <li>Each rule: its cap stepper and Remove, like a binding</li>
+          <li><b>Publish to guild</b> sends it to every guild member running Mailworthy</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="stepline"><b>Guild template</b> for The Ledger Keepers</div>
+          <div class="sub" style="margin-bottom:8px">Members who turn the guild rules on mail each profession's materials to the player named.
+            Their own bindings and professions come first.</div>
+          <div class="binding">
+            <div class="line1"><span>Alchemy materials</span><span class="toname">to Ann Fernwhistle</span><span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="captext">5g each or more: to my bank alt</span><span class="btn grey small step">-</span><span class="btn grey small step">+</span></div>
+          </div>
+          <div class="binding">
+            <div class="line1"><span>Enchanting materials</span><span class="toname">to Bob Thornfield</span><span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="captext">10g each or more: to my bank alt</span><span class="btn grey small step">-</span><span class="btn grey small step">+</span></div>
+          </div>
+          <div class="binding">
+            <div class="line1"><span>Tailoring materials</span><span class="toname">to Sela Brightloom</span><span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="captext">no price cap</span><span class="btn grey small step">-</span><span class="btn grey small step">+</span></div>
+          </div>
+          <div class="foot"><span class="btn grey">Add a rule...</span><span class="btn nav">Publish to guild</span><span class="hint"></span><span class="btn grey">Back</span><span class="btn">Done</span></div>
+          <div class="hint" style="margin-top:8px">Tailoring materials to Sela Brightloom. Publish to guild to send it.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Friends, add a rule step 1 -->
+    <div>
+      <div class="cap"><b>Guild master · Add a rule (step 1 of 2)</b><span class="size">guild members only</span>
+        <ul><li>The same two steps as a binding: a player, then the profession</li>
+          <li>Only guild members are listed, online first, with their professions</li>
+          <li>The rule goes into the template; Back returns to it</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="stepline"><span class="n">1 of 2</span><b>Which guild member gets them?</b><span class="btn grey small" style="margin-left:auto">Refresh list</span></div>
+          <div class="stack">
+            <span class="btn grey wide nav">Sela Brightloom <span class="meta">- Tailoring - online - guild, Mailworthy</span></span>
+            <span class="btn grey wide">Bob Thornfield <span class="meta">- Enchanting - online - guild, Mailworthy</span></span>
+            <span class="btn grey wide">Dorn Ashvale <span class="meta">- Blacksmithing, Engineering - online - guild</span></span>
+            <span class="btn grey wide">Ann Fernwhistle <span class="meta">- Alchemy - guild, Mailworthy</span></span>
+            <span class="btn grey wide">Harl Grubb <span class="meta">- Cooking - guild</span></span>
+            <span class="btn grey wide">Wren Fallowby <span class="meta">- guild</span></span>
+          </div>
+          <div class="foot"><span class="hint"></span><span class="btn grey">Back</span><span class="btn">Done</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

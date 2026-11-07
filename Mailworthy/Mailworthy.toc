@@ -25,6 +25,7 @@ Valuation.lua
 Config.lua
 Routes.lua
 Comms.lua
+Guild.lua
 Stale.lua
 Bags.lua
 Mailer.lua
