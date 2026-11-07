@@ -5,12 +5,15 @@
 -- and kept in our own weak table: no field is ever written on a Blizzard frame.
 -- Buttons are pooled, so every refresh recomputes from GetBagID / GetID.
 -- Refreshed by a post-hook on each container frame's UpdateItems (combined bags
--- and the individual bag frames), whenever a lock changes, and when a mailbox
--- opens or closes: the glow shows only while a mailbox is open (a CurseForge
--- user, 2026-10-21: the blue hue in the bags all the time was noise), unless the
--- "glow everywhere" setting is on. Away from a mailbox a fresh lock (Alt+click,
--- L3) still glows for FLASH seconds on every stack of that item, so the player
--- sees it worked (operator, 2026-10-21).
+-- and the individual bag frames), whenever a lock changes, and when the Mailworthy
+-- window shows or hides: the glow shows only while that window is open at the
+-- mailbox (operator, 2026-11-07: "only when looking at the mailbox with the addon
+-- open"; before, any open mailbox lit it, and a CurseForge user, 2026-10-21, found
+-- the blue hue all the time noise), unless the "glow everywhere" setting is on.
+-- Elsewhere a fresh lock (Alt+click, L3) still glows for FLASH seconds on every
+-- stack of that item, so the player sees it worked (operator, 2026-10-21).
+-- Hovering a glowing item says why it is blue: a tooltip line through
+-- TooltipDataProcessor (like the bank alt lines), only while the glow shows.
 local _, ns = ...
 
 local Border = {}
@@ -25,7 +28,6 @@ Border.FLASH = 3 -- seconds a fresh lock glows away from the mailbox
 
 local borders = setmetatable({}, { __mode = "k" }) -- button -> { textures }
 local frames = {}
-local atMailbox = false -- MAIL_SHOW .. MAIL_CLOSED
 local flashes = {} -- itemID -> GetTime() until which a fresh lock glows anyway
 local decorators = {} -- fn(button, bag, slot): more per-slot drawing (bank alt tags)
 
@@ -60,18 +62,18 @@ function Border.Show(button, shown)
     end
 end
 
---- Is a mailbox open (MAIL_SHOW seen, or Blizzard's mail window shown)?
-function Border.AtMailbox()
-    if atMailbox then return true end
-    local mail = rawget(_G, "MailFrame")
-    if type(mail) ~= "table" or type(mail.IsShown) ~= "function" then return false end
-    local ok, shown = pcall(mail.IsShown, mail)
-    return ok and shown == true
+--- Is the Mailworthy window open? It lives under the mail frame's tabs, so it is visible only
+--- at a mailbox (IsVisible: hidden with its tab or with the mailbox, its own shown flag stays).
+function Border.WindowOpen()
+    local window = ns.MailWindow and ns.MailWindow.Frame and ns.MailWindow.Frame()
+    if type(window) ~= "table" or type(window.IsVisible) ~= "function" then return false end
+    local ok, visible = pcall(window.IsVisible, window)
+    return ok and visible == true
 end
 
 --- Should locked items glow in the bags right now?
 function Border.Wanted()
-    return ns.Features.On("slotBorder") and (Border.AtMailbox() or ns.Config.Flag("glowEverywhere"))
+    return ns.Features.On("slotBorder") and (Border.WindowOpen() or ns.Config.Flag("glowEverywhere"))
 end
 
 local function now()
@@ -102,6 +104,38 @@ function Border.OnLockChanged(itemID, locked)
         end
     end
     Border.RefreshAll()
+end
+
+Border.TOOLTIP = "Locked in Mailworthy: it stays in your bags and is never mailed. "
+    .. "Alt+click it (L3 on a controller) to unlock."
+
+--- Pure: the tooltip line that says why an item glows, or nil when it doesn't glow.
+function Border.TooltipLine(itemID)
+    if itemID == nil or not ns.Features.On("slotBorder") or not ns.Locks.IsItemLocked(itemID) then return nil end
+    if not (Border.Wanted() or Border.Flashing(itemID)) then return nil end
+    return Border.TOOLTIP
+end
+
+local function onTooltip(tooltip, data)
+    if tooltip ~= rawget(_G, "GameTooltip") then return end
+    local line = Border.TooltipLine(type(data) == "table" and tonumber(data.id) or nil)
+    if not line then return end
+    tooltip:AddLine(line, Border.COLOR[1], Border.COLOR[2], Border.COLOR[3], true)
+end
+
+function Border.InstallTooltip()
+    local processor, enum = rawget(_G, "TooltipDataProcessor"), rawget(_G, "Enum")
+    local itemType = type(enum) == "table" and type(enum.TooltipDataType) == "table" and enum.TooltipDataType.Item
+    if type(processor) ~= "table" or type(processor.AddTooltipPostCall) ~= "function" or itemType == nil then
+        ns.Log.Add("border", "TooltipDataProcessor missing: no lock tooltip line")
+        return false
+    end
+    local ok, err = pcall(processor.AddTooltipPostCall, itemType, function(tooltip, data)
+        local okLine, errLine = pcall(onTooltip, tooltip, data)
+        if not okLine then ns.Log.Add("border", "tooltip error: %s", tostring(errLine)) end
+    end)
+    ns.Log.Add("border", "lock tooltip line %s", ok and "installed" or ("failed: " .. tostring(err)))
+    return ok
 end
 
 --- Every button of one container frame. Forever's EnumerateValidItems (BaseContainerFrameMixin)
@@ -245,16 +279,11 @@ function Border.Install()
         end
     end
     Border.InstallBaganator()
+    if ns.Features.On("slotBorder") then Border.InstallTooltip() end
     ns.Locks.OnChanged(Border.OnLockChanged)
     ns.Log.Add("border", "UpdateItems hooked on %d container frames", hooked)
 end
 
 ns.On("PLAYER_LOGIN", function() Border.Install() end)
-ns.On("MAIL_SHOW", function()
-    atMailbox = true
-    Border.RefreshAll()
-end)
-ns.On("MAIL_CLOSED", function()
-    atMailbox = false
-    Border.RefreshAll()
-end)
+-- MailWindow refreshes the glow when its window shows or hides; the mailbox closing hides it.
+ns.On("MAIL_CLOSED", function() Border.RefreshAll() end)

@@ -385,7 +385,7 @@ local function fillMain(bankAlt, here, choices)
     gatherButton:SetText(string.format("Sell what I gather: %s (%s)", v.sellGathered and "on" or "off",
         #gathering > 0 and table.concat(gathering, ", ") or "no gathering profession here"))
     tagsButton:SetText("Bag tags: " .. (ns.Config.Flag("tagsEverywhere") and "every character" or "bank alt only"))
-    glowButton:SetText("Lock glow: " .. (ns.Config.Flag("glowEverywhere") and "always" or "mailbox only"))
+    glowButton:SetText("Lock glow: " .. (ns.Config.Flag("glowEverywhere") and "always" or "in Mailworthy"))
     local bindings = ns.Routes.Count()
     friendsButton:SetText(bindings == 0 and "Friends..."
         or string.format("Friends (%d binding%s)...", bindings, bindings == 1 and "" or "s"))
