@@ -25,6 +25,8 @@ local WIDTH, MAIL_ROW, STAY_ROW, ROUTE_ROW = 520, 30, 20, 24
 local W = ns.Widgets
 local money = function(c) return ns.Valuation.Money(c) end
 
+-- The tab the last draw was for (true: the Inbox), so the watcher redraws when it changes.
+local renderedInbox
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
 local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
@@ -528,7 +530,8 @@ function UI.Refresh(keepScan)
     local status = ns.Mailer.Status()
     if status then totalNote:SetText(status) end
     sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt))
-    if UI.OnInbox() and not ns.Mailer.Busy() then
+    renderedInbox = UI.OnInbox()
+    if renderedInbox and not ns.Mailer.Busy() then
         -- Mail goes out from the Send Mail tab only, and we never switch tabs ourselves
         -- (MailFrameTab_OnClick taints the controller UI). No Send button here at all
         -- (operator, 2026-11-06: v0.16.1's secure "Open the Send Mail tab" button didn't show
@@ -572,11 +575,39 @@ function UI.Show(tab)
     ns.Log.Add("ui", "mail window shown (%s tab): %d to mail, %d staying", tostring(tab), #result.mail, #result.keep)
 end
 
---- True while the window sits on the Inbox tab (mouse/keyboard), where nothing can be sent.
+--- True while the Inbox tab is what shows, where nothing can be sent. Read from what the
+--- player sees (IsVisible), not from which tab the window was opened on: v0.17.1 to v0.20.1
+--- tested the window's parent and the Send Mail frame's own shown flag, and in game the Send
+--- button stayed hidden on the Send Mail tab (operator, 2026-11-07: "the send mail button is
+--- just gone now").
 function UI.OnInbox()
     local send, inbox = rawget(_G, "SendMailFrame"), rawget(_G, "InboxFrame")
-    return frame ~= nil and type(inbox) == "table" and frame:GetParent() == inbox
-        and not (type(send) == "table" and send:IsShown())
+    if type(send) == "table" and send:IsVisible() then return false end
+    return type(inbox) == "table" and inbox:IsVisible() == true
+end
+
+--- What the tab test sees, for the log and /mw report.
+function UI.TabState()
+    local function state(name)
+        local f = rawget(_G, name)
+        if type(f) ~= "table" then return name .. " missing" end
+        return string.format("%s shown %s visible %s", name, tostring(f:IsShown()), tostring(f:IsVisible()))
+    end
+    local parent = frame and frame:GetParent()
+    local parentName = parent and parent.GetName and parent:GetName() or tostring(parent)
+    return string.format("%s; %s; window on %s", state("SendMailFrame"), state("InboxFrame"), tostring(parentName))
+end
+
+--- The watcher's second job: if the tab changed since the last draw (the Send button and the
+--- Inbox note follow it), redraw. Returns true when it redrew.
+function UI.CheckTab()
+    if not (frame and frame:IsVisible()) or ns.Mailer.Busy() then return false end
+    local onInbox = UI.OnInbox()
+    if onInbox == renderedInbox then return false end
+    ns.Log.Add("ui", "tab changed (%s): %s", onInbox and "Inbox" or "Send Mail", UI.TabState())
+    renderedInbox = onInbox -- once per change, even if the redraw fails
+    UI.Refresh(true)
+    return true
 end
 
 --- Opened on the Inbox and the player moved to Send Mail: move the window there too.
@@ -593,7 +624,9 @@ function UI.FollowTab()
 end
 
 function UI.Toggle(tab)
-    if frame and frame:IsShown() then
+    -- IsVisible, not IsShown: opened on one tab and hidden with it, the window keeps its shown
+    -- flag, and a press on the other tab's button must show it there, not "hide" it.
+    if frame and frame:IsVisible() then
         frame:Hide()
     else
         UI.Show(tab)
@@ -616,6 +649,7 @@ ns.On("PLAYER_LOGIN", function()
         if elapsed < 0.2 then return end
         elapsed = 0
         local ok, err = pcall(UI.FollowTab)
+        if ok then ok, err = pcall(UI.CheckTab) end
         if not ok then ns.Log.Add("ui", "tab watcher error: %s", tostring(err)) end
     end)
     ns.Locks.OnChanged(refreshIfShown)
