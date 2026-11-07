@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mailworthy gallery: the mailbox</title>
+<!-- CurseForge gallery image 1 (tools/build-icons.sh -> 01-mailbox.png). The mailbox window
+     as shipped: To line, Mailing (chip + gain), Staying (locked first, reasons), the total,
+     Send / Settings (no Close button since the UX pass). Texts are MailWindow.lua's. -->
+<link rel="stylesheet" href="gallery.css">
+<style>
+  .mail { left: 404px; top: 196px; width: 300px; }
+  .mail .parchment { height: 250px; }
+  .launcher { position: absolute; left: 576px; top: 551px; min-width: 128px; }
+  .launcher img { width: 16px; height: 16px; }
+  .window { left: 728px; top: 92px; width: 510px; }
+</style>
+</head>
+<body>
+  <div class="headline" style="width: 336px; top: 112px">
+    <div class="brand"><img src="../logo-512.png" alt="">MAILWORTHY</div>
+    <h1>One press at the mailbox</h1>
+    <p>Everything worth more at the auction house, or disenchanted, goes to your bank alt. The rest stays in your
+      bags for the vendor.</p>
+    <ul class="points">
+      <li>Prices from Auctionator, after the AH cut, deposits and postage</li>
+      <li>Every item says why it goes or stays</li>
+      <li>Press an item to lock it: it never leaves your bags</li>
+      <li>Keeps your professions' materials until you outgrow them</li>
+    </ul>
+  </div>
+
+  <div class="frame mail">
+    <div class="title"><span>Send Mail</span><span class="x">x</span></div>
+    <div class="body">
+      <div class="parchment">
+        <div class="field"><b>To:</b><span></span></div>
+        <div class="field"><b>Subject:</b><span></span></div>
+        <div class="slots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="buttons"><span class="btn grey">Send</span><span class="btn grey">Cancel</span></div>
+    </div>
+    <div class="tabs"><span class="tab">Inbox</span><span class="tab on">Send Mail</span></div>
+  </div>
+  <span class="btn launcher"><img src="../logo-512.png" alt="">Mailworthy</span>
+
+  <div class="frame window">
+    <div class="title"><img src="../logo-512.png" alt=""><span>Mailworthy</span><span class="x">x</span></div>
+    <div class="content">
+      <div class="to"><div class="line"><b>To:</b><span class="who">Penny Ledgerwick</span><span class="note">your bank alt</span></div></div>
+
+      <h3>Mailing <small>press an item to keep it in your bags</small><span class="right">5 items · 1 mail</span></h3>
+      <table>
+        <tr><td style="width:34px"><div class="icon" style="background:linear-gradient(135deg,#c97b3d,#6b3a18)"></div></td>
+          <td class="q2">Bandit Cloak</td><td><span class="why de">Disenchant</span></td>
+          <td class="gain money">+49<i class="s"></i>81<i class="c"></i></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#e0874a,#7a3e1a)"></div></td>
+          <td class="q1">Copper Ore <span class="count">x20</span></td><td><span class="why ah">Auction</span></td>
+          <td class="gain money">+29<i class="s"></i>80<i class="c"></i></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#7fb3c9,#2f5a6b)"></div></td>
+          <td class="q1">Greater Magic Essence <span class="count">x2</span></td><td><span class="why ah">Auction</span></td>
+          <td class="gain money">+10<i class="s"></i>40<i class="c"></i></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#9aa0a8,#4a4f57)"></div></td>
+          <td class="q1">Rough Weightstone <span class="count">x20</span></td><td><span class="why ah">Auction</span></td>
+          <td class="gain money">+6<i class="s"></i>58<i class="c"></i></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#a07850,#503418)"></div></td>
+          <td class="q1">Light Leather <span class="count">x10</span></td><td><span class="why common">Common</span></td>
+          <td class="gain"></td></tr>
+      </table>
+
+      <h3>Staying in your bags<span class="right"><span class="locked">1 locked</span> · 4 items</span></h3>
+      <table class="kept">
+        <tr><td class="q1">Raw Brilliant Smallfish <span class="count">x9</span></td><td class="tag locked">locked (press to unlock)</td></tr>
+        <tr><td class="q1">Linen Cloth <span class="count">x20</span></td><td class="tag">your Tailoring needs it (Linen Bag still yellow)</td></tr>
+        <tr><td class="q1">Coarse Stone <span class="count">x6</span></td><td class="tag">only 40c more than a vendor (needs 1s)</td></tr>
+        <tr><td class="q1">Small Egg <span class="count">x2</span></td><td class="tag">no auction price yet</td></tr>
+      </table>
+
+      <div class="total">
+        <div class="big money">+1<i class="g"></i>96<i class="s"></i>59<i class="c"></i> more than vendoring</div>
+        <div class="sub">after the 5% AH cut, 24h deposits and 1s 50c postage</div>
+      </div>
+      <div class="actions">
+        <span class="btn send">Send to Penny</span>
+        <span class="btn grey">Settings</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

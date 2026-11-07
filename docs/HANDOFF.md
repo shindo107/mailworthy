@@ -36,6 +36,7 @@ must never break the game.
 | **Target bank alt view** (tags + tooltip + summary) | [media/bank-alt-prototype.html](../media/bank-alt-prototype.html) -> [.png](../media/bank-alt-prototype.png) |
 | **Bindings UI** (binding rows in the mail window, the friends window) | [media/bindings-prototype.html](../media/bindings-prototype.html) -> [.png](../media/bindings-prototype.png) |
 | **UX pass** (current layout of the mailbox, settings and friends windows, 2026-11-06) | [media/ux-pass-prototype.html](../media/ux-pass-prototype.html) -> [.png](../media/ux-pass-prototype.png) |
+| **CurseForge gallery** (4 images of the shipped UI, 2026-11-07; keep them in step when a window changes) | [media/gallery/](../media/gallery/) (`*.html` -> `*.png`, 1600x900) |
 | CurseForge description (paste into the project page) | [media/curseforge-description.html](../media/curseforge-description.html) |
 | Rebuild icon/avatar/TGA/screenshots | [tools/build-icons.sh](../tools/build-icons.sh) (Chrome headless + Pillow) |
 | Package layout check (CI) | [tools/check-package-layout.sh](../tools/check-package-layout.sh) |

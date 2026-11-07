@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mailworthy gallery: bindings</title>
+<!-- CurseForge gallery image 2 (tools/build-icons.sh -> 02-friends.png). Bindings: one To line
+     per recipient (UI.Recipients), the bindings block with Skip once / Remove, the Mailing list
+     grouped by recipient, and the friends window's list view (RoutesUI.lua). -->
+<link rel="stylesheet" href="gallery.css">
+<style>
+  .window { left: 40px; top: 22px; width: 530px; }
+  .window td { padding: 3px 8px; }
+  .friends { left: 618px; top: 272px; width: 600px; }
+  .binding .crafter { color: #aaa; }
+</style>
+</head>
+<body>
+  <div class="frame window">
+    <div class="title"><img src="../logo-512.png" alt=""><span>Mailworthy</span><span class="x">x</span></div>
+    <div class="content">
+      <div class="to">
+        <div class="line"><b>To:</b><span class="who">Penny Ledgerwick</span><span class="note">your bank alt · 1 mail</span></div>
+        <div class="line"><span class="who more">Bob Thornfield</span><span class="note">Enchanting materials · 1 mail</span></div>
+        <div class="line"><span class="who more">Tilda Marrow</span><span class="note">Leatherworking materials (their crafter) · 1 mail</span></div>
+      </div>
+      <div class="routes">
+        <div class="head">Bindings<span class="btn small grey">Friends...</span></div>
+        <div class="route">Enchanting materials <span class="toname">to Bob</span>
+          <span class="buttons"><span class="btn small grey">Skip once</span><span class="btn small grey">Remove</span></span></div>
+        <div class="route">Leatherworking materials <span class="toname">to Tilda</span> <span class="crafter">(Mara's crafter)</span>
+          <span class="buttons"><span class="btn small grey">Skip once</span><span class="btn small grey">Remove</span></span></div>
+        <div class="route">Cooking materials <span class="toname">to Harl</span> <span class="skipped">skipped this time</span>
+          <span class="buttons"><span class="btn small grey">Undo skip</span><span class="btn small grey">Remove</span></span></div>
+      </div>
+
+      <h3>Mailing <small>press an item to keep it in your bags</small><span class="right">6 items · 3 mails</span></h3>
+      <table>
+        <tr><td style="width:34px"><div class="icon" style="background:linear-gradient(135deg,#c97b3d,#6b3a18)"></div></td>
+          <td class="q2">Bandit Cloak</td><td><span class="why de">Disenchant</span></td>
+          <td class="gain money">+49<i class="s"></i>81<i class="c"></i></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#e0874a,#7a3e1a)"></div></td>
+          <td class="q1">Copper Ore <span class="count">x20</span></td><td><span class="why ah">Auction</span></td>
+          <td class="gain money">+29<i class="s"></i>80<i class="c"></i></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#8c8cff,#3a3a8a)"></div></td>
+          <td class="q1">Strange Dust <span class="count">x20</span></td><td><span class="why friend">to Bob</span></td>
+          <td class="gain"></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#7fb3c9,#2f5a6b)"></div></td>
+          <td class="q2">Lesser Magic Essence <span class="count">x3</span></td><td><span class="why friend">to Bob</span></td>
+          <td class="gain"></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#a07850,#503418)"></div></td>
+          <td class="q1">Light Leather <span class="count">x27</span> <span class="stacks">(2 stacks)</span></td><td><span class="why friend">to Tilda</span></td>
+          <td class="gain"></td></tr>
+        <tr><td><div class="icon" style="background:linear-gradient(135deg,#8a6a4a,#3e2a18)"></div></td>
+          <td class="q1">Medium Leather <span class="count">x8</span></td><td><span class="why friend">to Tilda</span></td>
+          <td class="gain"></td></tr>
+      </table>
+
+      <h3>Staying in your bags<span class="right">2 items</span></h3>
+      <table class="kept">
+        <tr><td class="q1">Raw Cooking Meat <span class="count">x6</span></td><td class="tag">no auction price yet</td></tr>
+        <tr><td class="q1">Mining Pick</td><td class="tag">profession tool</td></tr>
+      </table>
+
+      <div class="total">
+        <div class="big money">+79<i class="s"></i>61<i class="c"></i> more than vendoring</div>
+        <div class="sub">after the 5% AH cut, 24h deposits and 2s 70c postage</div>
+      </div>
+      <div class="actions">
+        <span class="btn send">Send to Penny +2</span>
+        <span class="btn grey">Settings</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="headline" style="left: 618px; top: 40px; width: 600px">
+    <div class="brand"><img src="../logo-512.png" alt="">MAILWORTHY</div>
+    <h1>Send materials to friends</h1>
+    <p>Bind a profession to a guildmate, a party member or one of your alts: its materials go to them in the
+      same press, to the character that has the profession.</p>
+    <ul class="points">
+      <li>A price cap sends a material the market suddenly wants to your bank alt</li>
+      <li>Skip once for a single visit</li>
+    </ul>
+  </div>
+
+  <div class="frame friends">
+    <div class="title"><img src="../logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+    <div class="content">
+      <div class="sub" style="margin-bottom:8px">Each binding mails a profession's materials to one player, every time, until you remove it.</div>
+      <div class="binding">
+        <div class="line1">Enchanting materials <span class="toname">to Bob Thornfield</span><span class="btn small grey">Remove</span></div>
+        <div class="line2"><span class="captext">5g each or more: to my bank alt</span>
+          <span class="btn small step grey">-</span><span class="btn small step grey">+</span>
+          <span class="btn small grey scope">All my characters</span></div>
+      </div>
+      <div class="binding">
+        <div class="line1">Leatherworking materials <span class="toname">to Mara Quill</span> <span class="crafter">(delivered to Tilda Marrow)</span><span class="btn small grey">Remove</span></div>
+        <div class="line2"><span class="captext">2g each or more: to my bank alt</span>
+          <span class="btn small step grey">-</span><span class="btn small step grey">+</span>
+          <span class="btn small grey scope">This character</span></div>
+      </div>
+      <div class="binding">
+        <div class="line1">Cooking materials <span class="toname">to Harl Grubb</span><span class="btn small grey">Remove</span></div>
+        <div class="line2"><span class="captext">no price cap</span>
+          <span class="btn small step grey">-</span><span class="btn small step grey">+</span>
+          <span class="btn small grey scope">All my characters</span></div>
+      </div>
+      <div class="foot">
+        <span class="btn">Add a binding...</span>
+        <span class="hint"></span>
+        <span class="btn">Done</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
