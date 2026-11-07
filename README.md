@@ -23,9 +23,10 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   what stays and why, and the total gain. **Send** mails it all in one press, 12 stacks
   per mail. Pressing an item locks it, so it stays.
 - **Lock items** you never want mailed: Alt+click (mouse), L3 in your bags (controller),
-  or press the item in the Mailworthy window. Locked items glow blue while a mailbox is
-  open (a setting keeps the glow on everywhere); away from one a new lock glows for a
-  moment so you see it took. Locks stay wherever the item moves.
+  or press the item in the Mailworthy window. Locked items glow blue while the Mailworthy
+  window is open at the mailbox (a setting keeps the glow on everywhere), and hovering one
+  says why; elsewhere a new lock glows for a moment so you see it took. Locks stay
+  wherever the item moves.
 - **On your bank alt:** bag slots carry **AH / B / DE / V** tags (list it, bank it for a
   later phase, disenchant it, vendor it now) recomputed with that character's own prices;
   tooltips show today's verdict and why the item was mailed; the Mailworthy button (or
@@ -166,7 +167,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Skill ranks: `GetProfessionInfo` 3rd return for this character (First Aid and Cooking included), `C_Club.GetMemberInfo` `profession1Rank` / `profession2Rank` for guild members (in Forever's `ClubDocumentation.lua` and Communities roster sort) | `/mw report` "kept for First Aid 85; First Aid 85 is past Linen Cloth (mailed)"; a binding line says "skill N" with a guild member's rank, or a Mailworthy peer's "skills: ..." | open (2026-11-06) |
 | Scan freshness: `Auctionator.API.v1.GetAuctionAgeByItemID(caller, itemID)` (read in Auctionator's source: days since seen, nil past 21 days; else the `item:ID` link form) over 12 everyday trade goods; the scan day sent as `F2\|<server day>` after each hello | a character that hasn't scanned for a week, in a guild with a Mailworthy user who just scanned: `/mw report` "price stamp: <name> scanned 0 day(s) ago", a **!** on the Mailworthy button and the chat line at the mailbox | open (2026-11-06) |
 | Tier check: Forever's Professions window is the retail one, fed by `C_TradeSkillUI` (in Forever's source: `GetBaseProfessionInfo` / `GetChildProfessionInfo` `professionID` / `skillLevel`, `GetRecipeInfo` `learned` / `relativeDifficulty` 0 orange .. 3 grey, `GetRecipeSchematic` `reagentSlotSchematics[].reagents[].itemID` / `outputItemID`, `GetFilteredRecipeIDs`, `IsTradeSkillLinked` / `IsTradeSkillGuild` / `IsTradeSkillGuildMember` / `IsNPCCrafting`; events `TRADE_SKILL_SHOW`, `TRADE_SKILL_LIST_UPDATE`, `TRADE_SKILL_DATA_SOURCE_CHANGED`). Not in Forever's Lua, tried first: `GetAllRecipeIDs` (retail has it; else the filtered list, so a search or "skill-up only" filter hides recipes). The Classic globals (`GetTradeSkillInfo`, `GetCraftInfo`, `CRAFT_SHOW`, ...) aren't in Forever's source; they are a fallback only. The skill line comes from `GetProfessionInfo` (matched by ID, else by name) | open each crafting profession: `/mw report` "tier check: <name> <profession> <rank> read ... (N learned recipes, C_TradeSkillUI)", N close to the window's learned recipe count; then any "still used" lines, checked against the window's colours | open (2026-11-06) |
-| Lock glow only while a mailbox is open (`MAIL_SHOW` / `MAIL_CLOSED`, `MailFrame:IsShown()`), "always" setting; a new lock flashes 3 s anywhere | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: glow; close it: gone | open (CurseForge user report + operator, 2026-10-21) |
+| Lock glow only while the Mailworthy window is open (its `OnShow` / `OnHide`, `IsVisible` under the mail frame), "always" setting; a new lock flashes 3 s anywhere; a tooltip line on a glowing item (`TooltipDataProcessor.AddTooltipPostCall`, item type, `data.id`) | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: still nothing; open the Mailworthy window: glow, and hovering a glowing item shows "Locked in Mailworthy: ..."; close the window or the mailbox: gone | open (operator, 2026-11-07; before: any open mailbox, 2026-10-21) |
 
 ## Picking up the work
 

@@ -184,7 +184,9 @@ describe("bank alt view", function()
         ns2.BankAlt.Redraw()
         ContainerFrameCombinedBags:UpdateItems()
         assert.is_nil(tagOf(button))
-        assert.is_nil(postCalls[0])
+        -- The only item-tooltip hook left is the lock glow's (its own switch, slotBorder: border_spec),
+        -- and it adds nothing for an unlocked item.
+        if postCalls[0] then assert.equal("", hover(WowStub.link(2770, "Copper Ore"), 2770)) end
         ns = ns2 -- after_each reads this one's log
     end)
 end)

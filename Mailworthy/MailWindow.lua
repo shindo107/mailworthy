@@ -355,6 +355,13 @@ function UI.Create()
     frame:SetScript("OnHide", function(self)
         if type(send) == "table" and self:GetParent() ~= send then self:SetParent(send) end
     end)
+    -- The lock glow shows only while this window is open (Border.Wanted): redraw it on both.
+    local function glow()
+        local ok, err = pcall(ns.Border.RefreshAll)
+        if not ok then ns.Log.Add("border", "refresh error: %s", tostring(err)) end
+    end
+    frame:HookScript("OnShow", glow)
+    frame:HookScript("OnHide", glow)
     ns.Nav.Attach(frame)
     ns.Log.Add("ui", "mail window created%s", type(send) == "table" and " under SendMailFrame" or "")
     return frame
