@@ -4,15 +4,18 @@
 # nether.wowhead.com/forever/tooltip/item/<id>). A row = the skill at which every non-holiday recipe
 # using the item (directly or through a part this profession makes) has gone grey; First Aid cloth
 # uses the next bandage's learn skill instead (operator). Greys of 300 and up have no row: kept forever.
+# Checked 2026-11-06 against Blizzard's Game Data API (namespace static-forever-us, build 1.60.1.70399):
+# every item ID and name, every reagent the API reaches and all five leather conversions match. The API
+# has no recipe colours, so every threshold is still unverified (the in-game tier check, TierCheck.lua).
 # Rows: (itemID, skill, name, why). Only thresholds below 300 (anything used at 300+ has no row).
 TAILORING = [
  (2589,115,"Linen Cloth","Soft-soled Linen Boots via bolt"),(2996,115,"Bolt of Linen Cloth",""),
- (2592,160,"Wool Cloth","Phoenix Pants / Gloves via bolt"),(2997,160,"Bolt of Woolen Cloth",""),
+ (2592,160,"Wool Cloth","Phoenix Pants / Gloves via bolt (Bindings learn 125?)"),(2997,160,"Bolt of Woolen Cloth",""),
  (3182,175,"Spider's Silk","Robes of Arcana, Silky Leggings"),
  (4337,215,"Thick Spider's Silk","Icy Cloak"),
  (4306,220,"Silk Cloth","Crimson Silk Gloves via bolt"),(4305,220,"Bolt of Silk Cloth",""),
  (10285,245,"Shadow Silk","Shadoweave Mask / Boots"),
- (4338,250,"Mageweave Cloth","Stormcloth Boots, Nether Cuffs via bolt"),(4339,250,"Bolt of Mageweave",""),
+ (4338,250,"Mageweave Cloth","Stormcloth Boots, Nether* Cuffs via bolt"),(4339,250,"Bolt of Mageweave",""),
 ]
 BLACKSMITHING = [
  (2835,155,"Rough Stone","Ironforge Breastplate via Rough Grinding Stone"),(3470,155,"Rough Grinding Stone",""),
@@ -34,7 +37,7 @@ ENGINEERING = [
  (2836,195,"Coarse Stone","SAF-T Bronze Bomb via Coarse Blasting Powder"),(4364,195,"Coarse Blasting Powder",""),
  (260796,195,"No Slip SAF-T Padding",""),
  (4359,210,"Handful of Copper Bolts",""),(4363,210,"Copper Modulator",""),(5507,210,"Ornate Spyglass",""),
- (3857,215,"Coal","Gyromatic Micro-Adjustor via Steel"),(3859,215,"Steel Bar","Gyromatic Micro-Adjustor"),
+ (3859,215,"Steel Bar","Gyromatic Micro-Adjustor"),  # Coal: no row, smelts into Azerothium (SAF-T, 300)
  (4375,225,"Whirring Bronze Gizmo",""),(249425,225,"Bauxite","Shafety Sheep via Sandpaper"),
  (249432,225,"Sandpaper",""),(260799,225,"SAF-T Bell",""),
  (4382,240,"Bronze Framework",""),(4387,240,"Iron Strut",""),(4394,240,"Big Iron Bomb",""),
@@ -52,7 +55,7 @@ ENCHANTING = [
  (247786,25,"Mote of Magic","Bracer - Inferior Stamina"),
  (6338,170,"Silver Rod",""),
  (10978,180,"Small Glimmering Shard","Glimmering Staff, Orb of Souls"),
- (10938,180,"Lesser Magic Essence","Mystic Mushroom (pair)"),(10939,180,"Greater Magic Essence",""),
+ (10938,180,"Lesser Magic Essence","Mystic Mushroom (Greater; pair unverified)"),(10939,180,"Greater Magic Essence",""),
  (10940,205,"Strange Dust","Chest - Lesser Absorption"),
  (10998,215,"Lesser Astral Essence","Chest - Minor Stats, Runed Golden Rod"),(11082,215,"Greater Astral Essence",""),
  (11084,215,"Large Glimmering Shard","Chest - Minor Stats"),(11128,215,"Golden Rod",""),
@@ -67,7 +70,7 @@ COOKING = [
  (1475,45,"Small Venom Sac",""),(2447,45,"Peacebloom",""),(6291,85,"Raw Brilliant Smallfish",""),
  (6303,85,"Raw Slitherskin Mackerel",""),(2672,90,"Stringy Wolf Meat",""),(5465,90,"Small Spider Leg",""),
  (2886,100,"Crag Boar Rib",""),(5466,100,"Scorpid Stinger",""),
- (6889,115,"Small Egg","Breakfast Omelette 95; Egg Nog (Winter Veil) 115"),(5467,115,"Kodo Meat",""),
+ (6889,95,"Small Egg","Breakfast Omelette (Egg Nog is Winter Veil)"),(5467,115,"Kodo Meat",""),
  (785,125,"Mageroyal",""),(723,130,"Goretusk Liver",""),(2673,130,"Coyote Meat",""),(5468,130,"Soft Frenzy Flesh",""),
  (5469,130,"Strider Meat",""),(6289,130,"Raw Longjaw Mud Snapper",""),(6317,130,"Raw Loch Frenzy",""),
  (6361,130,"Raw Rainbow Fin Albacore",""),(2452,140,"Swiftthistle",""),(3172,140,"Boar Intestines",""),
@@ -96,14 +99,17 @@ FIRST_AID = [
  (4338,260,"Mageweave Cloth","Runecloth Bandage learn 260"),(8838,270,"Sungrass","Superior Healing Potion"),
  (4304,280,"Thick Leather","Leather Tourniquet"),
 ]
-FIRST_AID_KEEP_FOREVER = [1288,13464,8170,19441]  # Large Venom Sac, Golden Sansam, Rugged Leather, Huge Venom Sac
+# Large Venom Sac, Golden Sansam, Rugged Leather, Huge Venom Sac; and Forever's poultices and Potent
+# Anti-Venom (API check 2026-11-06): Swollen Venom Sac, Murloc Fin, Spider Ichor, Elemental Water,
+# Essence of Water (their greys are unknown, so kept for good).
+FIRST_AID_KEEP_FOREVER = [1288,13464,8170,19441,255645,1468,3174,7070,7080]
 
 # Leatherworking: leather up-conversions use their direct grey; past it, Tiers.CONVERT decides by AH prices.
 LEATHERWORKING = [
  (2934,40,"Ruined Leather Scraps","Light Leather recipe"),(5082,95,"Thin Kodo Leather",""),
  (7286,125,"Black Whelp Scale",""),(5784,130,"Slimy Murloc Scale",""),
  (2318,135,"Light Leather","own recipes; then converts to Medium"),(6471,140,"Perfect Deviate Scale",""),
- (7287,145,"Red Whelp Scale",""),(783,165,"Light Hide","Dark Leather Gloves via Cured Light Hide"),
+ (7287,145,"Red Whelp Scale",""),(783,165,"Light Hide","class leather sets via Cured Light Hide (unverified)"),
  (4231,165,"Cured Light Hide",""),(2319,170,"Medium Leather","own recipes; then converts to Heavy"),
  (6470,170,"Deviate Scale",""),(4461,180,"Raptor Hide",""),
  (4232,205,"Medium Hide","Mender's mail via Cured Medium Hide"),(4233,205,"Cured Medium Hide",""),

@@ -31,7 +31,10 @@ ns.TierCheck = TierCheck
 TierCheck.COLORS = { [0] = "orange", [1] = "yellow", [2] = "green", [3] = "grey" }
 TierCheck.GREY = 3
 local CLASSIC_DIFFICULTY = { optimal = 0, medium = 1, easy = 2, trivial = 3 }
-local TRADE_GOODS = 7
+-- Item classes that count as a profession's own parts: trade goods (bolts, grinding stones,
+-- blasting powders) and consumables (Engineering's Accurate Scope and Rough Copper Bomb, which
+-- Forever files as Consumable: the tier table follows them too; Forever API check, 2026-11-06).
+local PART_CLASSES = { [0] = true, [7] = true }
 
 -- First Aid's cloth is done where the next bandage is learnable (the operator's rule), not
 -- where its bandages turn grey, so a still-yellow bandage is no evidence against it.
@@ -54,7 +57,8 @@ function TierCheck.On() return ns.Features.On("tierCheck") end
 --- the map reagent itemID -> { recipe, difficulty, via } (the hardest non-grey recipe using it, `via`
 --- the name of the profession's own part it goes through) or false (only grey recipes use it).
 --- A part is the output of another recipe in the list; with `classOf(itemID)` given, only trade
---- goods count as parts (bolts, grinding stones, blasting powders; not gear made from gear).
+--- goods and consumables count as parts (bolts, blasting powders, scopes, bombs; not gear made
+--- from gear).
 --- A recipe making the item a material converts into (Tiers.CONVERT: 4 Light Leather -> 1 Medium)
 --- doesn't count for that material: past its own recipes it is kept while converting pays.
 function TierCheck.Summarize(recipes, profession, classOf)
@@ -69,7 +73,7 @@ function TierCheck.Summarize(recipes, profession, classOf)
     for _, r in ipairs(recipes or {}) do
         local out = tonumber(r.output)
         local class = out and type(classOf) == "function" and classOf(out) or nil
-        if out and (class == nil or class == TRADE_GOODS) and not isConversion(r, out) then
+        if out and (class == nil or PART_CLASSES[class]) and not isConversion(r, out) then
             makers[out] = makers[out] or {}
             table.insert(makers[out], r)
         end

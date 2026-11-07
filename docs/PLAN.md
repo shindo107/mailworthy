@@ -284,6 +284,15 @@ them) then I just keep going to the AH. Same methodology for all crafting materi
   else, the highest grey of the non-holiday recipes using the material directly or through a
   part the profession makes (bolts, cured hides, grinding stones, blasting powders, tubes);
   one-off gear-into-gear chains (goggles) don't count. No row = never outgrown (a grey of 300+).
+- **API check** (2026-11-06, Blizzard's Game Data API, namespace `static-forever-us`, build
+  1.60.1.70399): every item ID, name, reachable reagent and leather conversion matches. The API
+  has no recipe colours, so no threshold is confirmed by it (the in-game tier check is). Fixed
+  from it: Coal has no row (it smelts into Azerothium for 300 SAF-T recipes), Small Egg drops to
+  Breakfast Omelette (Egg Nog is Winter Veil), First Aid keeps Forever's poultice and Potent
+  Anti-Venom reagents for good, and consumables (Accurate Scope, Rough Copper Bomb) count as
+  parts in the tier check, as in the table. Left for the in-game check: Light Hide (Dark Leather
+  Gloves no longer uses Cured Light Hide), Phoenix Bindings (Bolt of Woolen Cloth, learn 125),
+  the Lesser essences (the API has no essence conversions), First Aid's trainer bandages.
 - **Beyond the subclasses** (`Tiers.KEEP`, `Valuation.Uses`): each profession keeps the exact
   other materials it levels with (rows below 300; operator: "levelling ones only"), so
   valuables used at 300 still go to the AH. Kept for good: First Aid's 300 reagents, Oily
