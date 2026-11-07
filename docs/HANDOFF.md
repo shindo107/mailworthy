@@ -82,6 +82,8 @@ must never break the game.
 | `Comms.lua` | hellos between Mailworthys (`C_ChatInfo`, prefix `Mailworthy`): `H2\|<own crafting skill lines>\|<Name=ids;...>` (the account's other crafters here) / `A2` / `S2\|<id:rank,...>\|<Name=id:rank;...>` (skill ranks after each hello, and again at the mailbox after a skill-up crosses a tier: `Steps`); peers in `MailworthyDB.peers[realm\|faction]` (60 days); throttled; everything received is validated data. Switch `comms` |
 | `Guild.lua` | **guild template** (2026-11-07): rules (one per crafting profession, each a binding to one guild member) published by the guild master or the rank below (`PUBLISHER_RANK` 1) over Comms on GUILD only: `T2\|<rev>\|<author>\|<i>/<n>\|<skill line>=<Name>:<cap>` per rule, `Q2\|<rev held>` asks; any holder passes a copy on (`answerSoon`: 1 s for an officer, 2-6 s otherwise, cancelled when another copy as new goes out). Receiver needs the sender in its roster and the author at rank 0-1 (`RankOf`: C_Club `guildRankOrder` - 1, `GetGuildRosterInfo` fallback; an unknown name waits for `GUILD_ROSTER_UPDATE`), drops rules for non-members, newest revision wins (never > 10 min ahead); an author hearing a revision in its name missing from `guildPublished` republishes (`correct`). `MailworthyDB.guildTemplates[realm\|faction\|guild]` = { rev, from, rules, use = nil/true/false }; drafts in `guildDrafts`. Opt-in once (`use`), one-press off (`SetUse` / `ToggleUse`). `Rules(personal)` = what `Routes.List` appends (scope "guild", key "guild\|..."): none while off, minus professions this character has, professions bound personally, rules naming this character. Everyone asks at login (12 s) with the revision held. Switch `guildTemplate` |
 | `Stale.lua` | stale auction prices (2026-11-06): freshness = days since Auctionator saw the freshest of 12 everyday trade goods (`WATCH`, `GetAuctionAgeByItemID`); the scan day goes out as `F2\|<server day>` after each hello (Comms; older Mailworthys drop unknown kinds) and peers' days are kept in `MailworthyDB.fresh[realm\|faction]` (60 days; separate from `peers`, so bindings data is untouched). Pure `Nudge(ownAge, freshest, today, maxAgeDays, nudgeDays)`: nil up to `NUDGE_DAYS` (3, operator 2026-11-06), "self" past that (`ignored` past `maxAgeDays`, 7: those items stay in the bags), "peer" when someone heard in 14 days scanned within 2 days. Shown as "!" on the mail buttons, a line at the top of the Mailworthy window, and (peer only) one chat line at `MAIL_SHOW`; logging in stale sends an ask so fresh peers answer. Display only. Switch `staleNudge` |
+| `Ledger.lua` | **mail ledger** (2026-11-07): the log of every mail sent (Mailer's own, recorded with exactly what it attached; Blizzard's Send button via a `SendMail` post-hook and the Send Mail tab read as it changes) and every item / gold taken (`TakeInboxItem` / `TakeInboxMoney` / `AutoLootMailItem` post-hooks, `MAIL_SUCCESS` / `MAIL_FAILED`, leftovers at `MAIL_CLOSED`); `MailworthyDB.ledger[realm\|faction]` = { log (newest 2000), players (running totals: received, sent, settled, item names), expect (senders' values), outbox (values waiting for a player) }. `Net(name)` = received - sent per player (`Owner` merges a peer's characters); `Debts()` lists only players with net > 0 (operator: never "who owes me"); `MarkPaid`; `ExportText`. Values: own price at send (`Valuation.SmoothedPrice`); received: the sender's `V2` whisper value (at most `PRICE_CAP` 3x own), else own price at take. Switch `ledger` |
+| `LedgerUI.lua` | the ledger window (`/mw ledger`, Settings > Mail ledger..., Friends > Mail ledger..., the Mailworthy window's pay-back line): rows "Bob: 10s more than you've sent back" + what they sent + Mark paid (two presses), Export log... (the copy box) |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), three views (`UI.View`): list (the guild template line first, when there is one or this character can publish: "Guild rules: on / off / Use guild rules" one press, Edit... / Create...; guild rules as rows without buttons) (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step; `UI.Target()` "guild": guild members only, the rule goes to the draft) and guild (guild master / officers: the draft's rules with cap and Remove, Add a rule..., Publish to guild); opens on add while there are no bindings and no guild line; a binding returns to the list |
 
 Tests: `spec/` (busted on LuaJIT, 301 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
@@ -355,6 +357,19 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   the account's characters on the realm + faction. Not built: a slider widget, a never-mail
   list, typed names in the friends window (candidates only).
 
+- Mail ledger (operator, 2026-11-07: "a player exportable log of everything that was sent, in case
+  someone ever needs to validate where items went", and the balance with players who mailed you
+  materials, "captured at the time of send", to "encourage players to pay back"; then "i dont ever
+  want to see a list of 'who owes me' though"): `Ledger.lua` / `LedgerUI.lua`, PLAN "Mail ledger".
+  Chosen with the operator: **gold counts** both ways; **every item** from another player counts
+  (not own characters, system mail, COD); shown in the ledger window, a chat line on taking a
+  mail, the mailbox window and Friends rows, **only the player's own side** (no list of who owes
+  you, anywhere); values: when both run Mailworthy the sender's Mailworthy whispers the values
+  it captured at send (the operator asked whether the addons can talk), capped at 3x the
+  receiver's own price, else the receiver's price when they take it. Not the mail body (the
+  2026-10-24 decision stands: nothing carried in mail text). The critical path checks the log
+  holds exactly the mails sent.
+
 - Guild template (operator, 2026-11-07: "the guild master ... can setup a template for the rest
   of the guild members ... send enchanting to this person, send herbs here"; then "a 1 click
   disable as well"): `Guild.lua`, PLAN "Guild template". Chosen with the operator: **opt-in
@@ -474,3 +489,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    from <GM>: 2 rules (new)" and Use guild rules; after it the Mailworthy window lists the rules
    with "(guild)" and the mail arrives; "Guild rules: on" on the Bindings heading turns them off.
    An officer (rank 1) can publish too; a rank 2 member's Friends has no Edit.
+14. In-game check of the mail ledger (2026-11-07), mouse and controller: mail a friend by hand
+   (Blizzard's Send) and with a binding, and take a mail from them (click an attachment, and Open
+   All): `/mw ledger` Export log has a line for each with names, items, IDs and values; taking
+   it prints "Received ... from <name>. You've received Xs more ..." and the Mailworthy window
+   shows the pay-back line; paying back by mail clears it; Mark paid needs two presses. `/mw
+   report` "ledger: on, ... 0 take(s) unconfirmed" (unconfirmed takes mean `MAIL_SUCCESS` didn't
+   fire for them). With both players on Mailworthy, the receiver's export says "sender's value".

@@ -18,6 +18,9 @@
 --       Name=197:150,333:120;Other Name=165:90>   (right after a hello, for the material
 --       tiers: a binding stops taking what the bound player's skill is past; Mailworthys
 --       before v0.18 drop it)
+--   V2|<mail's sender>|<recipient>|<server time>|<itemID>:<count>:<copper>;...   (Ledger.lua: what a
+--       mail to another player was worth when it went; WHISPER only, to the recipient or one of their
+--       characters once they are heard from; older Mailworthys drop it)
 --
 -- What arrives is data from other players, never instructions: names are
 -- cleaned and length-checked, professions must be crafting skill lines
@@ -182,6 +185,10 @@ function Comms.Decode(text)
         end
         return { kind = "skills", version = tonumber(version), skills = (decodeSkills(own)), characters = characters }
     end
+    if kind == "V" then
+        local values = ns.Ledger and ns.Ledger.DecodeValues(rest)
+        return values and { kind = "values", version = tonumber(version), values = values } or nil
+    end
     if kind == "F" then
         local day = rest:match("^(%d+)$")
         return day and #day <= 7 and { kind = "fresh", version = tonumber(version), day = tonumber(day) } or nil
@@ -235,6 +242,17 @@ function Comms.SendGuild(message)
     return ok
 end
 
+--- Whisper one message to one player (Ledger.lua's values; only to a player just heard from,
+--- so never to someone offline).
+function Comms.Whisper(target, message)
+    if not Comms.On() or not target then return false end
+    local chat = rawget(_G, "C_ChatInfo")
+    if type(chat) ~= "table" then return false end
+    local ok, result = pcall(chat.SendAddonMessage, Comms.PREFIX, message, "WHISPER", target)
+    ns.Log.Add("comms", "%s to %s: %s", message:sub(1, 2), tostring(target), ok and tostring(result) or ("error " .. tostring(result)))
+    return ok
+end
+
 --- Say hello to the guild and group (throttled; the next tick sends a hello that was throttled).
 function Comms.Announce(reason)
     if not Comms.On() then return false end
@@ -278,6 +296,13 @@ function Comms.Hear(sender, text, channel)
     local name = ns.Routes.Clean(sender)
     if not msg or not name or #name > Comms.MAX_NAME or name:find("%c") then return nil end
     if name:lower() == tostring(ns.PlayerName()):lower() then return nil end
+    if msg.kind == "values" then
+        if channel ~= "WHISPER" or not ns.Ledger then return nil end
+        local values = ns.Ledger.HearValues(name, msg.values)
+        ns.Ledger.Heard(name)
+        return values
+    end
+    if ns.Ledger then pcall(ns.Ledger.Heard, name) end -- online: values waiting for them go now
     if msg.kind == "ask" then
         Comms.Announce("asked by " .. name)
         return msg

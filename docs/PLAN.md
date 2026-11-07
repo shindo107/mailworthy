@@ -487,6 +487,48 @@ the first public file: [CURSEFORGE.md](CURSEFORGE.md). Auctionator and Siz
 DisenchantValue are optional dependencies (`.pkgmeta`, `## OptionalDeps`; Disenchantry
 only in `## OptionalDeps`).
 
+## Mail ledger (operator, 2026-11-07)
+
+"A player exportable log of everything that was sent, in case someone ever needs to validate
+where items went." Then: "If someone sends you materials (another player, not your alt) ...
+show some desc of the debt balance between the two, captured at the time of send ... I want to
+encourage players to pay back who sent them materials." And: "I dont ever want to see a list of
+'who owes me' though. I think that will encourage bad behaviour."
+
+- **The log** (`Ledger.lua`, `MailworthyDB.ledger[realm|faction].log`, newest 2000): every mail
+  sent by this account's characters (Mailworthy's runs, recorded by `Mailer.lua` with exactly
+  what it attached; Blizzard's Send button through a `SendMail` post-hook, the Send Mail tab
+  read as it changes and in the hook) and every item or gold taken out of the mailbox
+  (`TakeInboxItem` / `TakeInboxMoney` / `AutoLootMailItem` post-hooks, confirmed by
+  `MAIL_SUCCESS`, dropped by `MAIL_FAILED`, unanswered ones counted at `MAIL_CLOSED`). Each
+  entry: time, both names, subject, items (ID, name, count, value and its source), gold, COD,
+  returned / own character / system flags. **Export log...** in the ledger window shows it in
+  the copy box, oldest first. The critical path checks the log matches every mail sent.
+- **The balance** per other player, kept as running totals (`players`), so pruning the log
+  never changes it: items received at their value plus gold received, minus items and gold
+  sent. Not counted: this account's characters (known characters and the bank alt), system
+  mail (`canReply` false, GM, AH invoices), COD (a sale). A returned mail taken back undoes the
+  "sent". A Mailworthy peer's characters (from their hello) count as one player.
+- **Only your own side shows** (operator): the ledger window lists players you received more
+  from than you sent back, with what they sent, and **Mark paid** (two presses: a trade or gold
+  in person; logged); a chat line when you take a counted mail; the Mailworthy window's line at
+  the mailbox (where you can pay back) with Ledger...; a grey suffix on that player's binding in
+  Friends. Nothing ever lists who owes you, and `/mw report` has counts only.
+- **Values, captured at the time of send** (operator, asked "if both players have mailworthy
+  can the apps communicate?"): what you send is valued with your own prices when it goes
+  (`Valuation.SmoothedPrice`, the decision rule's price). After a counted send, the item values
+  go to the recipient's Mailworthy: `V2|<mail's sender>|<recipient>|<server time>|<itemID>:
+  <count>:<copper>;...`, WHISPER only, and only to a player just heard from (any Mailworthy
+  message: they're online; else `Comms.Ask` prompts hellos, and the values wait up to 30 days in
+  `outbox`), to the recipient or another character their hello lists. The receiver keeps them in
+  `expect` (31 days) when the recipient is one of its own characters and the mail's sender is
+  the whisperer or one of their listed characters, and uses the oldest match (item and count)
+  when the item is taken, **at most 3x its own price** (a made-up value can't run up a debt).
+  Otherwise its own price when taken. No price: listed by count, not in gold.
+- Not built: face-to-face trades (Mark paid covers them), a shared "who owes whom" view (on
+  purpose), merging characters of a player who doesn't run Mailworthy.
+- Switch `/mw feature ledger off` (no hooks, nothing logged).
+
 ## Modules
 
 | File | Role | Tested how |
@@ -507,7 +549,8 @@ only in `## OptionalDeps`).
 | `MinimapButton.lua` | minimap button that opens settings (from LedgerLink) | busted |
 | `Report.lua` | `/mw report`, one copyable report; AH sale mails (house cut) | busted |
 | `Routes.lua` / `RoutesUI.lua` | bindings (a profession's materials to a player): store, pure divert with price cap, skip once, candidates (party, guild, own characters, peers); the friends window | busted |
-| `Comms.lua` | hellos between Mailworthys (professions, skill ranks, scan day) over addon messages | busted |
+| `Comms.lua` | hellos between Mailworthys (professions, skill ranks, scan day, mail values) over addon messages | busted |
+| `Ledger.lua` / `LedgerUI.lua` | the mail log (every mail sent and taken, exportable), the balance per player (only your own side shows), value whispers; the ledger window | busted |
 | `Tiers.lua` | material tiers: the skill at which each crafting profession is done with each material | busted (pure) |
 | `TierCheck.lua` | tier check: reads the player's own profession window (recipe colours, reagents), reports and keeps materials the table calls done too early | busted (stubbed `C_TradeSkillUI`) + in game |
 

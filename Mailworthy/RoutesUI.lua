@@ -33,7 +33,7 @@ local LIST_TOP = -72
 local W = ns.Widgets
 
 local frame, sub, bindHead, stepLabel, chosenLabel, emptyBindings, bindPage, candPage, refreshButton
-local addButton, backButton, doneButton, hint, legend
+local addButton, backButton, doneButton, ledgerButton, hint, legend
 local guildLabel, guildToggle, guildEdit, publishButton
 local bindingRows, candidateRows, professionRows = {}, {}, {}
 local pages = { bind = 1, cand = 1 }
@@ -65,6 +65,15 @@ end
 function UI.CapText(route)
     if not route.cap then return "no price cap" end
     return ns.Valuation.Money(route.cap) .. " each or more: to my bank alt"
+end
+
+--- What the bound player mailed this account beyond what it mailed back (Ledger.lua), as a
+--- grey suffix for their binding row, or "" (only this side ever shows).
+function UI.OwedText(name)
+    if not ns.Ledger.On() then return "" end
+    local net = ns.Ledger.Net(name)
+    if net <= 0 then return "" end
+    return " |cffaaaaaa(you've received " .. ns.Valuation.Money(net) .. " more from them)|r"
 end
 
 --- Pure: the guild template line's text and its toggle's ("Guild rules: on" / "off" / "Use guild
@@ -243,6 +252,7 @@ function UI.Create()
     hint = W.Label(frame, "GameFontHighlightSmall")
     hint:SetJustifyH("LEFT")
     doneButton = W.Button(frame, "Done", 100, function() frame:Hide() end, "MailworthyFriendsDone")
+    ledgerButton = W.Button(frame, "Mail ledger...", 120, function() ns.LedgerUI.Show(frame) end, "MailworthyFriendsLedger")
     legend = W.Label(frame, "GameFontHighlightSmall")
     legend:SetPoint("BOTTOM", 0, 14)
     ns.Nav.Attach(frame)
@@ -295,7 +305,7 @@ local function fillRows(list, top, kindOf, emptyText)
             else
                 local to, crafter = ns.Routes.Recipient(r)
                 row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r"
-                    .. (crafter and (" |cffaaaaaa(delivered to " .. to .. ")|r") or ""))
+                    .. (crafter and (" |cffaaaaaa(delivered to " .. to .. ")|r") or "") .. UI.OwedText(r.to))
             end
             row.cap:SetText(UI.CapText(r) .. (row.kind == "guild" and "  |cffaaaaaa(guild template)|r" or ""))
             row.scope:SetText(ns.Routes.SCOPES[r.scope] or tostring(r.scope))
@@ -426,6 +436,7 @@ function UI.Refresh()
     end
     if not list then show({ guildLabel, guildToggle, guildEdit }, false) end
     if not guild then publishButton:Hide() end
+    if not list then ledgerButton:Hide() end
     if add then
         for _, row in ipairs(bindingRows) do show(row.widgets, false) end
         show({ emptyBindings, bindPage, addButton }, false)
@@ -442,7 +453,9 @@ function UI.Refresh()
         backButton:Hide()
         at(addButton, 24, y - 10)
         at(hint, 176, y - 14)
-        hint:SetWidth(WIDTH - 176 - 140)
+        hint:SetWidth(WIDTH - 176 - 260)
+        at(ledgerButton, -134, y - 10, "TOPRIGHT")
+        ledgerButton:Show()
         at(doneButton, -24, y - 10, "TOPRIGHT")
     elseif guild then
         stepLabel:SetText("|cffffd100Guild template|r for " .. tostring((ns.Guild.Mine())))

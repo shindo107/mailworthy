@@ -197,6 +197,7 @@ local function sendMail(index)
         subject = string.format(Mailer.FRIEND_SUBJECT, index, #state.mails, mail.what)
         body = string.format(Mailer.FRIEND_BODY, mail.what:lower(), tostring(ns.PlayerName()))
     end
+    mail.subject = subject
     local ok, err = pcall(SendMail, mail.to, subject, body)
     ns.Log.Add("mailer", "SendMail %q to %s with %d stacks: %s", subject, tostring(mail.to), n, ok and "called" or tostring(err))
     if not ok then return Mailer.Stop("SendMail failed: " .. tostring(err)) end
@@ -283,6 +284,14 @@ ns.On("MAIL_SEND_SUCCESS", function()
     state.stacks = state.stacks + #mail.attached
     mail.sent = true
     record(mail)
+    if ns.Ledger then -- the mail log and the balance with a friend (Ledger.lua): exactly what was attached
+        local items = {}
+        for _, stack in ipairs(mail.attached) do
+            items[#items + 1] = { itemID = stack.itemID, link = stack.link, count = stack.count }
+        end
+        local okLog, err = pcall(ns.Ledger.RecordSent, { to = mail.to, subject = mail.subject, items = items }, "Mailworthy")
+        if not okLog then ns.Log.Add("mailer", "ledger error: %s", tostring(err)) end
+    end
     ns.Log.Add("mailer", "MAIL_SEND_SUCCESS for mail %d", index)
     notify()
     after(Mailer.DELAY, function() sendNext(index + 1) end)
