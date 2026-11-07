@@ -135,6 +135,44 @@ describe("mail window", function()
         for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("error", 1, true), line) end
     end)
 
+    it("on the Send Mail tab the Send button shows, however the window got there (v0.20.1 hid it)", function()
+        -- Opened on the Send Mail tab, the player looks at the Inbox, comes back.
+        InboxFrame:Hide()
+        SendMailFrame:Show()
+        _G.MailworthyMailButton:Click()
+        assert.is_true(_G.MailworthyMailSend:IsShown())
+        SendMailFrame:Hide()
+        InboxFrame:Show()
+        local watcher = _G.MailworthyTabWatcher
+        watcher.scripts.OnUpdate(watcher, 0.3)
+        _G.MailworthyInboxButton:Click() -- hidden with the Send Mail tab, shown here, not "toggled off"
+        assert.is_true(ns.MailWindow.Frame():IsVisible())
+        assert.is_false(_G.MailworthyMailSend:IsShown())
+        InboxFrame:Hide()
+        SendMailFrame:Show()
+        watcher.scripts.OnUpdate(watcher, 0.3)
+        assert.is_true(ns.MailWindow.Frame():IsVisible())
+        assert.is_true(_G.MailworthyMailSend:IsShown())
+        assert.is_nil(ns.MailWindow.Texts().note:find("Mail goes out from the Send Mail tab", 1, true))
+    end)
+
+    it("a stale Inbox draw on the Send Mail tab is redrawn by the watcher", function()
+        InboxFrame:Hide()
+        SendMailFrame:Show()
+        ns.MailWindow.Show("send")
+        -- Something drew it while the Inbox showed (both frames shown at once, as a tab switch passes).
+        SendMailFrame:Hide()
+        InboxFrame:Show()
+        ns.MailWindow.Refresh()
+        InboxFrame:Hide()
+        SendMailFrame:Show()
+        assert.is_false(_G.MailworthyMailSend:IsShown())
+        local watcher = _G.MailworthyTabWatcher
+        watcher.scripts.OnUpdate(watcher, 0.3)
+        assert.is_true(_G.MailworthyMailSend:IsShown())
+        assert.truthy(ns.Report.Build():find("mail tabs: SendMailFrame shown true visible true", 1, true))
+    end)
+
     it("on the bank alt itself: nothing is sent", function()
         ns.Config.SetBankAlt("Roknua Themicrulah")
         MailworthyDB.bankAlts["Classic Beta PvP|Alliance"] = "Rettana Quilwrit"
