@@ -156,6 +156,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Writing into Forever's controller UI (footer bindings, FrameControlsManager) | alpha1 self-test | **never do it**: tainted gamepad input game-wide (2026-10-13) |
 | Postage / AH deposit | alpha1 self-test, LedgerLink S8; a player on CurseForge (2026-11-07) | **30c per item**; deposit floor(vendor x 5%) x 1 / 4 / 12 (2h / 8h / 24h), **at least 1s** on live Forever (reported; counted per bag stack until it is known whether it is per auction and the same for every duration) |
 | AH cut | an AH sale mail (`GetInboxInvoiceInfo`) | open (5% assumed) |
+| Lock glow in Baganator (`Baganator.API.RegisterCornerWidget`, `RequestItemButtonsRefresh`; onUpdate details `itemID`) | Baganator source (2024 mirror), installed v843 on the game PC | open: shows on Baganator's buttons once the "Mailworthy lock glow" corner widget is active (auto-added top left) |
 | Disenchant prices for green items | Auctionator with a green item in bags | open |
 | SavedVariables survive `/reload` and relog | self-test marker, v0.4.0 settings | **work** (login, character switch, `/reload`) |
 | One-press sending from the Mailworthy window (no money, no COD) | v0.4.0 | **works** (operator, 2026-10-14) |

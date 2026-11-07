@@ -150,7 +150,17 @@ function Bags.Evaluate(settings)
         if oa ~= ob then return oa < ob end
         return byGain(a, b)
     end)
-    table.sort(result.keep, byGain)
+    -- Locked items first (operator, 2026-11-07: "I click them, they disappear off the menu and
+    -- then there's not a quick way to see what's been locked"): one press on the row unlocks.
+    table.sort(result.keep, function(a, b)
+        local la, lb = a.result.reason == "locked", b.result.reason == "locked"
+        if la ~= lb then return la end
+        return byGain(a, b)
+    end)
+    result.locked = 0
+    for _, item in ipairs(result.keep) do
+        if item.result.reason == "locked" then result.locked = result.locked + 1 end
+    end
     return result
 end
 
