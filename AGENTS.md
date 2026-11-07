@@ -54,7 +54,8 @@ textures / font strings on Blizzard frames kept in our own tables, read-only
 `spec/critical_path_spec.lua` is the shipping gate: a mailbox visit with a realistic
 bag, by mouse and by controller, with and without Auctionator, with a binding, and on
 an older build's SavedVariables; every mail checked against the Safety rules above, and
-what was previewed must be exactly what was sent. CI runs it first, and `release.yml`
+what was previewed must be exactly what was sent. CI runs it as its own job,
+`critical-path`, which main's branch protection requires (operator, 2026-11-07); `release.yml`
 publishes a tag only after all of CI passes.
 
 - Never loosen, skip or delete one of its assertions to make a change pass; fix the

@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  # Every spec (critical path first), luacheck and the package dry run must pass
+  # Every spec (the critical-path job too), luacheck and the package dry run must pass
   # before anything is uploaded to GitHub or CurseForge.
   ci:
     uses: ./.github/workflows/ci.yml
