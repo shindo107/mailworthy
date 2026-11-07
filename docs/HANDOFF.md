@@ -200,8 +200,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   **Without Auctionator: mail every unlocked, tradeable white (common) item**;
   greys and uncommon+ stay. Soulbound / quest items can't be mailed (don't list them).
 - Decision rule v2 (operator, 2026-10-20: "most gold while levelling, no math for the
-  player"; built from ALGORITHM-RESEARCH.md steps 1-5): the price is the 3-day median of
-  Auctionator's history (its database, not the stable API: guarded); launch day from
+  player"; built from ALGORITHM-RESEARCH.md steps 1-5): the price is the last scan, capped by the
+  3-day median of Auctionator's history when that is lower (2026-11-07: the median alone
+  over-valued a falling market; its database, not the stable API: guarded); launch day from
   `GetServerTime()` against Nov 4, 2026 (`Valuation.LAUNCH_EPOCH`), or the realm's first
   sight when earlier; days 0-13 mail unpriced white trade goods; a glut (10x our count
   listed, -25%) is valued at the floor; **Bank** verdict (B tag) for late-demand trade
