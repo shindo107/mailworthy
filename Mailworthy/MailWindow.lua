@@ -62,6 +62,15 @@ function UI.ItemText(link, count, stacks)
     return text
 end
 
+UI.LOCKED_COLOR = "|cff4da6ff" -- the bags' lock-glow blue
+
+--- Pure: the Staying header's count, with how many of them are locked (listed first).
+function UI.StayCountText(items, locked)
+    local text = string.format("%d item%s", items, items == 1 and "" or "s")
+    if locked > 0 then text = string.format("%s%d locked|r · %s", UI.LOCKED_COLOR, locked, text) end
+    return text
+end
+
 --- Pure: a player-facing reason for an item that stays.
 function UI.StayReason(r)
     if r.reason == "not worth it" then
@@ -129,7 +138,11 @@ function UI.Recipients(totals, bankAlt, isBankAlt)
 end
 
 local function toggleLock(row)
-    if row.item and not ns.Mailer.Busy() then ns.Locks.ToggleItem(row.item.itemID, row.item.link, "Mailworthy window") end
+    if row.item and not ns.Mailer.Busy() then
+        -- A fresh lock goes to the top of Staying (locked items first): show that page.
+        if not ns.Locks.IsItemLocked(row.item.itemID) then pages.stay = 1 end
+        ns.Locks.ToggleItem(row.item.itemID, row.item.link, "Mailworthy window")
+    end
 end
 
 local function showTooltip(row)
@@ -376,7 +389,9 @@ end
 
 local function fillStayRow(row, item)
     row.name:SetText(UI.ItemText(item.link, item.count))
-    row.reason:SetText(UI.StayReason(item.result))
+    local reason = UI.StayReason(item.result)
+    if item.result.reason == "locked" then reason = UI.LOCKED_COLOR .. reason .. "|r" end
+    row.reason:SetText(reason)
 end
 
 local function pageLabel(button, list, rows)
@@ -496,7 +511,7 @@ function UI.Refresh(keepScan)
     end
     mailCount:SetText(string.format("%d item%s · %d mail%s", t.items, t.items == 1 and "" or "s",
         t.mails, t.mails == 1 and "" or "s"))
-    stayCount:SetText(string.format("%d item%s", #result.keep, #result.keep == 1 and "" or "s"))
+    stayCount:SetText(UI.StayCountText(#result.keep, result.locked or 0))
     local okStale, nudge = pcall(ns.Stale.Current)
     local staleText = okStale and ns.Stale.Text(nudge) or nil
     staleLine:SetText(staleText or "")

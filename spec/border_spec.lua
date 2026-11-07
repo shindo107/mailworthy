@@ -118,3 +118,65 @@ describe("locked-item glow", function()
         assert.is_true(shown(bag.Items[1]))
     end)
 end)
+
+-- Baganator replaces the game's bags (2026-11-07: "I'm not seeing the icon borders anymore on my
+-- bag menu"). Its corner-widget API is stubbed the way its source calls it: onInit(itemButton)
+-- once per button, onUpdate(widget, details) on every redraw.
+describe("locked-item glow in Baganator", function()
+    local ns, registered, refreshes
+    local function baganatorButton(bag, slot)
+        local b = WowStub.itemButton(bag, slot)
+        local parent = { GetID = function() return bag end }
+        rawset(b, "GetParent", function() return parent end) -- the spec's own stub, not addon code
+        return b
+    end
+    local function glowing(button)
+        for _, t in ipairs(ns.Border.Glow(button)) do if not t:IsShown() then return false end end
+        return true
+    end
+    before_each(function()
+        ns = loadAddon()
+        registered, refreshes = nil, 0
+        _G.Baganator = { API = {
+            RegisterCornerWidget = function(label, id, onUpdate, onInit, defaultPosition)
+                registered = { label = label, id = id, onUpdate = onUpdate, onInit = onInit, position = defaultPosition }
+            end,
+            RequestItemButtonsRefresh = function() refreshes = refreshes + 1 end,
+        } }
+        WowStub.setBag(0, 1, WowStub.item(2589, "Linen Cloth", { count = 6 }))
+        ns.Fire("PLAYER_LOGIN")
+    end)
+    after_each(function() _G.Baganator = nil end)
+
+    it("registers a corner widget at login that never takes the corner", function()
+        assert.equal("mailworthy_lock", registered.id)
+        assert.same({ corner = "top_left", priority = 1 }, registered.position)
+        local button = baganatorButton(0, 1)
+        local widget = registered.onInit(button)
+        assert.is_false(widget:IsShown())
+        assert.is_false(registered.onUpdate(widget, { itemID = 2589 }), "false: the corner stays free")
+    end)
+
+    it("glows a locked item at the mailbox, by the item Baganator shows", function()
+        local button = baganatorButton(0, 1)
+        local widget = registered.onInit(button)
+        ns.Fire("MAIL_SHOW")
+        registered.onUpdate(widget, { itemID = 2589, itemLink = "[Linen Cloth]" })
+        assert.is_false(glowing(button), "not locked")
+        local before = refreshes
+        ns.Locks.ToggleItem(2589, "[Linen Cloth]", "spec")
+        assert.is_true(refreshes > before, "a lock change asks Baganator to redraw")
+        registered.onUpdate(widget, { itemID = 2589 })
+        assert.is_true(glowing(button))
+        ns.Fire("MAIL_CLOSED")
+        registered.onUpdate(widget, { itemID = 2589 })
+        assert.is_false(glowing(button), "away from the mailbox: no glow")
+    end)
+
+    it("without Baganator nothing is registered and nothing breaks", function()
+        _G.Baganator = nil
+        local ns2 = loadAddon()
+        ns2.Fire("PLAYER_LOGIN")
+        assert.is_false(ns2.Border.InstallBaganator())
+    end)
+end)
