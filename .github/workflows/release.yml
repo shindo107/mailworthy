@@ -9,7 +9,13 @@ permissions:
   contents: write
 
 jobs:
+  # Every spec (the critical-path job too), luacheck and the package dry run must pass
+  # before anything is uploaded to GitHub or CurseForge.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   package:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       # Full history so the packager can build the changelog and version from tags.

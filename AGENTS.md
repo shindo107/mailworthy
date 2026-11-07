@@ -49,6 +49,21 @@ textures / font strings on Blizzard frames kept in our own tables, read-only
   drag or hover-only actions; no required typing.
 - Every piece that touches Blizzard UI has a `/mw feature` switch.
 
+## Critical path (STRICT)
+
+`spec/critical_path_spec.lua` is the shipping gate: a mailbox visit with a realistic
+bag, by mouse and by controller, with and without Auctionator, with a binding, and on
+an older build's SavedVariables; every mail checked against the Safety rules above, and
+what was previewed must be exactly what was sent. CI runs it as its own job,
+`critical-path`, which main's branch protection requires (operator, 2026-11-07); `release.yml`
+publishes a tag only after all of CI passes.
+
+- Never loosen, skip or delete one of its assertions to make a change pass; fix the
+  change. If the operator changes a rule on purpose, update the test in the same PR
+  and say so in the PR description.
+- A new way to mail (a recipient kind, a send path, a SavedVariables migration) adds
+  its case here. Keep it to outcomes: thresholds and prices belong in other specs.
+
 ## Working rules
 
 - Branches and PRs only; never push to `main`, never force-push.

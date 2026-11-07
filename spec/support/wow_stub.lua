@@ -27,7 +27,7 @@ local function defaultState()
         professions = { { index = 6, name = "Mining", rank = 12, maxRank = 75, skillLine = 186 } },
         numSlots = { [0] = 20, [1] = 4, [2] = 6, [3] = 0, [4] = 0 },
         bags = { [0] = {}, [1] = {}, [2] = {} },
-        attached = {}, cursor = nil, used = {}, sent = {}, postage = 30, money = 0, cod = 0, moneyCalls = {},
+        attached = {}, cursor = nil, used = {}, sent = {}, sentItems = {}, postage = 30, money = 0, cod = 0, moneyCalls = {},
         inbox = {}, invoices = {},
         mods = {}, bindings = {}, bindingOwners = {}, activeFrame = nil, now = 1000, gamepadUI = false,
         navButton = nil,
@@ -392,13 +392,17 @@ _G.SetSendMailMoney = function(c) s().money = c; table.insert(s().moneyCalls, "m
 _G.SetSendMailCOD = function(c) s().cod = c; table.insert(s().moneyCalls, "cod " .. tostring(c)) end
 _G.SendMail = function(name, subject, body)
     table.insert(s().moneyCalls, "send")
-    local count = #s().attached
+    local count, carried = #s().attached, {}
     for _, item in ipairs(s().attached) do
+        -- what this mail carried, as the item was when it left (sentItems[i] goes with sent[i])
+        carried[#carried + 1] = { itemID = item.itemID, count = item.stackCount, quality = item.quality,
+            bound = item.isBound, quest = item.quest }
         for _, bag in pairs(s().bags) do
             for slot, x in pairs(bag) do if x == item then bag[slot] = nil end end
         end
     end
     s().attached = {}
+    table.insert(s().sentItems, carried)
     table.insert(s().sent, { name = name, subject = subject, body = body, count = count, money = s().money,
         cod = s().cod })
 end

@@ -2,9 +2,30 @@ name: ci
 
 on:
   push:
+    branches: ["**"] # tags run it through release.yml instead (once, not twice)
   pull_request:
+  # release.yml runs this whole workflow first: a tag publishes only if it passes.
+  workflow_call:
 
 jobs:
+  # The shipping gate (spec/critical_path_spec.lua; AGENTS.md "Critical path"), its own
+  # job so main's branch protection can require it by name: "critical-path".
+  critical-path:
+    name: critical-path
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Tests run on LuaJIT = Lua 5.1 semantics, like the WoW client.
+      # luarocks itself runs on PUC Lua 5.1 (it can't load the luarocks.org
+      # manifest under LuaJIT); rocks built for 5.1 load fine in LuaJIT.
+      - name: Install LuaJIT + luarocks
+        run: sudo apt-get update && sudo apt-get install -y luajit lua5.1 liblua5.1-0-dev luarocks
+      - name: Install rocks
+        run: |
+          for rock in luacheck busted; do sudo luarocks --lua-version=5.1 install "$rock"; done
+      - name: critical path (mailing)
+        run: busted --lua=luajit spec/critical_path_spec.lua
+
   lua:
     runs-on: ubuntu-latest
     steps:
@@ -19,7 +40,7 @@ jobs:
           for rock in luacheck busted; do sudo luarocks --lua-version=5.1 install "$rock"; done
       - name: luacheck
         run: luacheck .
-      - name: busted (LuaJIT)
+      - name: busted (LuaJIT, all specs)
         run: busted --lua=luajit
 
   package:
