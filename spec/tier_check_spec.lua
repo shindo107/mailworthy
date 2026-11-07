@@ -130,6 +130,15 @@ describe("tier check (the profession window against the tier table)", function()
                 ns.TierCheck.Summarize(list, TAILORING, function() return nil end)[LINEN])
         end)
 
+        it("a consumable part counts (Rough Copper Bomb into the Satchel, like the tier table)", function()
+            local list = {
+                { name = "Rough Copper Bomb", difficulty = 3, reagents = { 4357 }, output = 4360 },
+                { name = "Satchel of Copper Bombs", difficulty = 1, reagents = { 4360 }, output = 502 },
+            }
+            assert.same({ recipe = "Satchel of Copper Bombs", difficulty = 1, via = "Rough Copper Bomb" },
+                ns.TierCheck.Summarize(list, 202, function(id) return ({ [4360] = 0, [502] = 0 })[id] end)[4357])
+        end)
+
         it("a leather's own up-conversion doesn't count (past its recipes it's kept while converting pays)", function()
             local list = {
                 { name = "Medium Leather", difficulty = 1, reagents = { LIGHT_LEATHER }, output = 2319 },

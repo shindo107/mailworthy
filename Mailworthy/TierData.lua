@@ -80,7 +80,7 @@ T.DONE = {
         { 7287, 145, "Red Whelp Scale" },
         { 5116, 150, "Long Tail Feather" },          -- outside its main materials
         { 3356, 160, "Kingsblood" },                 -- outside its main materials
-        { 783, 165, "Light Hide" },                  -- Dark Leather Gloves via Cured Light Hide
+        { 783, 165, "Light Hide" },                  -- class leather sets via Cured Light Hide (unverified)
         { 4231, 165, "Cured Light Hide" },
         { 2319, 170, "Medium Leather" },             -- own recipes; then converts to Heavy
         { 2997, 170, "Bolt of Woolen Cloth" },       -- outside its main materials
@@ -170,10 +170,10 @@ T.DONE = {
         { 6303, 85, "Raw Slitherskin Mackerel" },
         { 2672, 90, "Stringy Wolf Meat" },
         { 5465, 90, "Small Spider Leg" },
+        { 6889, 95, "Small Egg" },                   -- Breakfast Omelette (Egg Nog is Winter Veil)
         { 2886, 100, "Crag Boar Rib" },
         { 5466, 100, "Scorpid Stinger" },
         { 5467, 115, "Kodo Meat" },
-        { 6889, 115, "Small Egg" },                  -- Breakfast Omelette 95; Egg Nog (Winter Veil) 115
         { 785, 125, "Mageroyal" },
         { 723, 130, "Goretusk Liver" },
         { 2673, 130, "Coyote Meat" },
@@ -233,7 +233,7 @@ T.DONE = {
         { 2589, 115, "Linen Cloth" },                -- Soft-soled Linen Boots via bolt
         { 2996, 115, "Bolt of Linen Cloth" },
         { 2318, 130, "Light Leather" },              -- outside its main materials
-        { 2592, 160, "Wool Cloth" },                 -- Phoenix Pants / Gloves via bolt
+        { 2592, 160, "Wool Cloth" },                 -- Phoenix Pants / Gloves via bolt (Bindings learn 125?)
         { 2997, 160, "Bolt of Woolen Cloth" },
         { 5500, 160, "Iridescent Pearl" },           -- outside its main materials
         { 2319, 165, "Medium Leather" },             -- outside its main materials
@@ -257,7 +257,7 @@ T.DONE = {
         { 10285, 245, "Shadow Silk" },               -- Shadoweave Mask / Boots
         { 1529, 250, "Jade" },                       -- outside its main materials
         { 4304, 250, "Thick Leather" },              -- outside its main materials
-        { 4338, 250, "Mageweave Cloth" },            -- Stormcloth Boots, Nether Cuffs via bolt
+        { 4338, 250, "Mageweave Cloth" },            -- Stormcloth Boots, Nether* Cuffs via bolt
         { 4339, 250, "Bolt of Mageweave" },
         { 6037, 250, "Truesilver Bar" },             -- outside its main materials
         { 8153, 250, "Wildvine" },                   -- outside its main materials
@@ -298,7 +298,6 @@ T.DONE = {
         { 4359, 210, "Handful of Copper Bolts" },
         { 4363, 210, "Copper Modulator" },
         { 5507, 210, "Ornate Spyglass" },
-        { 3857, 215, "Coal" },                       -- Gyromatic Micro-Adjustor via Steel
         { 3859, 215, "Steel Bar" },                  -- Gyromatic Micro-Adjustor
         { 2996, 225, "Bolt of Linen Cloth" },        -- outside its main materials
         { 4375, 225, "Whirring Bronze Gizmo" },
@@ -353,7 +352,7 @@ T.DONE = {
         { 6338, 170, "Silver Rod" },
         { 1210, 180, "Shadowgem" },                  -- outside its main materials
         { 2775, 180, "Silver Ore" },                 -- outside its main materials
-        { 10938, 180, "Lesser Magic Essence" },      -- Mystic Mushroom (pair)
+        { 10938, 180, "Lesser Magic Essence" },      -- Mystic Mushroom (Greater; pair unverified)
         { 10939, 180, "Greater Magic Essence" },
         { 10978, 180, "Small Glimmering Shard" },    -- Glimmering Staff, Orb of Souls
         { 249399, 180, "Frilled Lichen" },           -- outside its main materials
@@ -398,9 +397,9 @@ T.DONE = {
 -- kept for good (First Aid's 300-skill reagents, Oily Blackmouth, cooking fish filed as food).
 T.KEEP = {
     [129] = { -- First Aid
-        [1288] = true, [1475] = true, [2447] = true, [2450] = true, [2453] = true, [2589] = true, [2592] = true,
-        [3357] = true, [4304] = true, [4306] = true, [4338] = true, [8170] = true, [8838] = true, [13464] = true,
-        [19441] = true,
+        [1288] = true, [1468] = true, [1475] = true, [2447] = true, [2450] = true, [2453] = true, [2589] = true,
+        [2592] = true, [3174] = true, [3357] = true, [4304] = true, [4306] = true, [4338] = true, [7070] = true,
+        [7080] = true, [8170] = true, [8838] = true, [13464] = true, [19441] = true, [255645] = true,
     },
     [164] = { -- Blacksmithing
         [774] = true, [818] = true, [1206] = true, [1210] = true, [1529] = true, [1705] = true, [2318] = true,
