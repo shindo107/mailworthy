@@ -192,6 +192,8 @@ local function workings(item, settings)
         local text = "AH " .. money(r.ahUnit or p.ah) .. " each"
         if (r.scans or 1) > 1 then
             text = text .. string.format(" (%d-day median; last scan %s)", r.scans, money(p.ah))
+        elseif r.median then
+            text = text .. string.format(" (last scan; %d-day median %s)", r.medianDays or 0, money(r.median))
         end
         if p.age then text = text .. ", " .. p.age .. " days old" end
         if p.exact == false then text = text .. " (not exact, -10%)" end

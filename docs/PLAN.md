@@ -154,8 +154,8 @@ item never splits into "mail 20, keep 3" (`Valuation.lua`):
 
 ```
 vendor  = v * n
-a       = median of the last 3 scanned days' highest minimum buyout (Auctionator's history),
-          the last scan's price with under 2 days of history; -10% when the price is inexact
+a       = the last scan's price, or the median of the last 3 scanned days' highest minimum
+          buyout (Auctionator's history) when that is lower (a spike); -10% when inexact
 deposit = floor(v * n * 0.05) * 12      -- 24h listing (x1 / x4 for 2h / 8h)
 counted = deposit * relistFactor        -- 0.5: the game refunds it on a sale; a glut counts it in full
 ahNet   = a * n * (1 - cut) - counted - postage

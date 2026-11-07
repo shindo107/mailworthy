@@ -104,19 +104,27 @@ describe("bag scan", function()
         assert.equal("in use", byName(result.keep, "Copper Ore").result.reason)
     end)
 
-    it("values at the 3-day median and says so in the workings", function()
+    it("values at the last scan, or the 3-day median when lower, and says which in the workings", function()
         local rows = { { rawDay = 9, maxSeen = 60, available = 400 }, { rawDay = 8, maxSeen = 65, available = 300 },
             { rawDay = 7, maxSeen = 58 } }
         Auctionator.Database = { GetPriceHistory = function(_, key) return key == "2589" and rows or nil end }
         Auctionator.Utilities = { BasicDBKeyFromLink = function(l) return l:match("item:(%d+)") end }
+        -- the market fell: 40c last scan (Auctionator's own price) under a 60c median of the daily highs
         local result = ns.Bags.Evaluate()
-        local linen = byName(result.mail, "Linen Cloth")
-        assert.is_not_nil(linen, "40c last scan, 60c median: mails now")
-        assert.equal(60, linen.result.ahUnit)
+        local linen = byName(result.keep, "Linen Cloth")
+        assert.is_not_nil(linen, "40c last scan: still not worth it, whatever the last days' highs were")
+        assert.equal(40, linen.result.ahUnit)
         assert.equal(400, linen.price.available)
         local report = ns.Bags.Report(result)
-        assert.truthy(report:find("AH 60c each (3-day median; last scan 40c), 0 days old", 1, true), report)
+        assert.truthy(report:find("AH 40c each (last scan; 3-day median 60c), 0 days old", 1, true), report)
         assert.truthy(report:find("AH 50c each, 0 days old", 1, true), "Copper Ore: no history, last scan")
+        -- a spike: 40c last scan over a 30c median of the daily highs
+        rows = { { rawDay = 9, maxSeen = 30 }, { rawDay = 8, maxSeen = 35 }, { rawDay = 7, maxSeen = 28 } }
+        result = ns.Bags.Evaluate()
+        linen = byName(result.keep, "Linen Cloth")
+        assert.equal(30, linen.result.ahUnit)
+        report = ns.Bags.Report(result)
+        assert.truthy(report:find("AH 30c each (3-day median; last scan 40c), 0 days old", 1, true), report)
     end)
 
     it("fresh realm (launch days 0-13): unpriced white trade goods are mailed as common items", function()

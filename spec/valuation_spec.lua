@@ -139,16 +139,22 @@ describe("valuation", function()
             assert.same({ nil, 0 }, { V.SmoothedPrice(nil) })
         end)
 
-        it("is the median of the last three scanned days (two days: their mean)", function()
-            assert.same({ 60, 3 }, { V.SmoothedPrice({ ah = 40, history = hist(40, 60, 65) }) })
-            assert.same({ 60, 3 }, { V.SmoothedPrice({ ah = 40, history = hist(40, 60, 65, 5, 5) }) }, "older days don't count")
-            assert.same({ 50, 2 }, { V.SmoothedPrice({ ah = 40, history = hist(40, 61) }) })
+        it("is the median of the last three scanned days when the last scan is above it (two days: their mean)", function()
+            assert.same({ 65, 3 }, { V.SmoothedPrice({ ah = 70, history = hist(70, 60, 65) }) })
+            assert.same({ 65, 3 }, { V.SmoothedPrice({ ah = 70, history = hist(70, 60, 65, 5, 5) }) }, "older days don't count")
+            assert.same({ 65, 2 }, { V.SmoothedPrice({ ah = 70, history = hist(70, 61) }) })
+            assert.same({ 60, 3 }, { V.SmoothedPrice({ ah = 60, history = hist(60, 60, 65) }) }, "equal: the median")
+        end)
+
+        it("is the last scan when that is under the median, and names the median it beat", function()
+            assert.same({ 40, 1, 60, 3 }, { V.SmoothedPrice({ ah = 40, history = hist(40, 60, 65) }) })
+            assert.same({ 40, 1, 50, 2 }, { V.SmoothedPrice({ ah = 40, history = hist(40, 61) }) })
         end)
 
         it("skips days without a price and tolerates odd rows", function()
-            local rows = hist(40, 60, 65)
+            local rows = hist(70, 60, 65)
             rows[2].maxSeen = nil
-            assert.same({ 52, 2 }, { V.SmoothedPrice({ ah = 40, history = rows }) })
+            assert.same({ 67, 2 }, { V.SmoothedPrice({ ah = 70, history = rows }) })
             assert.same({ 40, 1 }, { V.SmoothedPrice({ ah = 40, history = "junk" }) })
         end)
 
@@ -156,19 +162,37 @@ describe("valuation", function()
             assert.same({ 54, 1 }, { V.SmoothedPrice({ ah = 60, exact = false }) })
             assert.same({ 60, 1 }, { V.SmoothedPrice({ ah = 60, exact = true }) })
             assert.same({ 60, 1 }, { V.SmoothedPrice({ ah = 60 }) })
-            assert.same({ 54, 3 }, { V.SmoothedPrice({ ah = 40, exact = false, history = hist(40, 60, 65) }) })
+            assert.same({ 58, 3 }, { V.SmoothedPrice({ ah = 70, exact = false, history = hist(70, 60, 65) }) })
+            assert.same({ 36, 1, 60, 3 }, { V.SmoothedPrice({ ah = 40, exact = false, history = hist(40, 60, 65) }) })
         end)
 
-        it("one undercut in the latest scan doesn't flip the verdict", function()
+        it("one spike in the latest scan doesn't make a dud mailworthy; a drop is believed", function()
             -- 20 Linen Cloth: 40c each is "not worth it" (PLAN's example), 60c mails.
             assert.equal("keep", V.Evaluate(item(), { ah = 40, age = 0 }, S).action)
-            local r = V.Evaluate(item(), { ah = 40, age = 0, history = hist(40, 60, 65) }, S)
-            assert.equal("mail", r.action)
-            assert.equal(60, r.ahUnit)
-            assert.equal(3, r.scans)
-            assert.equal(1140 - 60 - 30, r.ahNet)
-            -- and one spike doesn't make a dud mailworthy
             assert.equal("keep", V.Evaluate(item(), { ah = 60, age = 0, history = hist(60, 40, 40) }, S).action)
+            local r = V.Evaluate(item(), { ah = 70, age = 0, history = hist(70, 60, 65) }, S)
+            assert.equal("mail", r.action)
+            assert.equal(65, r.ahUnit)
+            assert.equal(3, r.scans)
+            assert.equal(1235 - 60 - 30, r.ahNet)
+            -- the market fell to 40c: the item stays, whatever the last days' highs were
+            r = V.Evaluate(item(), { ah = 40, age = 0, history = hist(40, 60, 65) }, S)
+            assert.equal("keep", r.action)
+            assert.equal(40, r.ahUnit)
+            assert.equal(1, r.scans)
+            assert.equal(60, r.median)
+        end)
+
+        it("a fresh scan under the median wins: Silk Cloth at 2s 70c, not 5s 30c (vdb1, CurseForge)", function()
+            -- "AH data seems off from auctionator ... says silk cloth 5s30 while its 2s70": Auctionator's
+            -- last scan (its tooltip, API.v1) says 2s 70c; its daily highs of the minimum buyout over the
+            -- last three days were 5s 30c (an earlier scan today), 6s and 5s, median 5s 30c.
+            local unit, scans, median, days = V.SmoothedPrice({ ah = 270, age = 0, history = hist(530, 600, 500) })
+            assert.same({ 270, 1, 530, 3 }, { unit, scans, median, days })
+            local r = V.Evaluate(item({ link = "[Silk Cloth]", itemID = 4306, vendor = 150 }),
+                { ah = 270, age = 0, history = hist(530, 600, 500) }, S)
+            assert.equal(270, r.ahUnit)
+            assert.equal(530, r.median)
         end)
 
         it("the age gate still uses the last scan's age", function()

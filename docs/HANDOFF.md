@@ -59,7 +59,7 @@ must never break the game.
 | `Characters.lua` | known characters (name "First Surname", realm, faction, class, level, professions); `Mailable()` = same realm+faction; SavedVariables marker per login/reload |
 | `Gamepad.lua` | read-only helpers: button symbols (`labelStyle`, `CreateAtlasMarkup`), API presence |
 | `Locks.lua` | **item locks** (by item ID, per character; follow the item; slot locks migrate); Alt+click via `hooksecurefunc("HandleModifiedItemClick")`; L3 via read-only `SmartNavigation:GetCurrentButton()` |
-| `Border.lua` | blue glow on locked items: Blizzard's quest border texture tinted blue, on bag buttons via `hooksecurefunc(frame, "UpdateItems")` on combined + individual bag frames; shown only while a mailbox is open (`MAIL_SHOW` / `MAIL_CLOSED`, `MailFrame:IsShown()`) unless the `glowEverywhere` flag is set; a fresh lock flashes `Border.FLASH` (3 s) anywhere, via `Locks.OnChanged(itemID, locked)`; Forever's `EnumerateValidItems` yields nil buttons up to `GetBagSize()` (v0.22.0 errored on them), so `RefreshFrame` skips them |
+| `Border.lua` | blue glow on locked items: Blizzard's quest border texture tinted blue, on bag buttons via `hooksecurefunc(frame, "UpdateItems")` on combined + individual bag frames; shown only while the Mailworthy window is open (`Border.WindowOpen`: the window's `IsVisible`; `MailWindow` refreshes it from the window's `OnShow` / `OnHide`; operator, 2026-11-07) unless the `glowEverywhere` flag is set; a glowing item's tooltip says why (`Border.TooltipLine`, `TooltipDataProcessor`, switch `slotBorder`); a fresh lock flashes `Border.FLASH` (3 s) anywhere, via `Locks.OnChanged(itemID, locked)`; Forever's `EnumerateValidItems` yields nil buttons up to `GetBagSize()` (v0.22.0 errored on them), so `RefreshFrame` skips them |
 | `MailButton.lua` | "Mailworthy" button under the mail window on both tabs (children of InboxFrame / SendMailFrame, created at login); `Activate` toggles the window; controller on the Inbox gets an "R1 first" hint (we never switch tabs) |
 | `Nav.lua` | Mailworthy's **own** controller navigation for its window: nearest button within 45 degrees, top-left start, gold highlight |
 | `PadKey.lua` | Mailworthy's **own override bindings** (watcher every 0.1 s, re-apply when replaced, clear on focus loss and at `PLAYER_REGEN_DISABLED`): set `mail` (Triangle), `window` (Triangle, D-pad, Cross, Circle), `bags` (L3 lock) |
@@ -84,7 +84,7 @@ must never break the game.
 | `Stale.lua` | stale auction prices (2026-11-06): freshness = days since Auctionator saw the freshest of 12 everyday trade goods (`WATCH`, `GetAuctionAgeByItemID`); the scan day goes out as `F2\|<server day>` after each hello (Comms; older Mailworthys drop unknown kinds) and peers' days are kept in `MailworthyDB.fresh[realm\|faction]` (60 days; separate from `peers`, so bindings data is untouched). Pure `Nudge(ownAge, freshest, today, maxAgeDays, nudgeDays)`: nil up to `NUDGE_DAYS` (3, operator 2026-11-06), "self" past that (`ignored` past `maxAgeDays`, 7: those items stay in the bags), "peer" when someone heard in 14 days scanned within 2 days. Shown as "!" on the mail buttons, a line at the top of the Mailworthy window, and (peer only) one chat line at `MAIL_SHOW`; logging in stale sends an ask so fresh peers answer. Display only. Switch `staleNudge` |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), three views (`UI.View`): list (the guild template line first, when there is one or this character can publish: "Guild rules: on / off / Use guild rules" one press, Edit... / Create...; guild rules as rows without buttons) (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step; `UI.Target()` "guild": guild members only, the rule goes to the draft) and guild (guild master / officers: the draft's rules with cap and Remove, Add a rule..., Publish to guild); opens on add while there are no bindings and no guild line; a binding returns to the list |
 
-Tests: `spec/` (busted on LuaJIT, 298 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
+Tests: `spec/` (busted on LuaJIT, 301 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
 `spec/support/wow_stub.lua` (bags, mail send tab, postage, timers with delays,
 override bindings, focused frame, item buttons that **error on any field write**).
 `Nav` drives the most recently shown visible window (`Nav.Root`); Circle closes only that one.
@@ -203,8 +203,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   **Without Auctionator: mail every unlocked, tradeable white (common) item**;
   greys and uncommon+ stay. Soulbound / quest items can't be mailed (don't list them).
 - Decision rule v2 (operator, 2026-10-20: "most gold while levelling, no math for the
-  player"; built from ALGORITHM-RESEARCH.md steps 1-5): the price is the 3-day median of
-  Auctionator's history (its database, not the stable API: guarded); launch day from
+  player"; built from ALGORITHM-RESEARCH.md steps 1-5): the price is the last scan, capped by the
+  3-day median of Auctionator's history when that is lower (2026-11-07: the median alone
+  over-valued a falling market; its database, not the stable API: guarded); launch day from
   `GetServerTime()` against Nov 4, 2026 (`Valuation.LAUNCH_EPOCH`), or the realm's first
   sight when earlier; days 0-13 mail unpriced white trade goods; a glut (10x our count
   listed, -25%) is valued at the floor; **Bank** verdict (B tag) for late-demand trade
@@ -237,6 +238,11 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   shows only while a mailbox is open, with a settings button ("Locked items glow blue:
   at the mailbox only / always", flag `glowEverywhere`) for the old behaviour; a new lock
   (Alt+click, L3) still glows 3 s away from a mailbox so the player sees it worked.
+- Lock glow, operator 2026-11-07 ("only when looking at the mailbox with the addon open";
+  "a hover tooltip indicating why they are blue"): the glow follows the Mailworthy window,
+  not the mailbox (an open mailbox alone no longer lights the bags; settings button "Lock
+  glow: in Mailworthy / always"), and a glowing item's tooltip says it is locked and how to
+  unlock it. The 3 s flash for a new lock elsewhere stays.
 - Profession materials (operator, 2026-10-22: "factor in the player's own professions"): a
   setting, on by default ("Keep my professions' materials", `keepProfessionMats`), keeps trade
   goods the character's crafting professions use, as the keep reason "your Tailoring needs

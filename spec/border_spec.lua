@@ -1,9 +1,26 @@
 -- Blue glow on locked items (the quest-item border, tinted): textures on the
 -- game's bag buttons, refreshed after UpdateItems, on lock changes and when the
--- mailbox opens or closes; shown only while a mailbox is open unless the
--- "glow everywhere" setting is on; no field is written on Blizzard's buttons
+-- Mailworthy window shows or hides; shown only while that window is open at the
+-- mailbox (operator, 2026-11-07) unless the "glow everywhere" setting is on; a
+-- tooltip line says why an item glows; no field is written on Blizzard's buttons
 -- (the stub errors if one is).
 local loadAddon = require("spec.support.load_addon")
+
+--- At the mailbox with the Mailworthy window open.
+local function openWindow(ns)
+    MailFrame:Show()
+    SendMailFrame:Show()
+    ns.Fire("MAIL_SHOW")
+    ns.MailWindow.Show("send")
+end
+
+--- The mailbox closes (the game hides the window with the mail frame it lives under).
+local function closeMailbox(ns)
+    ns.MailWindow.Frame():Hide()
+    MailFrame:Hide()
+    SendMailFrame:Hide()
+    ns.Fire("MAIL_CLOSED")
+end
 
 local function shown(button)
     if #button.textures == 0 then return false end
@@ -21,12 +38,12 @@ describe("locked-item glow", function()
         combined = ContainerFrameCombinedBags
         combined.Items = { WowStub.itemButton(0, 1), WowStub.itemButton(0, 2), WowStub.itemButton(1, 1) }
         ns.Fire("PLAYER_LOGIN")
-        ns.Fire("MAIL_SHOW") -- most of these run at the mailbox
+        openWindow(ns) -- most of these run with the Mailworthy window open at the mailbox
     end)
 
-    it("shows only while a mailbox is open", function()
+    it("shows only while the Mailworthy window is open", function()
         MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
-        ns.Fire("MAIL_CLOSED")
+        closeMailbox(ns)
         combined:UpdateItems()
         assert.is_false(shown(combined.Items[2]), "away from the mailbox: no glow")
         ns.Locks.Toggle(0, 1, "test")
@@ -34,16 +51,21 @@ describe("locked-item glow", function()
         WowStub.state.now = WowStub.state.now + ns.Border.FLASH
         WowStub.runTimers(ns.Border.FLASH)
         assert.is_false(shown(combined.Items[1]), "after its flash a lock away from the mailbox draws nothing")
-        ns.Fire("MAIL_SHOW")
-        assert.is_true(shown(combined.Items[1]), "opening the mailbox refreshes the open bags")
+        openWindow(ns)
+        assert.is_true(shown(combined.Items[1]), "opening the window refreshes the open bags")
         assert.is_true(shown(combined.Items[2]))
-        ns.Fire("MAIL_CLOSED")
-        assert.is_false(shown(combined.Items[1]), "closing it clears them")
+        ns.MailWindow.Frame():Hide()
+        assert.is_true(MailFrame:IsShown(), "the mailbox is still open")
+        assert.is_false(shown(combined.Items[1]), "closing the window clears them")
+        ns.MailWindow.Show("send")
+        assert.is_true(shown(combined.Items[1]))
+        closeMailbox(ns)
+        assert.is_false(shown(combined.Items[1]), "closing the mailbox clears them")
         assert.is_false(shown(combined.Items[3]))
     end)
 
     it("a fresh lock away from the mailbox flashes for a moment, so the player sees it worked", function()
-        ns.Fire("MAIL_CLOSED")
+        closeMailbox(ns)
         ns.Locks.Toggle(0, 2, "Alt+click") -- Copper Ore (the Alt+click hook itself: locks_spec)
         assert.is_true(shown(combined.Items[2]))
         assert.is_true(shown(combined.Items[3]), "every stack of the item")
@@ -60,14 +82,14 @@ describe("locked-item glow", function()
         assert.is_false(ns.Locks.IsItemLocked(2770))
     end)
 
-    it("an unlock during the flash ends it; the mailbox opening keeps a flashed item lit", function()
-        ns.Fire("MAIL_CLOSED")
+    it("an unlock during the flash ends it; the window opening keeps a flashed item lit", function()
+        closeMailbox(ns)
         ns.Locks.Toggle(0, 1, "L3")
         assert.is_true(shown(combined.Items[1]))
         ns.Locks.Toggle(0, 1, "L3")
         assert.is_false(shown(combined.Items[1]))
         ns.Locks.Toggle(0, 1, "L3")
-        ns.Fire("MAIL_SHOW")
+        openWindow(ns)
         WowStub.state.now = WowStub.state.now + ns.Border.FLASH
         WowStub.runTimers(ns.Border.FLASH)
         assert.is_true(shown(combined.Items[1]), "at the mailbox the glow is the normal one")
@@ -75,22 +97,25 @@ describe("locked-item glow", function()
 
     it("the glow everywhere setting keeps it on away from the mailbox", function()
         MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
-        ns.Fire("MAIL_CLOSED")
+        closeMailbox(ns)
         ns.Config.Set("glowEverywhere", true)
         combined:UpdateItems()
         assert.is_true(shown(combined.Items[2]))
         _G.MailworthySettingsGlow:Click()
         assert.is_false(ns.Config.Flag("glowEverywhere"))
         assert.is_false(shown(combined.Items[2]), "the settings button refreshes the bags at once")
-        assert.equal("Lock glow: mailbox only", _G.MailworthySettingsGlow:GetText())
+        assert.equal("Lock glow: in Mailworthy", _G.MailworthySettingsGlow:GetText())
     end)
 
-    it("Blizzard's mail window being shown counts as a mailbox too", function()
+    -- Operator, 2026-11-07: "i dont want the bag to always show the blue slots, only when looking
+    -- at the mailbox with the addon open". Before, any open mailbox lit the bags.
+    it("an open mailbox alone doesn't light the bags: only the Mailworthy window does", function()
         MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
-        ns.Fire("MAIL_CLOSED")
-        MailFrame:Show()
+        ns.MailWindow.Frame():Hide()
+        assert.is_true(MailFrame:IsShown())
+        ns.Fire("MAIL_SHOW")
         combined:UpdateItems()
-        assert.is_true(shown(combined.Items[2]))
+        assert.is_false(shown(combined.Items[2]))
     end)
 
     it("glows every stack of a locked item after the bags update", function()
@@ -177,10 +202,10 @@ describe("locked-item glow in Baganator", function()
         assert.is_false(registered.onUpdate(widget, { itemID = 2589 }), "false: the corner stays free")
     end)
 
-    it("glows a locked item at the mailbox, by the item Baganator shows", function()
+    it("glows a locked item while the Mailworthy window is open, by the item Baganator shows", function()
         local button = baganatorButton(0, 1)
         local widget = registered.onInit(button)
-        ns.Fire("MAIL_SHOW")
+        openWindow(ns)
         registered.onUpdate(widget, { itemID = 2589, itemLink = "[Linen Cloth]" })
         assert.is_false(glowing(button), "not locked")
         local before = refreshes
@@ -188,7 +213,9 @@ describe("locked-item glow in Baganator", function()
         assert.is_true(refreshes > before, "a lock change asks Baganator to redraw")
         registered.onUpdate(widget, { itemID = 2589 })
         assert.is_true(glowing(button))
-        ns.Fire("MAIL_CLOSED")
+        local before2 = refreshes
+        closeMailbox(ns)
+        assert.is_true(refreshes > before2, "closing asks Baganator to redraw")
         registered.onUpdate(widget, { itemID = 2589 })
         assert.is_false(glowing(button), "away from the mailbox: no glow")
     end)
@@ -198,5 +225,61 @@ describe("locked-item glow in Baganator", function()
         local ns2 = loadAddon()
         ns2.Fire("PLAYER_LOGIN")
         assert.is_false(ns2.Border.InstallBaganator())
+    end)
+end)
+
+-- Hovering a glowing item says why it is blue (operator, 2026-11-07: "give a hover tooltip
+-- indicating why they are blue"): one line through TooltipDataProcessor, only while it glows.
+describe("why a locked item glows: the tooltip line", function()
+    local ns, postCalls, lines
+    local function hover(itemID)
+        lines = {}
+        for _, fn in ipairs(postCalls) do fn(GameTooltip, { id = itemID }) end
+        return lines
+    end
+    before_each(function()
+        ns = loadAddon()
+        postCalls = {}
+        _G.Enum = { TooltipDataType = { Item = 0 } }
+        _G.TooltipDataProcessor = { AddTooltipPostCall = function(_, fn) table.insert(postCalls, fn) end }
+        rawset(GameTooltip, "AddLine", function(_, text, r, g, b) table.insert(lines, { text, r, g, b }) end)
+        WowStub.setBag(0, 1, WowStub.item(2589, "Linen Cloth", { count = 6 }))
+        WowStub.setBag(0, 2, WowStub.item(2770, "Copper Ore", { count = 5 }))
+        ns.Fire("PLAYER_LOGIN")
+        MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
+    end)
+    after_each(function()
+        _G.Enum, _G.TooltipDataProcessor = nil, nil
+        rawset(GameTooltip, "AddLine", nil)
+        for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("error", 1, true), line) end
+    end)
+
+    it("explains the glow on a locked item while the window is open, in the glow's blue", function()
+        openWindow(ns)
+        local got = hover(2770)
+        assert.equal(1, #got)
+        assert.equal(ns.Border.TOOLTIP, got[1][1])
+        assert.matches("never mailed", got[1][1])
+        assert.matches("Alt%+click", got[1][1])
+        assert.matches("L3", got[1][1])
+        assert.same(ns.Border.COLOR, { got[1][2], got[1][3], got[1][4] })
+        assert.equal(0, #hover(2589), "an unlocked item: nothing")
+    end)
+
+    it("says nothing where the item doesn't glow, and follows the flash and the setting", function()
+        assert.equal(0, #hover(2770), "window closed: no glow, no line")
+        ns.Locks.Toggle(0, 1, "Alt+click") -- Linen Cloth: a fresh lock flashes
+        assert.equal(1, #hover(2589), "during the flash it glows, so it says why")
+        WowStub.state.now = WowStub.state.now + ns.Border.FLASH
+        WowStub.runTimers(ns.Border.FLASH)
+        assert.equal(0, #hover(2589))
+        ns.Config.Set("glowEverywhere", true)
+        assert.equal(1, #hover(2770), "glow everywhere: the line everywhere")
+    end)
+
+    it("the slotBorder switch turns the line off with the glow", function()
+        MailworthyDB.features = { slotBorder = false }
+        openWindow(ns)
+        assert.equal(0, #hover(2770))
     end)
 end)
