@@ -78,6 +78,16 @@ the verdict "(1 scan)" when only one day exists. Why first: one 1-copper undercu
 or one empty market flips a verdict today, in both directions, and this costs the
 player nothing to understand. Cheap: ~30 lines plus specs.
 
+**Revised 2026-11-07** (CurseForge report, Silk Cloth valued at 5s 30c while Auctionator's
+last scan said 2s 70c): the median now only ever **lowers** the price. `maxSeen` is the
+day's *highest* minimum buyout (Auctionator `Database/Mixin.lua`, `h[day]`), so on a
+falling market, which a fresh realm is for every low-level material, the median of the
+last three days' highs trails the market and over-values in the unsafe direction (mail,
+postage, deposit for something that lists under the threshold). The last scan is what a
+listing competes with today and what Auctionator shows, so it wins when lower; the median
+still caps an empty-market spike. A below-market undercut now keeps the item for one scan,
+the cautious direction.
+
 ### 4.2 HIGH: a fresh-realm default for unpriced white trade goods
 
 In the first weeks almost nothing has a price even with Auctionator installed, and
