@@ -78,6 +78,20 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   you at the mailbox. Only the day of each player's scan is shared (with the addon messages
   above), never prices, and it never changes what gets mailed. `/mw feature staleNudge off`
   hides it.
+- **Mail ledger** (`/mw ledger`, Settings > Mail ledger, Friends): Mailworthy logs every mail
+  your characters send (its own and Blizzard's Send button) and every item or gold you take
+  out of the mailbox: date, both names, subject, each item with its count and value. **Export
+  log...** puts all of it in a copy box, so you can show where items went. From the same log,
+  when another player mails you more than you've mailed them back, you see it: a chat line
+  when you take it ("Received 20 Linen Cloth (10s) from Bob. You've received 10s more from Bob
+  than you've sent back."), a line at the top of the Mailworthy window, the ledger window and
+  their binding in Friends. Pay back by mail, materials or gold; it counts when it goes.
+  **Mark paid** (two presses) clears it if you settled another way. Only your own side ever
+  shows: nobody is listed as owing you. Values are taken when the mail is sent: your prices
+  for what you send; for what you receive, the sender's value when they run Mailworthy (it
+  tells yours, at most 3x your own price), else your price when you take it. Your own
+  characters, the auction house, system mail and COD mail don't count; a returned mail takes
+  back what you sent. `/mw feature ledger off` stops all of it.
 - Profession tools (fishing poles, Mining Pick, Blacksmith Hammer, Skinning Knife, ...)
   always stay. Gold is never attached.
 - **Your professions' materials stay** (on by default; the settings' "Keep my professions'
@@ -171,6 +185,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | AH cut | an AH sale mail (`GetInboxInvoiceInfo`) | open (5% assumed) |
 | Lock glow in Baganator (`Baganator.API.RegisterCornerWidget`, `RequestItemButtonsRefresh`; onUpdate details `itemID`) | Baganator source (2024 mirror), installed v843 on the game PC | open: shows on Baganator's buttons once the "Mailworthy lock glow" corner widget is active (auto-added top left) |
 | Disenchant prices for green items | Auctionator with a green item in bags | open |
+| Mail ledger (`Ledger.lua`): `hooksecurefunc` post-hooks on `SendMail`, `TakeInboxItem`, `TakeInboxMoney` and `AutoLootMailItem` (Blizzard's Open All and shift-click call them; read in Forever's `MailFrame.lua`); the Send Mail tab read with `GetSendMailItem` / `GetSendMailItemLink` / `GetSendMailMoney` / `GetSendMailCOD` at `MAIL_SEND_INFO_UPDATE` / `SEND_MAIL_MONEY_CHANGED` / `SEND_MAIL_COD_CHANGED` and in the hook (not in Forever's generated API docs: legacy globals, guarded); `GetInboxHeaderInfo` returns 10 `wasReturned`, 12 `canReply`, 13 `isGM` (as `MailFrame.lua` reads them); `GetInboxItem` / `GetInboxItemLink`; `MAIL_SUCCESS(itemID)` confirms a take and `MAIL_FAILED(itemID)` refuses one (MailInfoDocumentation; unanswered takes count when the mailbox closes); value whispers `SendAddonMessage(prefix, text, "WHISPER", name)` | mail a friend by hand and take a mail from them: `/mw ledger` Export log shows both lines with item names and values, the chat line appears on taking it, `/mw report` "ledger: on, N log entries ... 0 take(s) unconfirmed"; with both on Mailworthy, the receiver's export says "sender's value" | open (2026-11-07) |
 | SavedVariables survive `/reload` and relog | self-test marker, v0.4.0 settings | **work** (login, character switch, `/reload`) |
 | One-press sending from the Mailworthy window (no money, no COD) | v0.4.0 | **works** (operator, 2026-10-14) |
 | Reagent bag (bag 5, `NUM_TOTAL_EQUIPPED_BAG_SLOTS`) scanned, locked (Alt+click, L3) and mailed like bags 0-4 | a white item in the reagent bag: `/mw scan` lists it, Send mails it | open (CurseForge user report, 2026-10-21; source-backed: `Enum.BagIndex.ReagentBag` = 5 in `Blizzard_FrameXMLBase/Constants.lua`) |

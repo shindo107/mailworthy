@@ -67,6 +67,14 @@ describe("no writes into the controller UI", function()
         _G.MailworthySettingsDuration2:Click()
         WowStub.state.activeFrame = nil
         MailworthyPadWatcher.scripts.OnUpdate(MailworthyPadWatcher, 0.2)
+        -- the mail ledger: a mail taken from the inbox (post-hooks only), the window, the export
+        WowStub.state.inbox = { { sender = "Bob Surname", subject = "mats",
+            items = { { itemID = 2589, name = "Linen Cloth", count = 20 } } } }
+        _G.TakeInboxItem(1, 1)
+        ns.Fire("MAIL_SUCCESS", 2589)
+        _G.MailworthySettingsLedger:Click()
+        assert.equal("settings", ns.PadKey.Wanted(), "the ledger window takes the controller like the others")
+        _G.MailworthyLedgerExport:Click()
         assert.equal(0, #InboxFrame.gamepadFooter.calls)
         assert.falsy(table.concat(MailworthyDB.log, "\n"):find("Mailworthy called", 1, true))
     end)

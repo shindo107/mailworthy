@@ -28,7 +28,7 @@ end
 ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
-    tiers = true, tierCheck = true, guildTemplate = true,
+    tiers = true, tierCheck = true, guildTemplate = true, ledger = true,
 } }
 
 function ns.Features.Describe()
@@ -102,9 +102,11 @@ local HELP = {
         .. " (bindings; the Mailworthy window shows them with Skip once)",
     "/mw locks - list this character's locked items",
     "/mw scan - what Mailworthy would mail and why (sends nothing)",
+    "/mw ledger - what other players mailed you beyond what you sent back, and Export log (every mail sent"
+        .. " and received)",
     "/mw summary - on your bank alt: what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
-        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck> on|off"
+        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",
     "/mw help - this list",
@@ -128,6 +130,8 @@ function ns.HandleSlash(msg)
         ns.RoutesUI.Show()
     elseif cmd == "scan" then
         ns.Bags.Scan()
+    elseif cmd == "ledger" or cmd == "log" then
+        ns.LedgerUI.Show()
     elseif cmd == "summary" then
         ns.BankAlt.ShowWindow()
     elseif cmd == "" or cmd == "settings" then

@@ -24,6 +24,8 @@ read_globals = {
     "SendMailFrame", "InboxFrame", "SendMail", "ClearSendMail", "ClickSendMailItemButton", "GetSendMailItem",
     "GetSendMailPrice", "ATTACHMENTS_MAX_SEND", "C_Mail", "GetInboxNumItems", "GetInboxHeaderInfo",
     "GetInboxInvoiceInfo", "SetSendMailMoney", "SetSendMailCOD",
+    -- the mail ledger (Ledger.lua): post-hooks on the take calls, the attachments being taken
+    "GetInboxItem",
     -- price sources
     "Auctionator",
     -- locks (Alt+click) and the locked-slot border
@@ -50,6 +52,7 @@ files["spec/**"] = {
         "C_Container", "Auctionator", "Menu", "MailFrame",
         "MailworthyMailButton", "GamepadSharedUtility", "GamepadMode", "ContainerFrameCombinedBags", "ContainerFrameContainer",
         "HandleModifiedItemClick", "MailworthyPadWatcher", "DisenchantryDB", "MailworthyInboxButton", "GameTooltip", "SmartNavigation", "Minimap", "MailworthyMinimapButton", "MailworthySettingsFrame", "TooltipDataProcessor", "Enum", "TooltipUtil", "MailworthySummaryFrame", "MailworthyReportFrame",
-        "MailworthyFriendsFrame", "C_Club", "C_ChatInfo", "C_GuildInfo" },
+        "MailworthyFriendsFrame", "C_Club", "C_ChatInfo", "C_GuildInfo",
+        "TakeInboxItem", "TakeInboxMoney", "AutoLootMailItem" },
     allow_defined_top = true,
 }

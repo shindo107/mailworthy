@@ -28,7 +28,7 @@ local function defaultState()
         numSlots = { [0] = 20, [1] = 4, [2] = 6, [3] = 0, [4] = 0 },
         bags = { [0] = {}, [1] = {}, [2] = {} },
         attached = {}, cursor = nil, used = {}, sent = {}, sentItems = {}, postage = 30, money = 0, cod = 0, moneyCalls = {},
-        inbox = {}, invoices = {},
+        inbox = {}, invoices = {}, takes = {},
         mods = {}, bindings = {}, bindingOwners = {}, activeFrame = nil, now = 1000, gamepadUI = false,
         navButton = nil,
         -- bindings: guild = nil (not in one) or { clubId, name, rank (this character's 0-based rank index, default 3),
@@ -66,6 +66,7 @@ WowStub.menuModifiers = {}
 
 function WowStub.reset()
     WowStub.state = defaultState()
+    for fn, original in pairs(WowStub.originals or {}) do _G[fn] = original end
     for i = #printed, 1, -1 do printed[i] = nil end
     for i = #WowStub.timers, 1, -1 do WowStub.timers[i] = nil end
     WowStub.menuModifiers = {}
@@ -392,7 +393,7 @@ _G.ClickSendMailItemButton = function()
 end
 _G.GetSendMailItem = function(i)
     local item = s().attached[i]
-    if item then return "name", item.itemID, 0, item.stackCount, item.quality end
+    if item then return item.hyperlink:match("%[(.-)%]") or "name", item.itemID, 0, item.stackCount, item.quality end
 end
 _G.GetSendMailPrice = function() return s().postage * math.max(1, #s().attached) end
 _G.ClearSendMail = function()
@@ -419,9 +420,35 @@ _G.SendMail = function(name, subject, body)
 end
 _G.C_Mail = { IsCommandPending = function() return false end }
 _G.GetInboxNumItems = function() return #s().inbox, #s().inbox end
+-- inbox[i] = { sender, subject, money, cod, daysLeft, returned, canReply (default true), isGM,
+--   items = { { itemID, name, count, link } } }; takes are recorded in state.takes (the tests fire
+-- MAIL_SUCCESS / MAIL_FAILED, as the server would).
 _G.GetInboxHeaderInfo = function(i)
     local m = s().inbox[i]
-    if m then return nil, nil, m.sender, m.subject, 0, 0, m.daysLeft or 30, m.hasItem or 1 end
+    if m then
+        return nil, nil, m.sender, m.subject, m.money or 0, m.cod or 0, m.daysLeft or 30,
+            m.items and #m.items or m.hasItem or 1, false, m.returned == true, false, m.canReply ~= false, m.isGM == true
+    end
+end
+_G.GetInboxItem = function(i, a)
+    local it = s().inbox[i] and s().inbox[i].items and s().inbox[i].items[a]
+    if it then return it.name, it.itemID, 0, it.count or 1, it.quality or 1, true end
+end
+_G.GetInboxItemLink = function(i, a)
+    local it = s().inbox[i] and s().inbox[i].items and s().inbox[i].items[a]
+    return it and (it.link or link(it.itemID, it.name)) or nil
+end
+_G.TakeInboxItem = function(i, a) table.insert(s().takes, { "item", i, a }) end
+_G.TakeInboxMoney = function(i) table.insert(s().takes, { "money", i }) end
+_G.AutoLootMailItem = function(i) table.insert(s().takes, { "all", i }) end
+_G.GetSendMailItemLink = function(i) local item = s().attached[i]; return item and item.hyperlink end
+_G.GetSendMailMoney = function() return s().money end
+_G.GetSendMailCOD = function() return s().cod end
+-- Mail functions the addon hooks (hooksecurefunc): put back at every reset, so one spec's
+-- hooks never wrap the next spec's calls.
+WowStub.originals = {}
+for _, fn in ipairs({ "SendMail", "TakeInboxItem", "TakeInboxMoney", "AutoLootMailItem" }) do
+    WowStub.originals[fn] = _G[fn]
 end
 _G.GetInboxInvoiceInfo = function(i)
     local v = s().invoices[i]

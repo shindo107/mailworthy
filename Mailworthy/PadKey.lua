@@ -74,7 +74,7 @@ function PadKey.Wanted()
     if InCombatLockdown() or not ns.MailButton.GamepadUI() then return nil end
     -- "settings": our free-standing windows (settings, bank alt summary, report), anywhere.
     local standalone = false
-    for _, mod in ipairs({ ns.SettingsUI, ns.RoutesUI, ns.BankAlt, ns.Report }) do
+    for _, mod in ipairs({ ns.SettingsUI, ns.RoutesUI, ns.LedgerUI, ns.BankAlt, ns.Report }) do
         local f = mod and mod.Frame()
         if f and f:IsShown() then standalone = true end
     end

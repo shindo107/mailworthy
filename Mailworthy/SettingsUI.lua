@@ -286,6 +286,8 @@ local function createBagsAndMore()
         if ns.MinimapButton then ns.MinimapButton.Refresh() end
     end)
     minimapButton:SetPoint("TOPLEFT", 24, -404)
+    add(mainWidgets, W.Button(frame, "Mail ledger...", 182, function() ns.LedgerUI.Show(frame) end,
+        "MailworthySettingsLedger")):SetPoint("TOPLEFT", 214, -404)
     pricesLine = add(mainWidgets, W.Label(frame, "GameFontDisableSmall"))
     pricesLine:SetPoint("TOPLEFT", 28, -446)
     pricesLine:SetWidth(270)

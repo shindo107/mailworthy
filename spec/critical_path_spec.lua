@@ -6,6 +6,8 @@
 --
 -- These tests check outcomes, not tuning: what was previewed is exactly what was sent,
 -- to exactly the recipients shown, and the AGENTS.md safety rules hold for every mail.
+-- The mail log (Ledger.lua, the record players export to show where items went) holds
+-- exactly what was sent: one entry per mail, same recipient, same stacks.
 -- Thresholds and prices are other specs' business. Don't loosen an assertion here to
 -- make a change pass: a red test here means a player's mail would break.
 local loadAddon = require("spec.support.load_addon")
@@ -112,6 +114,19 @@ local function assertSafeAndComplete(ns, preview, allowed)
         end
     end
     for itemID in pairs(preview) do assert.is_true(got[itemID], "previewed but not mailed: " .. itemID) end
+    local logged = {}
+    for _, e in ipairs(ns.Ledger.Store().log) do
+        if e.dir == "sent" then logged[#logged + 1] = e end
+    end
+    assert.equal(#sent, #logged, "the mail log doesn't hold one entry per mail sent")
+    for i, mail in ipairs(sent) do
+        assert.equal(mail.name, logged[i].other, "mail " .. i .. " is logged to the wrong recipient")
+        assert.equal(#carried[i], #logged[i].items, "mail " .. i .. " is logged with the wrong stacks")
+        for j, it in ipairs(carried[i]) do
+            assert.equal(it.itemID, logged[i].items[j].itemID, "mail " .. i .. " stack " .. j)
+            assert.equal(it.count, logged[i].items[j].count, "mail " .. i .. " stack " .. j)
+        end
+    end
 end
 
 local function assertQuiet(ns)

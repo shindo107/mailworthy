@@ -29,7 +29,7 @@ local money = function(c) return ns.Valuation.Money(c) end
 local renderedInbox
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
 local guildButton
-local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine
+local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine, owedLine, owedButton
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
@@ -338,6 +338,14 @@ function UI.Create()
     staleLine:SetWidth(WIDTH - 48)
     staleLine:SetJustifyH("LEFT")
     staleLine:Hide()
+    -- Pay back (Ledger.lua): what another player mailed this account beyond what it mailed back,
+    -- here where the player can mail it back. Only this side ever shows.
+    owedLine = W.Label(frame, "GameFontHighlightSmall")
+    owedLine:SetWidth(WIDTH - 48 - 100)
+    owedLine:SetJustifyH("LEFT")
+    owedLine:Hide()
+    owedButton = W.Button(frame, "Ledger...", 90, function() ns.LedgerUI.Show(frame) end, "MailworthyMailLedger")
+    owedButton:Hide()
     createRouteRows()
 
     mailHead = W.Label(frame, "GameFontNormal")
@@ -425,6 +433,15 @@ local function pageLabel(button, list, rows)
     button:Show()
 end
 
+--- Pure: the pay-back line for the ledger's debts (Ledger.Debts: most first), or nil.
+function UI.OwedText(debts)
+    local d = debts and debts[1]
+    if not d then return nil end
+    local text = ns.Ledger.DebtText(d.name, d.net)
+    if #debts > 1 then text = text .. string.format(" |cffaaaaaa(and %d more)|r", #debts - 1) end
+    return text
+end
+
 --- Place everything top to bottom for the rows that show; returns the window height.
 --- `n` = { routes = , mail = , stay = } shown row counts; `n.stale` = the stale-prices line shows;
 --- `n.to` = recipient lines under "To:" (more than one recipient).
@@ -441,6 +458,11 @@ function UI.Layout(n)
     if n.stale then
         at(staleLine, 24, y)
         y = y - 32
+    end
+    if n.owed then
+        at(owedLine, 24, y - 2)
+        at(owedButton, -24, y + 4, "TOPRIGHT")
+        y = y - 30
     end
     if n.routes > 0 then
         at(routesHead, 24, y)
@@ -538,9 +560,15 @@ function UI.Refresh(keepScan)
     local staleText = okStale and ns.Stale.Text(nudge) or nil
     staleLine:SetText(staleText or "")
     if staleText then staleLine:Show() else staleLine:Hide() end
+    local owedText = UI.OwedText(ns.Ledger.On() and ns.Ledger.Debts() or {})
+    owedLine:SetText(owedText or "")
+    for _, w in ipairs({ owedLine, owedButton }) do
+        if owedText then w:Show() else w:Hide() end
+    end
     local shown = {
         to = more,
         stale = staleText ~= nil,
+        owed = owedText ~= nil,
         routes = fillRoutes(),
         mail = fillList(mailRows, result.mail, pages.mail, UI.MAIL_ROWS, fillMailRow),
         stay = fillList(stayRows, result.keep, pages.stay, UI.STAY_ROWS, fillStayRow),
