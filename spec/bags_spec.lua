@@ -14,6 +14,7 @@ describe("bag scan", function()
 
     before_each(function()
         ns = loadAddon()
+        ns.Valuation.DEFAULTS.minGain = 500 -- these fixtures were built on the old 5s default (1s since 2026-11-07)
         -- launch day 20: past the fresh-realm window, so "no price" keeps (the window has its own test)
         WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 20 * 86400
         ns.Fire("PLAYER_LOGIN")
@@ -76,16 +77,17 @@ describe("bag scan", function()
         local ore = byName(result.mail, "Copper Ore")
         assert.equal(25, ore.count)
         assert.equal(2, ore.stacks)
-        -- 1250 x 0.95 = 1187; deposit floor(125 x 5%) x 12 = 72, half counted; postage 2 x 30
-        assert.equal(1187 - 36 - 60, ore.result.ahNet)
-        assert.equal(1187 - 36 - 60 - 125, ore.result.gain)
+        -- 1250 x 0.95 = 1187; deposit floor(125 x 5%) x 12 = 72, raised to 1s per stack (Forever's
+        -- minimum) = 200, half counted; postage 2 x 30
+        assert.equal(1187 - 100 - 60, ore.result.ahNet)
+        assert.equal(1187 - 100 - 60 - 125, ore.result.gain)
         assert.equal(1, #result.mail)
         assert.equal("not worth it", byName(result.keep, "Linen Cloth").result.reason)
         assert.equal("soulbound", byName(result.unmailable, "Hearthstone").result.reason)
         assert.equal("quest item", byName(result.unmailable, "Quest Thing").result.reason)
         assert.is_nil(byName(result.keep, "Hearthstone"), "never-mailable items aren't in the keep list")
         assert.equal("no price", byName(result.keep, "Rough Stone").result.reason)
-        assert.same({ items = 25, stacks = 2, mails = 1, gain = 966, postage = 60, routed = 0, recipients = { "" },
+        assert.same({ items = 25, stacks = 2, mails = 1, gain = 902, postage = 60, routed = 0, recipients = { "" },
             byRecipient = { [""] = { items = 25, stacks = 2, mails = 1, what = {} } } },
             result.totals)
     end)
@@ -135,7 +137,7 @@ describe("bag scan", function()
         WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 90 * 86400
         local report = ns.Bags.Report(ns.Bags.Evaluate())
         assert.truthy(report:find("min gain 5s (6s 52c at launch day 90) and 25%", 1, true), report)
-        assert.truthy(report:find("gain 9s 66c (needs 6s 52c)", 1, true), report)
+        assert.truthy(report:find("gain 9s 2c (needs 6s 52c)", 1, true), report)
     end)
 
     it("a late-demand item before the raids goes in the mail as BANK", function()
@@ -195,8 +197,8 @@ describe("bag scan", function()
         local s = ns.Bags.CurrentSettings()
         assert.equal(1, s.duration)
         assert.is_false(s.disenchant)
-        -- the 2h deposit is floor(125 x 5%) = 6
-        assert.equal(6, byName(ns.Bags.Evaluate().mail, "Copper Ore").result.deposit)
+        -- the 2h deposit is floor(125 x 5%) = 6, under the 1s minimum for each of the 2 stacks
+        assert.equal(200, byName(ns.Bags.Evaluate().mail, "Copper Ore").result.deposit)
     end)
 
     it("keeps the materials this character's professions use; the setting lets them go", function()
@@ -257,9 +259,9 @@ describe("bag scan", function()
         has("prices: Auctionator")
         has("settings: 24h listing (deposit x12), AH cut 5%, postage 30c per stack, min gain 5s and 25%, "
             .. "disenchant off, max price age 7 days, launch day 20")
-        has("total: 25 items (2 stacks) in 1 mail(s), 9s 66c more than vendoring, postage 60c")
+        has("total: 25 items (2 stacks) in 1 mail(s), 9s 2c more than vendoring, postage 60c")
         has("MAIL AH [Copper Ore] x25 (2 stacks): auction house - vendor 5c each = 1s 25c; AH 50c each, 0 days old; "
-            .. "AH net 10s 91c (cut 5%, deposit 72c counted 36c, postage 60c); gain 9s 66c (needs 5s)")
+            .. "AH net 10s 27c (cut 5%, deposit 2s counted 1s, postage 60c); gain 9s 2c (needs 5s)")
         has("KEEP [Linen Cloth] x20: not worth it - vendor 10c each = 2s; AH 40c each, 0 days old; "
             .. "AH net 6s 70c (cut 5%, deposit 1s 20c counted 60c, postage 30c); gain 4s 70c (needs 5s)")
         has("NOT MAILABLE (soulbound or quest, not listed in the window): [Hearthstone] x1, [Quest Thing] x1")
@@ -267,7 +269,7 @@ describe("bag scan", function()
         assert.same({}, WowStub.state.sent)
         assert.same({}, WowStub.state.used)
         local log = table.concat(ns.Log.Lines(), "\n")
-        assert.truthy(log:find("[scan] 1 to mail (2 stacks, 1 mails, gain 9s 66c), 2 kept", 1, true), log)
+        assert.truthy(log:find("[scan] 1 to mail (2 stacks, 1 mails, gain 9s 2c), 2 kept", 1, true), log)
     end)
 
     it("/mw scan says what 'Sell what I gather' does", function()

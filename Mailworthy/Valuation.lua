@@ -5,7 +5,8 @@
 --
 -- An item is every stack of one item link in the bags (so one item never
 -- splits into "mail 20, keep 3"). Measured on Forever (2026-10-13):
---   deposit = floor(vendor value of the listing x 5%) x 1 / 4 / 12 for 2h / 8h / 24h
+--   deposit = floor(vendor value of the listing x 5%) x 1 / 4 / 12 for 2h / 8h / 24h,
+--             at least 1s per listing (Forever's minimum: player report, 2026-11-07)
 --   postage = 30c per attached stack
 local _, ns = ...
 
@@ -13,6 +14,11 @@ local Valuation = {}
 ns.Valuation = Valuation
 
 Valuation.DEPOSIT_RATE = 0.05
+-- Forever's minimum auction deposit (a player on CurseForge, 2026-11-07: "I didn't expect them to
+-- make the minimum deposit 1 silver"). Counted per stack in the bags, each stack a listing: the
+-- cautious reading while it's unverified whether it is per auction and the same for every
+-- duration (README "Beta unknowns").
+Valuation.MIN_DEPOSIT = 100
 Valuation.MEDIAN_DAYS = 3        -- the smoothed price: median of the last 3 scanned days
 Valuation.LAUNCH_EPOCH = 1793833200 -- Forever launch: 2026-11-04 15:00 PST (docs/ALGORITHM-RESEARCH.md)
 Valuation.FRESH_REALM_DAYS = 14  -- launch days 0-13: unpriced white trade goods are mailed
@@ -35,7 +41,7 @@ Valuation.DEFAULTS = {
                           -- (research 4.3); a glut counts it in full
     cut = 0.05,           -- AH cut, until a sale mail confirms it
     postage = 30,         -- copper per attached stack
-    minGain = 500,        -- 5s ...
+    minGain = 100,        -- 1s (operator, 2026-11-07; was 5s) ...
     minGainPct = 0.25,    -- ... and 25% of the vendor value, both
     maxAgeDays = 7,       -- older Auctionator prices don't count
     disenchant = false,   -- Valuation.Settings switches it on when a disenchant addon is installed
@@ -235,9 +241,12 @@ function Valuation.Settings(saved, disenchantAddonInstalled)
     return s
 end
 
-function Valuation.Deposit(vendorUnit, count, duration)
+--- Pure: the deposit for `count` items listed in `listings` auctions (default 1): the
+--- vendor-based deposit, and never under Forever's minimum per listing.
+function Valuation.Deposit(vendorUnit, count, duration, listings)
     local mult = Valuation.DEPOSIT_MULTIPLIER[duration] or Valuation.DEPOSIT_MULTIPLIER[Valuation.DEFAULTS.duration]
-    return math.floor((vendorUnit or 0) * (count or 0) * Valuation.DEPOSIT_RATE) * mult
+    local deposit = math.floor((vendorUnit or 0) * (count or 0) * Valuation.DEPOSIT_RATE) * mult
+    return math.max(deposit, Valuation.MIN_DEPOSIT * math.max(1, tonumber(listings) or 1))
 end
 
 -- Profession tools stay in the bags whatever they'd sell for (the v0.2.0 scan
@@ -408,7 +417,7 @@ evaluate = function(item, price, settings)
     if price.ah ~= nil and not stale then
         r.liquidity = Valuation.Liquidity(price, n)
         r.ahUnit, r.scans = Valuation.SmoothedPrice(price, r.liquidity.glut and "minSeen" or nil)
-        r.deposit = Valuation.Deposit(item.vendor, n, settings.duration)
+        r.deposit = Valuation.Deposit(item.vendor, n, settings.duration, item.stacks)
         r.depositCounted = math.floor(r.deposit * (r.liquidity.glut and 1 or settings.relistFactor))
         r.ahNet = math.floor(r.ahUnit * n * (1 - settings.cut)) - r.depositCounted - postage
     end
