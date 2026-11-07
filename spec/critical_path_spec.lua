@@ -1,6 +1,6 @@
 -- CRITICAL PATH: the shipping gate. Every build must still mail, safely, the way a
 -- player does it: a mailbox visit with a realistic bag, the mouse and the controller,
--- with and without Auctionator, with a binding, and on SavedVariables an older build
+-- with and without Auctionator, with a binding, with a guild template, and on SavedVariables an older build
 -- left behind. CI runs this file on its own before the rest, and a tag can't publish
 -- unless it passes.
 --
@@ -243,6 +243,49 @@ describe("critical path: mailing", function()
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+    end)
+
+    --- The guild master's template (Guild.lua) arrives over the guild channel: Enchanting to Bob.
+    local function guildTemplate()
+        local gm = "Guild Master"
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = {
+            { name = gm, rank = 0, online = true }, { name = BOB, rank = 3, online = true } } }
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3 -- the rule alone would keep it
+        -- passed on by a plain member: any guild member may hand on a copy (operator, 2026-11-07)
+        for _, m in ipairs(ns.Guild.Encode(WowStub.state.serverTime - 60, gm, { { profession = ENCHANTING, to = BOB } })) do
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m, "GUILD", BOB)
+        end
+    end
+
+    it("a guild template: nothing goes to the guild until the player turns it on, then only the shown recipients", function()
+        guildTemplate()
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(previewed(ns)[10940], "a template the player hasn't turned on mails nothing")
+        ns.RoutesUI.Show()
+        _G.MailworthyFriendsGuildRules:Click() -- "Use guild rules"
+        ns.MailWindow.Refresh()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940])
+        assert.equal("Send to Roknua, Bob", _G.MailworthyMailSend:GetText())
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+    end)
+
+    it("a guild template turned off in one press: only the bank alt gets mail", function()
+        guildTemplate()
+        ns.Guild.SetUse(true)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(BOB, previewed(ns)[10940])
+        _G.MailworthyMailGuildRules:Click() -- "Guild rules: on" -> off
+        local preview = previewed(ns)
+        assert.is_nil(preview[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
     end)
 
     it("bags that change after the preview: Send re-reads them, and a slot that changes mid-run is skipped", function()

@@ -59,6 +59,18 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   `/mw feature comms off` stops them), and the mail goes to **whichever of their characters
   has the profession**: the friend when they do, their crafter alt when they don't, and the
   friend when nothing is known. Never their bank alt. The window names the recipient.
+- **Guild template**: the guild master (or an officer, the rank right below) opens Friends,
+  presses **Create...** / **Edit...** and sets one rule per profession: "Enchanting to Bob",
+  "Alchemy (herbs) to Ann", each with a price cap, then **Publish to guild**. Every guild
+  member running Mailworthy gets a chat line and a "Guild template from ..." line in Friends;
+  nothing is mailed until they press **Use guild rules** once. Later updates then apply on
+  their own (with a chat line). **One press turns the guild rules off** again: "Guild rules:
+  on" in Friends, or on the Bindings heading of the Mailworthy window. Your own bindings come
+  first, and a rule for a profession you have yourself is left out (a tailor keeps their
+  cloth). Skip once works on guild rules too. Any guildmate running Mailworthy passes a copy on
+  to whoever logs in (hidden addon messages), so the guild master doesn't need to be online; a
+  copy is taken only when its author is the guild master or an officer in your own roster, and
+  only its rules for guild members. `/mw feature guildTemplate off` turns all of it off.
 - **Stale auction prices** get a nudge at the mailbox: once your Auctionator prices are over
   3 days old, the Mailworthy button gets a **!** and the window says so (past 7 days
   Mailworthy stops trusting them, and those items stay in your bags). When another Mailworthy user in
@@ -118,7 +130,7 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 ```
 /mw                   settings: bank alt (pick, type, or "This character is my bank alt"), minimum gain, disenchant, listing length, tags, lock glow, profession materials, friends, minimap button
 /mw scan              what Mailworthy would mail and why, with the numbers (sends nothing)
-/mw friends           send a profession's materials to a guild member, party member or one of your characters (bindings)
+/mw friends           send a profession's materials to a guild member, party member or one of your characters (bindings); the guild template
 /mw summary           on your bank alt: what to list, disenchant or vendor
 /mw locks             this character's locked items
 /mw report            a copyable report for bug reports
@@ -164,6 +176,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Reagent bag (bag 5, `NUM_TOTAL_EQUIPPED_BAG_SLOTS`) scanned, locked (Alt+click, L3) and mailed like bags 0-4 | a white item in the reagent bag: `/mw scan` lists it, Send mails it | open (CurseForge user report, 2026-10-21; source-backed: `Enum.BagIndex.ReagentBag` = 5 in `Blizzard_FrameXMLBase/Constants.lua`) |
 | Guild members through `C_Club.GetGuildClubId` / `GetClubMembers` / `GetMemberInfo` (`name`, `presence`, `profession1ID` / `profession2ID` as skill line IDs, as Blizzard's Communities roster reads them on Forever; `GetGuildRosterInfo` fallback), party through `GetNumGroupMembers` / `GetUnitName(unit, true)` / `UnitIsConnected`, the roster asked for with `C_GuildInfo.GuildRoster()` | `/mw friends` lists guild and party members with "online" and their professions; a two-part name without a realm suffix lands in the binding and the mail arrives | open (2026-10-26) |
 | Addon messages between Mailworthys: `C_ChatInfo.RegisterAddonMessagePrefix("Mailworthy")`, `SendAddonMessage(prefix, text, "GUILD" / "PARTY" / "RAID")`, `CHAT_MSG_ADDON` (sender possibly "Name-Realm") | two guild members with Mailworthy: `/mw report` shows "mailworthy peer: <name> (<professions>; other characters: ...)" on each, `/mw friends` marks them "Mailworthy", and a binding for a profession only an alt of theirs has says "delivered to their ... character" | open (2026-10-26) |
+| Guild template: `GetGuildInfo("player")` (guild name, rank name, 0-based rank index, as Blizzard's TabardFrame reads it), `C_Club.GetMemberInfo` `guildRankOrder` (1-based, Communities `GuildRoster.lua`; `GetGuildRosterInfo` 3rd return as the fallback), `CHAT_MSG_ADDON`'s channel "GUILD" | the guild master's `/mw report` shows "guild: <name>, rank 0, can publish"; after Publish to guild, a member's shows "guild template: from <GM> ..., in use: not chosen yet" and a chat line; Use guild rules makes the rules appear in the Mailworthy window | open (2026-11-07) |
 | Skill ranks: `GetProfessionInfo` 3rd return for this character (First Aid and Cooking included), `C_Club.GetMemberInfo` `profession1Rank` / `profession2Rank` for guild members (in Forever's `ClubDocumentation.lua` and Communities roster sort) | `/mw report` "kept for First Aid 85; First Aid 85 is past Linen Cloth (mailed)"; a binding line says "skill N" with a guild member's rank, or a Mailworthy peer's "skills: ..." | open (2026-11-06) |
 | Scan freshness: `Auctionator.API.v1.GetAuctionAgeByItemID(caller, itemID)` (read in Auctionator's source: days since seen, nil past 21 days; else the `item:ID` link form) over 12 everyday trade goods; the scan day sent as `F2\|<server day>` after each hello | a character that hasn't scanned for a week, in a guild with a Mailworthy user who just scanned: `/mw report` "price stamp: <name> scanned 0 day(s) ago", a **!** on the Mailworthy button and the chat line at the mailbox | open (2026-11-06) |
 | Tier check: Forever's Professions window is the retail one, fed by `C_TradeSkillUI` (in Forever's source: `GetBaseProfessionInfo` / `GetChildProfessionInfo` `professionID` / `skillLevel`, `GetRecipeInfo` `learned` / `relativeDifficulty` 0 orange .. 3 grey, `GetRecipeSchematic` `reagentSlotSchematics[].reagents[].itemID` / `outputItemID`, `GetFilteredRecipeIDs`, `IsTradeSkillLinked` / `IsTradeSkillGuild` / `IsTradeSkillGuildMember` / `IsNPCCrafting`; events `TRADE_SKILL_SHOW`, `TRADE_SKILL_LIST_UPDATE`, `TRADE_SKILL_DATA_SOURCE_CHANGED`). Not in Forever's Lua, tried first: `GetAllRecipeIDs` (retail has it; else the filtered list, so a search or "skill-up only" filter hides recipes). The Classic globals (`GetTradeSkillInfo`, `GetCraftInfo`, `CRAFT_SHOW`, ...) aren't in Forever's source; they are a fallback only. The skill line comes from `GetProfessionInfo` (matched by ID, else by name) | open each crafting profession: `/mw report` "tier check: <name> <profession> <rank> read ... (N learned recipes, C_TradeSkillUI)", N close to the window's learned recipe count; then any "still used" lines, checked against the window's colours | open (2026-11-06) |

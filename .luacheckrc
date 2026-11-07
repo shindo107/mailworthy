@@ -17,7 +17,7 @@ read_globals = {
     "GetBuildInfo", "GetProfessions", "GetProfessionInfo", "InCombatLockdown",
     -- bindings: party / raid, guild (C_Club member info, GetGuildRosterInfo fallback), addon messages
     "GetNumGroupMembers", "IsInRaid", "UnitIsConnected", "IsInGuild", "GetNumGuildMembers", "GetGuildRosterInfo",
-    "C_GuildInfo", "C_Club", "C_ChatInfo",
+    "GetGuildInfo", "C_GuildInfo", "C_Club", "C_ChatInfo",
     -- bags and items
     "C_Container", "C_Item", "GetItemInfo", "GetItemInfoInstant", "NUM_BAG_SLOTS", "NUM_REAGENTBAG_SLOTS", "NUM_TOTAL_EQUIPPED_BAG_SLOTS", "CursorHasItem", "ClearCursor",
     -- mail

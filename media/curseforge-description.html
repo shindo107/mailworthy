@@ -1,44 +1,60 @@
-<p><strong>Mailworthy</strong> clears your bags at the mailbox. One click sends everything worth more on the auction house (or worth more disenchanted) to your bank alt, and leaves the rest in your bags for the vendor. No more checking prices item by item, no more dragging twelve items into a mail at a time.</p>
+<p><strong>Mailworthy</strong> clears your bags at the mailbox. One click sends everything worth more on the auction house (or worth more disenchanted) to your bank alt, sends your friends and guildmates the crafting materials they need, and leaves the rest in your bags for the vendor. No more checking prices item by item, no more dragging twelve items into a mail at a time.</p>
 
 <p>Made for <strong>World of Warcraft: Forever</strong>. Works with mouse and keyboard, and with a controller.</p>
 
 <h2>How it works</h2>
 <ol>
-<li>Open any mailbox and click the <strong>Mailworthy</strong> button under the mail window.</li>
-<li>Check the Mailworthy window: who it's going to, what will be mailed and why, and what stays in your bags and why. Click any item to keep it.</li>
-<li>Click <strong>Send</strong>. Mailworthy fills as many mails as it needs (12 stacks each) and sends them all with that one click.</li>
+<li>Open any mailbox, go to the <strong>Send Mail</strong> tab and click the <strong>Mailworthy</strong> button under the mail window.</li>
+<li>Check the Mailworthy window: who gets mail, what will be mailed and why, and what stays in your bags and why. Click any item to keep it.</li>
+<li>Click <strong>Send</strong>. Mailworthy fills as many mails as it needs (12 stacks each), for every recipient, and sends them all with that one click.</li>
 <li>Sell what's left to the nearest vendor: after sending, the items worth more at a vendor (grey junk too) carry a small <strong>V</strong> tag in your bags. Changed your mind about one? Lock it and the tag goes.</li>
 </ol>
-<p>The first time, Mailworthy asks you to pick your bank alt. You choose from the characters you've logged into on this realm and faction, so there are no typos.</p>
+<p>The first time, Mailworthy asks you to pick your bank alt. You choose from the characters you've logged into on this realm and faction, so there are no typos. Bank alt on a second WoW account? Type its name, or press <strong>This character is my bank alt</strong> on the alt itself.</p>
 
 <h2>What gets mailed</h2>
-<p>For every item in your bags (all its stacks together, in every bag you carry, reagent bag included), Mailworthy compares what you'd get from a vendor with what it's worth on the auction house after the 5% auction cut, the listing deposit and the postage (30 copper per stack). An item is mailed when it's clearly worth it: by default at least <strong>5 silver</strong> and <strong>25%</strong> more than the vendor pays. Both numbers are adjustable.</p>
-<p>No math needed on your side. The price is the <strong>3-day median</strong> of your Auctionator scans, so one undercut can't flip a verdict; half the deposit counts, since the game refunds it on a sale; a flooded market is valued at its floor; and the rule knows your realm's launch day. In launch week, white trade goods with no price yet are mailed anyway. Before the first raids, enchanting materials, herbs and elementals get a <strong>B</strong> verdict: bank them on your alt, they sell for more later. As the realm ages and gold piles up, the minimum gain grows with it.</p>
+<p>For every item in your bags (all its stacks together, in every bag you carry, reagent bag included), Mailworthy compares what you'd get from a vendor with what it's worth on the auction house after the 5% auction cut, the listing deposit and the postage (30 copper per stack). An item is mailed when it's clearly worth it: by default at least <strong>1 silver</strong> and <strong>25%</strong> more than the vendor pays. Both numbers are adjustable.</p>
+<p>No math needed on your side. The price is your last Auctionator scan, or the <strong>3-day median</strong> of your scans when that's lower, so one empty-market spike can't make a dud look valuable. Half the deposit counts, since the game refunds it on a sale; a flooded market is valued at its floor; and the rule knows your realm's launch day. In launch week, white trade goods with no price yet are mailed anyway. Before the first raids, enchanting materials, herbs and elementals get a <strong>B</strong> verdict: bank them on your alt, they sell for more later. As the realm ages and gold piles up, the minimum gain grows with it.</p>
 <p>Mailworthy never mails:</p>
 <ul>
 <li>items you've locked;</li>
-<li>the materials your own professions use (see below);</li>
+<li>soulbound and quest items;</li>
+<li>the materials your own professions still use (see below);</li>
 <li>your profession tools (fishing poles, Mining Pick, Blacksmith Hammer, Skinning Knife and the like);</li>
 <li>gold.</li>
 </ul>
 
 <h2>Your professions come first</h2>
-<p>Mailworthy knows which professions the character has and keeps their materials in the bags, whatever they'd sell for: cloth for a tailor (or for first aid), leather for a leatherworker, metal and stone for a blacksmith or an engineer (plus parts, explosives and devices), herbs for an alchemist, dust, essences and shards for an enchanter, meat and fish for a cook. The window shows them under "staying" with the reason, for example <em>your Tailoring needs it</em>. Gathering professions keep nothing: what you mine, pick or skin is what gets sold. Elemental materials are still mailed; lock them if you want to keep them. The whole rule is one checkbox in the settings, on by default.</p>
+<p>Mailworthy knows which professions the character has and keeps their materials in the bags, whatever they'd sell for: cloth for a tailor (or for first aid), leather for a leatherworker, metal and stone for a blacksmith or an engineer (plus parts, explosives and devices), herbs for an alchemist, dust, essences and shards for an enchanter, meat and fish for a cook. The window shows them under "staying" with the reason, for example <em>your First Aid needs it (until skill 150)</em>. Elemental materials are still mailed; lock them if you want to keep them. The whole rule is one checkbox in the settings, on by default.</p>
+<ul>
+<li><strong>Levelled past it? It goes.</strong> Once every recipe that uses a material is grey for you, it's mailed to be sold: at First Aid 80 your linen goes, your wool stays. The thresholds come from a recipe-by-recipe read of every Forever profession, and when you open your own profession window Mailworthy checks them against your recipe colours.</li>
+<li><strong>Sell what I gather</strong> (off by default): a miner who is also a blacksmith, or an herbalist who is also an alchemist, can mail what they gather to the auction house instead of keeping it.</li>
+</ul>
 
 <h2>Send a profession's materials to a friend</h2>
-<p>Got a guildmate who enchants, or a friend levelling leatherworking? Bind a profession to them once and Mailworthy mails them every material it uses, every time you press Send, until you remove the binding. Type <code>/mw friends</code> (or press <strong>Send materials to friends</strong> in the settings), pick the player from your party, your guild or your own characters (online players first, with their professions shown and suggested), then pick the profession. Two clicks, or two presses on the controller.</p>
+<p>Got a guildmate who enchants, or a friend levelling leatherworking? Bind a profession to them once and Mailworthy mails them every material it uses, every time you press Send, until you remove the binding. Type <code>/mw friends</code> (or press <strong>Friends...</strong> in the settings), pick the player from your party, your guild or your own characters (online players first, with their professions shown and suggested), then pick the profession. Two clicks, or two presses on the controller.</p>
 <ul>
-<li>The Mailworthy window lists your bindings above the mail list, each with <strong>Skip once</strong> (just this visit) and <strong>Remove</strong>. Items headed to a friend show <em>to Bob</em> instead of a gain.</li>
+<li>The Mailworthy window lists your bindings above the mail list, each with <strong>Skip once</strong> (just this visit) and <strong>Remove</strong>. Every recipient gets a line under <em>To:</em>, and items headed to a friend show <em>to Bob</em> instead of a gain.</li>
+<li>An <strong>Enchanting</strong> binding also takes your green and blue weapons and armor, for them to disenchant.</li>
 <li>Each binding has a <strong>price cap</strong>, 5 gold each by default. When the market suddenly wants a material, anything at or above the cap goes to your bank alt instead, and the scan tells you why.</li>
+<li>Once your friend has levelled past a material, it stops going to them and goes to your bank alt. Mailworthy learns their skill from their own Mailworthy, the guild roster, or your own character's last login.</li>
 <li>Bindings cover all your characters on that realm and faction, or just one; your call per binding.</li>
 <li>Locked items still stay, and a binding beats "keep my professions' materials" for that profession, since you asked for it.</li>
 <li>If your friend runs Mailworthy too, the addons tell each other which of their characters craft what, and your mail goes to <strong>whichever of their characters has the profession</strong>: the friend themself, or their crafter alt. Never their bank alt. The window always names who gets it. (<code>/mw feature comms off</code> stops the messages.)</li>
 </ul>
 
+<h2>One template for the whole guild</h2>
+<p>Guild masters and officers can set who gets each profession's materials for the whole guild: herbs to the alchemist, dust and greens to the enchanter, cloth to the tailor. Open <code>/mw friends</code>, press <strong>Create...</strong>, add a rule per profession (each with its price cap) and press <strong>Publish to guild</strong>.</p>
+<ul>
+<li>Guildmates running Mailworthy get it in chat and in their Friends window. Nothing is mailed until they press <strong>Use guild rules</strong> once; after that, updates apply on their own, each with a chat line.</li>
+<li><strong>One press turns it off</strong>: <em>Guild rules: on</em>, in Friends or on the mailbox window's Bindings heading.</li>
+<li>Your own bindings and your own professions always come first: a tailor keeps their cloth. Skip once works on guild rules too.</li>
+<li>Any guildmate running Mailworthy passes a copy on, so the guild master doesn't need to be online. A copy is taken only when your own guild roster shows its author as the guild master or an officer, and only its rules for guild members.</li>
+</ul>
+
 <h2>Optional: Auctionator, Disenchantry and Siz DisenchantValue</h2>
 <p>Mailworthy works on its own, and gets smarter with these addons installed:</p>
 <ul>
-<li><strong><a href="https://www.curseforge.com/wow/addons/auctionator">Auctionator</a></strong> (recommended) provides the auction house prices from your own scans. With it, Mailworthy weighs every item's real value and only mails what's worth selling.</li>
+<li><strong><a href="https://www.curseforge.com/wow/addons/auctionator">Auctionator</a></strong> (recommended) provides the auction house prices from your own scans. With it, Mailworthy weighs every item's real value and only mails what's worth selling. When your prices are more than 3 days old, the Mailworthy button shows a <strong>!</strong>, and if a guildmate running Mailworthy has scanned recently, it tells you who.</li>
 <li><strong><a href="https://www.curseforge.com/wow/addons/disenchantry">Disenchantry</a></strong>: with it installed, Mailworthy also compares the <strong>disenchant value</strong> of green, blue and purple gear (switched on by default), the same "Expected disenchant value" Disenchantry shows in the tooltip: the era disenchant tables priced with today's Auctionator prices. Gear that's worth more as enchanting materials goes to your bank alt to disenchant, and the scan says which source priced it.</li>
 <li><strong><a href="https://www.curseforge.com/wow/addons/siz-disenchantvalue">Siz DisenchantValue</a></strong>: also switches the disenchant comparison on, and its numbers come first when both are installed, since it learns from your own disenchants.</li>
 </ul>
@@ -62,19 +78,20 @@
 </ul>
 
 <h2>Controller support</h2>
-<p>Mailworthy works with WoW Forever's controller interface. At a mailbox, switch to <strong>Send Mail</strong> (R1) and press <strong>Triangle (Y)</strong>. In the Mailworthy window the D-pad moves between buttons, Cross presses and Circle closes it. The settings window works the same way, wherever you open it.</p>
+<p>Mailworthy works with WoW Forever's controller interface. At a mailbox, switch to <strong>Send Mail</strong> (R1) and press <strong>Triangle (Y)</strong>. In the Mailworthy window the D-pad moves between buttons, Cross presses and Circle closes it. The settings and Friends windows work the same way, wherever you open them.</p>
 
 <h2>Settings</h2>
 <ul>
-<li>Minimum gain over the vendor price (silver and percent)</li>
-<li>Include disenchant value</li>
-<li>Auction listing length used for the deposit estimate</li>
 <li>Your bank alt</li>
-<li>Keep my professions' materials (lists the character's crafting professions and what they use)</li>
-<li>Send materials to friends: your bindings, each with its price cap and scope</li>
+<li>Minimum gain over the vendor price (silver and percent)</li>
+<li>Auction listing length used for the deposit estimate</li>
+<li>Include disenchant value</li>
+<li>Keep my professions' materials (lists the character's crafting professions and their skill)</li>
+<li>Sell what I gather</li>
 <li>Bank alt tags on every character, or only on the bank alt</li>
 <li>Locked-item glow: in the Mailworthy window only, or always</li>
-<li>Minimap button</li>
+<li>Friends: your bindings and your guild's template</li>
+<li>Bank alt summary and the minimap button</li>
 </ul>
 <p>Open them from the Mailworthy window, the minimap button, or type <code>/mw</code>.</p>
 
@@ -82,8 +99,10 @@
 <ul>
 <li>Mail only goes between characters on the same realm and faction, so that's who Mailworthy offers as your bank alt and as friends.</li>
 <li>Mailworthy doesn't post auctions. It gets the items to your bank alt; you list them there (Auctionator makes that quick).</li>
-<li>Nothing is sent without your click, nothing happens in combat, and the window always shows who gets each item and why it's mailed or kept.</li>
+<li>Nothing is sent without your click, nothing happens in combat, no gold is ever attached, and the window always shows who gets each item and why it's mailed or kept.</li>
+<li>Mailworthys talk to each other over hidden addon messages, to your guild and group only: which characters craft what, their skill, the day of the last price scan, and your guild's template. Never prices, bags or gold.</li>
 <li>Want the numbers? <code>/mw scan</code> shows the price, deposit, postage and gain behind every decision.</li>
+<li>The full guide, page by page, is on the <a href="https://github.com/sjdodge123/mailworthy/wiki">Mailworthy wiki</a>.</li>
 </ul>
 
 <h2>Feedback</h2>

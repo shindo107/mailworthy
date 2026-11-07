@@ -28,6 +28,7 @@ local money = function(c) return ns.Valuation.Money(c) end
 -- The tab the last draw was for (true: the Inbox), so the watcher redraws when it changes.
 local renderedInbox
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
+local guildButton
 local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
@@ -217,11 +218,20 @@ end
 
 -- Bindings (Routes): shown only while there are bindings. One row each with Skip once
 -- (this mailbox visit) and Remove, under a "Bindings" heading with the way into the
--- friends window. The mail list below shows where each item goes.
+-- friends window. The mail list below shows where each item goes. A guild template's
+-- rules (Guild.lua) are rows too, with Skip once but no Remove; while any shows, "Guild
+-- rules: on" on the heading turns them all off in one press (operator, 2026-11-07).
 local function createRouteRows()
     routesHead = W.Label(frame, "GameFontNormal")
     routesHead:SetText("Bindings")
     friendsButton = W.Button(frame, "Friends...", 90, function() ns.RoutesUI.Show(frame) end, "MailworthyMailFriends")
+    guildButton = W.Button(frame, "Guild rules: on", 130, function()
+        if ns.Guild.SetUse(false) then
+            ns.Print("Guild rules off: your materials no longer follow the guild template. Turn them back on in Friends.")
+        end
+        UI.Refresh()
+    end, "MailworthyMailGuildRules")
+    guildButton:Hide()
     for i = 1, UI.ROUTE_ROWS do
         local row = {}
         row.text = W.Label(frame, "GameFontHighlightSmall")
@@ -262,10 +272,11 @@ local function fillRoutes()
             local skipped = ns.Routes.Skipped(r.key)
             row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. firstName(to) .. "|r"
                 .. (crafter and (" |cff888888(" .. firstName(r.to) .. "'s crafter)|r") or "")
+                .. (r.scope == "guild" and " |cff888888(guild)|r" or "")
                 .. (skipped and " |cff888888skipped this time|r" or ""))
             row.skip:SetText(skipped and "Undo skip" or "Skip once")
             row.skip:Show()
-            row.remove:Show()
+            if r.scope == "guild" then row.remove:Hide() else row.remove:Show() end
         end
         if r then
             row.text:Show()
@@ -276,6 +287,8 @@ local function fillRoutes()
             row.remove:Hide()
         end
     end
+    local guild = false
+    for _, r in ipairs(list) do guild = guild or r.scope == "guild" end
     if shown > 0 then
         routesHead:Show()
         friendsButton:Show()
@@ -283,6 +296,7 @@ local function fillRoutes()
         routesHead:Hide()
         friendsButton:Hide()
     end
+    if guild then guildButton:Show() else guildButton:Hide() end
     return shown
 end
 
@@ -431,6 +445,7 @@ function UI.Layout(n)
     if n.routes > 0 then
         at(routesHead, 24, y)
         at(friendsButton, -24, y + 4, "TOPRIGHT")
+        at(guildButton, -120, y + 4, "TOPRIGHT")
         y = y - 22
         for i, row in ipairs(routeRows) do
             if i <= n.routes then

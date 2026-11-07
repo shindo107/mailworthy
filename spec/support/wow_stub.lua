@@ -31,7 +31,8 @@ local function defaultState()
         inbox = {}, invoices = {},
         mods = {}, bindings = {}, bindingOwners = {}, activeFrame = nil, now = 1000, gamepadUI = false,
         navButton = nil,
-        -- bindings: guild = nil (not in one) or { clubId, members = { { name, level, class, online, professions, ranks } } },
+        -- bindings: guild = nil (not in one) or { clubId, name, rank (this character's 0-based rank index, default 3),
+        --   members = { { name, level, class, online, professions, ranks, rank (0-based rank index, default 3) } } },
         -- group = nil or { raid, members = { ... } } (party: the others; raid: everyone), addon messages sent / prefixes
         guild = nil, group = nil, addonMessages = {}, prefixes = {}, rosterRequests = 0,
     }
@@ -293,7 +294,13 @@ _G.GetNumGuildMembers = function() return s().guild and #s().guild.members or 0 
 _G.GetGuildRosterInfo = function(i)
     local m = s().guild and s().guild.members[i]
     if not m then return nil end
-    return m.name, "Member", 1, m.level, m.class, "Zone", "", "", m.online == true, 0, (m.class or "WARRIOR"):upper()
+    return m.name, "Member", m.rank or 3, m.level, m.class, "Zone", "", "", m.online == true, 0, (m.class or "WARRIOR"):upper()
+end
+-- GetGuildInfo("player"): guild name, rank name, 0-based rank index (TabardFrame.lua reads it so).
+_G.GetGuildInfo = function(unit)
+    local g = s().guild
+    if unit ~= "player" or not g then return nil end
+    return g.name or "Stub Guild", "Rank", g.rank or 3
 end
 _G.C_GuildInfo = { GuildRoster = function() s().rosterRequests = s().rosterRequests + 1 end }
 _G.C_Club = {
@@ -313,7 +320,8 @@ _G.C_Club = {
         return { isSelf = m.name == s().name, memberId = i, name = m.name .. (m.realm and ("-" .. m.realm) or ""),
             presence = m.online and 1 or 3, level = m.level, classID = 1,
             profession1ID = m.professions and m.professions[1], profession2ID = m.professions and m.professions[2],
-            profession1Rank = m.ranks and m.ranks[1], profession2Rank = m.ranks and m.ranks[2] }
+            profession1Rank = m.ranks and m.ranks[1], profession2Rank = m.ranks and m.ranks[2],
+            guildRankOrder = (m.rank or 3) + 1 }
     end,
 }
 

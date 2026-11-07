@@ -269,6 +269,47 @@ explicit choice over the default keep. The bank alt's tags ignore bindings.
 - Two presses with the controller: the friends window is all buttons (Nav / PadKey
   "settings" set).
 
+## Guild template (operator, 2026-11-07)
+
+"The guild master (if using Mailworthy) can set up a template for the rest of the guild members
+to use ... send enchanting to this person, send herbs here, etc. ... to help distribute
+materials amongst the guild." And: "the template should have a 1 click disable as well."
+
+- **What a rule is:** a binding (above) the guild hands out: one crafting profession's
+  materials to one guild member, with a per-unit price cap. One rule per profession (at most
+  8). "Herbs" is Alchemy's rule, "cloth" Tailoring's.
+- **Who publishes:** the guild master and the rank right below (rank index 0 and 1). The
+  friends window shows them Create... / Edit...: the draft (`MailworthyDB.guildDrafts`), Add a
+  rule... (guild members only, then the profession), cap steppers, Remove, Publish to guild.
+- **Copies, from anyone** (operator, same day: "the guild master and officers have the original
+  and can modify it, whoever is online gets the copy, and it can be copied from them by any
+  member"). Wire, GUILD only: `T2|<revision>|<author>|<i>/<n>|<skill line>=<Name>:<cap copper>`
+  per rule (`0/0` = empty) and `Q2|<revision held>` (ask). The revision is the author's server
+  time; the newest wins, never more than 10 minutes ahead. Everyone asks at login with the
+  revision they hold; whoever holds a newer copy answers after a short wait (an officer 1 s,
+  anyone else 2-6 s) unless another answer as new goes out first, so one answer per ask; whoever
+  hears an ask for a newer revision than theirs asks back. The receiver needs the **sender** in
+  its roster and the **author** at rank 0 or 1 in it (a name not in the roster yet is re-checked
+  at `GUILD_ROSTER_UPDATE`), and leaves out rules for players not in it.
+- **A copy can't be signed** (no secret every member could check), so a member running a
+  modified addon could pass on a copy in an officer's name. Limits: its rules can only name
+  guild members; only players who turned the guild rules on are affected, with a chat line
+  naming every rule and every recipient shown before Send; and the named author's Mailworthy,
+  hearing a revision it never published (`MailworthyDB.guildPublished`), sends the real one
+  again with a newer revision, which replaces every copy (a publisher with no record at all,
+  saved data lost, takes its own copy back instead).
+- **Opt-in once:** a new template prints one chat line and shows "Guild template from <name>:
+  N rules (new)" with **Use guild rules** in Friends; nothing is mailed before that press.
+  Updates then apply on their own, each with a chat line naming the rules. Kept per account
+  per realm + faction + guild (`MailworthyDB.guildTemplates`).
+- **One-press off:** "Guild rules: on" in Friends and on the Bindings heading of the Mailworthy
+  window (shown while a guild rule applies).
+- **Personal wins:** `Routes.List` = this character's bindings, the account's, then the guild's
+  (`Guild.Rules`) minus rules for a profession bound personally, a profession this character
+  has (they keep their materials), or naming this character. Skip once works on guild rules;
+  Remove doesn't (turn the rules off instead). `/mw report` lists each left-out rule and why.
+- Switch `/mw feature guildTemplate off`.
+
 ## Material tiers (operator, 2026-11-06)
 
 "I just got my first aid to 80, which is a threshold to where I shouldn't be using linen

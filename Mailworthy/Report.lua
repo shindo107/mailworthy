@@ -103,6 +103,7 @@ function Report.Build()
     }
     for _, entry in pairs(MailworthyDB.characters) do lines[#lines + 1] = "known character: " .. ns.Characters.Describe(entry) end
     for _, l in ipairs(ns.Routes.ReportLines()) do lines[#lines + 1] = l end
+    for _, l in ipairs(ns.Guild.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.Comms.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.Stale.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.TierCheck.ReportLines()) do lines[#lines + 1] = l end
