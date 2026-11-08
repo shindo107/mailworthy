@@ -171,6 +171,13 @@ function Nav.Follow(force)
     if root and not (current and current:IsVisible()) then return Nav.Resume() end
 end
 
+--- Every window registered with Attach (specs: the D-pad reach spec walks each one).
+function Nav.Windows()
+    local list = {}
+    for frame in pairs(highlights) do list[#list + 1] = frame end
+    return list
+end
+
 --- Close the window the controller is in (Circle).
 function Nav.CloseTop()
     local root = Nav.Root()

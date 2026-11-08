@@ -8,6 +8,9 @@ local loadAddon = require("spec.support.load_addon")
 local BOB = "Bob Surname"
 local ENCHANTING = 333
 
+-- Windows walked by the specs below (by name), so the last one can check none was left out.
+local walked = {}
+
 describe("D-pad reach in every view", function()
     local ns, watcher
     local function tick() watcher.scripts.OnUpdate(watcher, 0.2) end
@@ -41,6 +44,8 @@ describe("D-pad reach in every view", function()
     end
 
     local function assertNavigable(view, atLeast)
+        local root = ns.Nav.Root()
+        walked[root and root:GetName() or "?"] = true
         local candidates, unreachable, stuck = walk()
         assert.truthy(#candidates >= atLeast, view .. ": only " .. #candidates .. " buttons")
         local spots = {}
@@ -152,5 +157,18 @@ describe("D-pad reach in every view", function()
         ns.BankAlt.ShowWindow()
         tick()
         assertNavigable("summary", 1)
+    end)
+
+    -- CI's "controller" job runs this file: a new Mailworthy window (Nav.Attach) fails it until a
+    -- spec above walks its views.
+    it("walked every window the controller can drive", function()
+        ns.Fire("PLAYER_LOGIN")
+        local missing = {}
+        for _, frame in ipairs(ns.Nav.Windows()) do
+            local name = frame:GetName() or "?"
+            if not walked[name] then missing[#missing + 1] = name end
+        end
+        table.sort(missing)
+        assert.same({}, missing, "no D-pad reach spec for " .. table.concat(missing, ", "))
     end)
 end)
