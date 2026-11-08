@@ -214,7 +214,8 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   3-day median of Auctionator's history when that is lower (2026-11-07: the median alone
   over-valued a falling market; its database, not the stable API: guarded); launch day from
   `GetServerTime()` against Nov 4, 2026 (`Valuation.LAUNCH_EPOCH`), or the realm's first
-  sight when earlier; days 0-13 mail unpriced white trade goods; a glut (10x our count
+  sight when earlier; days 0-13 mailed unpriced white trade goods (replaced 2026-11-08: every
+  unpriced item goes to the bank alt, see below); a glut (10x our count
   listed, -25%) is valued at the floor; **Bank** verdict (B tag) for late-demand trade
   goods before day 35 and gluts until day 60; the minimum gain grows 1/180 a day after
   day 35, capped at 2x. No new settings.
@@ -337,13 +338,38 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
 - TradeSkillMaster as a price source (CurseForge user Warki7, 2026-11-08: "possible to use this with
   TradeSkillMaster?"): `Prices.Source()`; Auctionator wins when both are installed (no new setting:
   its scans carry the age, exactness and history decision rule v2 uses; TSM's public API gives none).
-  TSM counts as "with Auctionator" in AGENTS.md Safety: an item it has no price for stays, a failed
+  TSM counts as "with Auctionator" in AGENTS.md Safety: an item it has no price for stays (to the
+  bank alt since 2026-11-08), a failed
   call (a raise, or a source `IsCustomPriceValid` rejects) never counts as "no price yet", and the
   launch-week white trade goods exception applies the same way. Unit price = the lower of
   `DBMinBuyout` and `DBMarket` (this realm's AuctionDB; never region data). With TSM alone there is
   no price age, so no "price too old" keep and no stale nudge. Critical path: TSM alone, TSM with a
   failing call, and both installed (TSM never asked). Not changed: `BankAlt.lua` / `MailWindow.lua`
   texts that say "Auctionator" for the no-source case (other sessions were editing them).
+- No auction price yet = to the bank alt (operator, 2026-11-08, a screenshot of "Plans: Iridescent
+  Hammer" tagged "[Keep] Stays in your bags: no auction price yet": "going to the bank alt on no data
+  is better than holding on the main"). `Valuation.Unpriced`: with a price source and no auction
+  price, route `noprice` (chip "No price", `/mw scan` "NO PRICE", no gain); a price past the age limit
+  counts as none ("auction price too old (N days)"); grey junk and a failed call stay; unpriced gear
+  too (`UNPRICED_GEAR`). Operator's answers the same day: no price source = "Whites + staples +
+  recipes", "Yes, gear goes too", "Stale prices go too" (the stale nudge now says old-priced items go
+  to the bank alt). Class bindings never take an item without a current auction price, whatever
+  its route (`Routes.Divert`; a disenchant value alone isn't one: Codex review). A failed price
+  call reaches no binding either (Codex review; materials included), and mails nothing on a
+  disenchant value either (second Codex pass). The total line counts them ("+9s more than
+  vendoring, 2 with no price yet", `MailWindow.TotalText`); the bank alt's own tooltip says why its
+  share stays (`OtherLine` with `Bags.HoldReason`); the stale nudge says old-priced items "count as
+  unpriced". Staple trade goods (`Valuation.STAPLES`, ~110 Classic IDs, one table) are
+  "always mail" as a common item when unpriced (Bank on top), and without any price source whatever
+  their quality. Recipes: `Valuation.RecipeProfession` (class 9, `Enum.ItemRecipeSubclass`) makes a
+  recipe part of its profession's binding (`Routes.Matches`; reason "Blacksmithing recipe goes to
+  Bob"; mailed with the materials, same subject); the cap applies to a priced recipe, a stale
+  price included (Codex review: a 9g plan 9 days old doesn't reach the friend under a 5g cap). Replaces the
+  launch-days 0-13 white trade goods exception (`FreshRealmDefault`, `FRESH_REALM_DAYS` removed).
+  AGENTS.md Safety rewritten; critical path: unpriced to the bank alt (hard keeps and junk stay, no
+  bank alt = stays), recipes to the binding / the bank alt / over the cap, class binding never takes
+  an unpriced item, staples without a price source; the old "unpriced stays" assertions changed on
+  purpose, each with a comment saying what it was.
 - Optional deps: `.pkgmeta` `optional-dependencies` auctionator, tradeskill-master (2026-11-08), siz-disenchantvalue and (since
   2026-10-26, the project being back) disenchantry: a slug that disappears fails the CurseForge
   upload with error 1018 (v0.8.0 and v0.9.0 did on disenchantry in October 2026), so if a tag's

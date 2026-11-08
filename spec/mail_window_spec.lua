@@ -88,7 +88,21 @@ describe("mail window", function()
         assert.equal("only 4s 10c more than a vendor (needs 5s)",
             ns.MailWindow.StayReason({ reason = "not worth it", gain = 410, threshold = 500 }))
         assert.equal("no auction price yet", ns.MailWindow.StayReason({ reason = "no price" }))
+        assert.equal("the price lookup failed", ns.MailWindow.StayReason({ reason = "no price", failed = true }))
         assert.equal("profession tool", ns.MailWindow.StayReason({ reason = "profession tool" }))
+    end)
+
+    it("the total counts what goes with no price yet, and says what goes without a price source (Codex review)", function()
+        local S = { cut = 0.05, duration = 3 }
+        local line, note = ns.MailWindow.TotalText({ priced = true, settings = S,
+            totals = { gain = 902, unpriced = 2, postage = 90, items = 3 } })
+        assert.equal("+9s 2c more than vendoring, 2 with no price yet", line)
+        assert.equal("after the 5% AH cut, 24h deposits and 90c postage", note)
+        line = ns.MailWindow.TotalText({ priced = true, settings = S, totals = { gain = 902, unpriced = 0, postage = 0 } })
+        assert.equal("+9s 2c more than vendoring", line)
+        line, note = ns.MailWindow.TotalText({ priced = false, settings = S, totals = { items = 1, postage = 30 } })
+        assert.equal("1 item to mail", line)
+        assert.equal("No Auctionator: white items and staple trade goods go. Postage 30c.", note)
     end)
 
     it("the Staying count says how many are locked", function()

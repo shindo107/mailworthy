@@ -136,7 +136,8 @@ function Bags.Evaluate(settings)
     local priced = source ~= nil
     local routes = settings.routes or ns.Routes.Active()
     local result = { settings = settings, priced = priced, source = source, routes = routes, mail = {}, keep = {}, unmailable = {},
-        totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, recipients = {}, byRecipient = {} } }
+        totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, unpriced = 0, recipients = {},
+            byRecipient = {} } }
     local stacksTo = {}
     -- Class bindings (Routes, Classes.lua) need each item's class line: read only when there's one.
     local classRoutes = false
@@ -166,6 +167,8 @@ function Bags.Evaluate(settings)
             t.postage = t.postage + item.result.postage
             local to = item.result.to or "" -- "" = the bank alt
             if item.result.to then t.routed = t.routed + item.stacks else t.gain = t.gain + (item.result.gain or 0) end
+            -- To the bank alt with no gain known (no auction price yet): the total says so (Codex review).
+            if priced and not item.result.to and item.result.gain == nil then t.unpriced = t.unpriced + 1 end
             if not stacksTo[to] then
                 stacksTo[to] = {}
                 t.recipients[#t.recipients + 1] = to
@@ -251,7 +254,8 @@ end
 
 local money = function(c) return ns.Valuation.Money(c) end
 
-local ROUTE = { ah = "AH", de = "DE", common = "COMMON", bank = "BANK", friend = "FRIEND", ["return"] = "RETURN" }
+local ROUTE = { ah = "AH", de = "DE", common = "COMMON", bank = "BANK", friend = "FRIEND", ["return"] = "RETURN",
+    noprice = "NO PRICE" }
 
 local function itemName(item)
     local name = item.link:match("%[(.-)%]") or item.link
@@ -377,8 +381,7 @@ function Bags.Report(result)
             .. (s.returns and "; return to sender: on (what other characters mailed you goes back)" or ""),
         "prices: " .. (result.priced and (ns.Prices.SOURCE_NAME[result.source] or "Auctionator")
             or "none (no Auctionator or TradeSkillMaster: mailing common items)")
-            .. ((result.priced and (s.serverDay or math.huge) < ns.Valuation.FRESH_REALM_DAYS)
-                and " (fresh realm: unpriced white trade goods are mailed)" or ""),
+            .. (result.priced and " (no auction price yet: to the bank alt)" or ""),
         string.format("settings: %dh listing (deposit x%d), AH cut %d%%, postage %s per stack, "
             .. "min gain %s and %d%%, disenchant %s, max price age %d days, launch day %s, profession materials %s",
             ns.Valuation.DURATION_HOURS[s.duration], ns.Valuation.DEPOSIT_MULTIPLIER[s.duration],

@@ -199,8 +199,9 @@ BankAlt.QUIET_KEEPS = { soulbound = true, ["quest item"] = true, locked = true, 
     ["item info not loaded yet"] = true }
 
 --- Pure: the label and the line for an item with no verdict tag: where the Mailworthy window
---- mails it, or why it stays in the bags. nil when there's nothing to add. `noBankAlt`: none is
---- set, so nothing goes to one (Bags.HoldReason; Codex review).
+--- mails it, or why it stays in the bags. nil when there's nothing to add. `noBankAlt`: the bank
+--- alt's share stays (true = none is set, or Bags.HoldReason's text: "this is your bank alt",
+--- "bank alt skipped"), so nothing goes to one (Codex review).
 function BankAlt.OtherLine(item, noBankAlt)
     local r = item and item.result
     if type(r) ~= "table" then return nil end
@@ -209,7 +210,10 @@ function BankAlt.OtherLine(item, noBankAlt)
             return "Mail", string.format("Goes to %s at the mailbox: %s.", tostring(r.to),
                 r.what and (tostring(r.what) .. " binding") or "a binding")
         end
-        if noBankAlt then return "Keep", "Stays in your bags: no bank alt (" .. tostring(r.reason) .. ")." end
+        if noBankAlt then
+            return "Keep", string.format("Stays in your bags: %s (%s).", type(noBankAlt) == "string" and noBankAlt
+                or "no bank alt", tostring(r.reason))
+        end
         return "Mail", "Goes to your bank alt at the mailbox: " .. tostring(r.reason) .. "."
     end
     if r.action ~= "keep" or BankAlt.QUIET_KEEPS[r.reason] then return nil end
@@ -224,7 +228,7 @@ function BankAlt.TooltipLines(item, record, settings)
     local verdict = item and (item.advice or item.verdict)
     local tag = verdict and BankAlt.TAGS[verdict]
     local otherLabel, otherText
-    if not tag then otherLabel, otherText = BankAlt.OtherLine(item, not ns.Config.BankAlt()) end
+    if not tag then otherLabel, otherText = BankAlt.OtherLine(item, ns.Bags.HoldReason() or false) end
     local label = tag and tag.label or otherLabel
     if not label and not record then return lines end
     lines[1] = { "Mailworthy" .. (label and ("  |cffffffff[" .. label .. "]|r") or ""), 1, 0.82, 0 }
@@ -258,7 +262,8 @@ function BankAlt.TooltipLines(item, record, settings)
     end
     if record then
         local was = BankAlt.TAGS[record.route] and BankAlt.TAGS[record.route].label
-            or (record.route == "bank" and "Bank") or (record.route == "common" and "Common item") or tostring(record.reason)
+            or (record.route == "bank" and "Bank") or (record.route == "common" and "Common item")
+            or (record.route == ns.Valuation.NO_PRICE and "No auction price yet") or tostring(record.reason)
         lines[#lines + 1] = { string.format("Mailed for: %s%s, %s, from %s", was,
             record.gain and (" +" .. money(record.gain)) or "", date("%b %d", record.at or 0), tostring(record.from)),
             0.55, 0.75, 1 }

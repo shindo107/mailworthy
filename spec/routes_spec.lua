@@ -153,6 +153,45 @@ describe("bindings", function()
             assert.equal("mail", v.action)
         end)
 
+        it("recipes: their profession's binding, under the cap; a failed or stale price never sneaks past it", function()
+            -- operator, 2026-11-08: "recipes should go to their respective profession mappings"; Codex review, same day
+            local smith = { to = BOB, profession = 164, key = "s", cap = 50000 }
+            local recipe = { itemID = 7975, classID = 9, subclassID = 4, count = 1, stacks = 1, quality = 2, vendor = 450 }
+            local D = ns.Valuation.DEFAULTS
+            local unpriced = { action = "mail", route = "noprice" }
+            local v = ns.Routes.Divert(recipe, unpriced, { ah = nil }, D, { smith })
+            assert.equal(BOB, v.to)
+            assert.equal("Blacksmithing recipe goes to Bob Surname", v.reason)
+            assert.equal("Blacksmithing materials", v.what, "one mail with the materials")
+            assert.equal(BOB, ns.Routes.Divert(recipe, { action = "mail", route = "ah" }, { ah = 49999, age = 0 }, D, { smith }).to)
+            local capped
+            v, capped = ns.Routes.Divert(recipe, { action = "mail", route = "ah" }, { ah = 50000, age = 0 }, D, { smith })
+            assert.is_nil(v)
+            assert.equal(smith, capped)
+            v, capped = ns.Routes.Divert(recipe, unpriced, { ah = 90000, age = 8 }, D, { smith })
+            assert.is_nil(v, "a stale 9g price still caps a recipe")
+            assert.equal(smith, capped)
+            assert.equal(BOB, ns.Routes.Divert(recipe, unpriced, { ah = 2000, age = 8 }, D, { smith }).to, "stale, under the cap")
+            assert.is_nil(ns.Routes.Divert(recipe, { action = "keep", reason = "no price", failed = true },
+                { ah = nil, failed = true }, D, { smith }), "a failed price call mails nothing")
+            assert.is_nil(ns.Routes.Divert(recipe, unpriced, { ah = nil }, D,
+                { { to = BOB, profession = 197, key = "t" } }), "a Tailoring binding doesn't take Blacksmithing plans")
+            assert.is_nil(ns.Routes.Divert({ classID = 9, subclassID = 0 }, unpriced, { ah = nil }, D,
+                { smith }), "a book: no profession")
+        end)
+
+        it("a class binding needs a current auction price when there's a price source (Codex review)", function()
+            local mage = { to = BOB, class = "MAGE", key = "m", cap = 50000 }
+            local robe = { itemID = 1, classID = 4, quality = 2, count = 1, stacks = 1, vendor = 50, classes = { MAGE = true },
+                myClass = "PALADIN" }
+            local D = ns.Valuation.DEFAULTS
+            assert.is_nil(ns.Routes.Divert(robe, { action = "mail", route = "de" }, { ah = nil, de = 5000 }, D, { mage }),
+                "a disenchant value alone isn't an auction price")
+            assert.is_nil(ns.Routes.Divert(robe, { action = "mail", route = "noprice" }, { ah = 900, age = 8 }, D, { mage }),
+                "stale")
+            assert.equal(BOB, ns.Routes.Divert(robe, { action = "mail", route = "ah" }, { ah = 900, age = 0 }, D, { mage }).to)
+        end)
+
         it("the price cap: at or above it the normal rule applies; unknown or stale prices don't count", function()
             local route = { to = BOB, profession = ENCHANTING, key = "k", cap = 50000 }
             local item = { classID = 7, subclassID = 12, count = 20, stacks = 1, vendor = 2 }
@@ -651,8 +690,8 @@ describe("bindings", function()
             _G.MailworthyFriendsPick1:Click()
             assert.is_false(_G.MailworthyFriendsPick1:IsShown())
             assert.truthy(_G.MailworthyFriendsProfession4:GetText()
-                :find("> Enchanting (dust, essences, shards, green and blue gear) <", 1, true))
-            assert.equal("Alchemy (herbs)", _G.MailworthyFriendsProfession1:GetText())
+                :find("> Enchanting (dust, essences, shards, green and blue gear, recipes) <", 1, true))
+            assert.equal("Alchemy (herbs, recipes)", _G.MailworthyFriendsProfession1:GetText())
             _G.MailworthyFriendsProfession4:Click()
             local r = ns.Routes.List()[1]
             assert.equal(BOB, r.to)

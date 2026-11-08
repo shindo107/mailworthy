@@ -159,6 +159,12 @@ describe("bank alt view", function()
             { other({ result = { action = "keep", route = "ah", gain = 500, held = "bank alt skipped" } }) })
         assert.same({ "Keep", "Stays in your bags: no auction price yet." },
             { other({ result = { action = "keep", reason = "no price" } }) })
+        -- The screenshot's Plans: Iridescent Hammer said "[Keep] Stays in your bags: no auction price yet." (operator,
+        -- 2026-11-08: "going to the bank alt on no data is better than holding on the main")
+        assert.same({ "Mail", "Goes to your bank alt at the mailbox: no auction price yet." },
+            { other({ result = { action = "mail", route = "noprice", reason = "no auction price yet" } }) })
+        assert.same({ "Keep", "Stays in your bags: the price lookup failed." },
+            { other({ result = { action = "keep", reason = "no price", failed = true } }) })
         for reason in pairs(ns.BankAlt.QUIET_KEEPS) do
             assert.is_nil(other({ result = { action = "keep", reason = reason } }), reason)
         end
@@ -166,6 +172,9 @@ describe("bank alt view", function()
         -- No bank alt: nothing goes to one, so the tooltip never says it does (Codex review).
         assert.same({ "Keep", "Stays in your bags: no bank alt (common item (no price data))." },
             { other({ result = { action = "mail", route = "common", reason = "common item (no price data)" } }, true) })
+        -- On the bank alt itself (or skipped): never "goes to your bank alt" (Codex review, 2026-11-08).
+        assert.same({ "Keep", "Stays in your bags: this is your bank alt (no auction price yet)." },
+            { other({ result = { action = "mail", route = "noprice", reason = "no auction price yet" } }, "this is your bank alt") })
     end)
 
     it("without Auctionator: no tags, only why it was mailed", function()
