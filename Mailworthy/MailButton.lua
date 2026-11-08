@@ -31,7 +31,8 @@ function MailButton.GamepadUI()
     return ok and on == true
 end
 
---- Mail button click or Triangle: toggle the Mailworthy window. A bank alt is optional
+--- Mail button click or Triangle: toggle the Mailworthy window, on the bank alt too (it keeps
+--- what it sells, and bindings and Return to sender mail from it). A bank alt is optional
 --- (operator, 2026-11-08): without one the window shows what would go and keeps it in the
 --- bags, and bindings still mail.
 --- Mouse / keyboard: on whichever tab is showing. Controller: on the Send Mail tab
@@ -41,8 +42,9 @@ end
 function MailButton.Activate(source)
     ns.lastCommand = tostring(source)
     local tab = shown("SendMailFrame") and "send" or "inbox"
-    if ns.BankAlt and ns.BankAlt.IsBankAlt() then
-        -- On the bank alt there's nothing to mail: the summary of what to do with it all.
+    if ns.BankAlt and ns.BankAlt.IsBankAlt() and not ns.Features.On("bankAltMail") then
+        -- Switched off: on the bank alt, the summary of what to do with it all (the window's own
+        -- Summary button opens it otherwise; operator, 2026-11-08: the bank alt mails too).
         local summary = ns.BankAlt.Frame()
         if summary and summary:IsShown() then summary:Hide() else ns.BankAlt.ShowWindow() end
         ns.Log.Add("mailbutton", "%s on the bank alt: summary", tostring(source))

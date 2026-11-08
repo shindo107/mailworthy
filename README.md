@@ -27,6 +27,12 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   per mail. Pressing an item locks it, so it stays. **Skip once** beside your bank alt keeps
   its share in the bags for this visit (bindings still go). Hovering an item says what the
   window does with it, or why it stays.
+- **Return to sender:** a toggle in the window, on every character (bank alt too). Pressed,
+  what other characters mailed you joins the Mailing list to go back to them (whole stacks, up
+  to what they sent and you haven't mailed back; never a locked or quest item); pressed again,
+  the list is back to normal. It is lit while on and turns itself off when the mailbox closes.
+  It reads the mail ledger, so it knows what you took from the mailbox since that came in.
+  `/mw feature returnToSender off` removes it.
 - **No bank alt needed:** without one, the window still opens and mails your bindings;
   what's worth selling stays in your bags (listed under Staying, e.g. "Auction +5s: no bank
   alt") and your bags carry the AH / B / DE / V tags. Pick one any time with **Choose...** in
@@ -42,8 +48,10 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - **On your bank alt:** bag slots carry **AH / B / DE / V** tags (list it, bank it for a
   later phase, disenchant it, vendor it now) recomputed with that character's own prices;
   tooltips show today's verdict and why the item was mailed, or why it stays (a profession
-  that still needs it, a quest, no price yet); the Mailworthy button (or `/mw summary`) sums
-  it up.
+  that still needs it, a quest, no price yet). The Mailworthy button opens the window there
+  too: what it sells stays, and bindings and Return to sender mail from it; its **Summary...**
+  button (or `/mw summary`) sums it up (`/mw feature bankAltMail off`: the button opens only
+  the summary, as before).
 - **Bank alt on a second WoW account** (played on another monitor): mail crosses accounts,
   saved settings don't. On your main, press **Change...** in `/mw` and type the alt's name under
   "Or type a name" (press **Use name** twice: Mailworthy hasn't seen that character). On the alt's account

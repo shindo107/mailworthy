@@ -29,7 +29,7 @@ ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
     tiers = true, tierCheck = true, guildTemplate = true, ledger = true, questNeeds = true, autoOpen = true,
-    peerMark = true,
+    returnToSender = true, bankAltMail = true, peerMark = true,
 } }
 
 function ns.Features.Describe()

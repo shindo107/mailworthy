@@ -347,6 +347,7 @@ end
 
 local function fillPicker(bankAlt, here, choices)
     hereButton:SetText(selected("This character is my bank alt", here))
+    W.SetToggled(hereButton, here)
     local shown, marked = 0, false
     for i, row in ipairs(choiceRows) do
         local c = choices[i]
@@ -357,6 +358,7 @@ local function fillPicker(bankAlt, here, choices)
             local nameText, m = ns.Comms.Mark(c.name)
             marked = marked or m
             row.button:SetText(selected(nameText .. "  " .. detail, bankAlt == c.name))
+            W.SetToggled(row.button, bankAlt == c.name)
             row.button:Show()
             if c.known then row.forget:Hide() else row.forget:Show() end
             shown = shown + 1
@@ -394,24 +396,31 @@ local function fillMain(bankAlt, here, choices)
         math.floor(v.minGainPct * 100 + 0.5)))
     for i, b in ipairs(durationButtons) do
         b:SetText(selected(ns.Valuation.DURATION_HOURS[i] .. "h", v.duration == i))
+        W.SetToggled(b, v.duration == i)
     end
     local deAddon = ns.Prices.DisenchantAddon()
     disenchantButton:SetText(string.format("Include disenchant value: %s (%s)", v.disenchant and "on" or "off",
         deAddon or "era tables"))
+    W.SetToggled(disenchantButton, v.disenchant == true)
     local crafting = ns.Bags.CraftingText(ns.Characters.Professions()) -- "First Aid 80, Tailoring 130"
     matsButton:SetText(string.format("Keep my professions' materials: %s (%s)", v.keepProfessionMats and "on" or "off",
         crafting ~= "" and crafting or "no crafting profession here"))
+    W.SetToggled(matsButton, v.keepProfessionMats == true)
     local gathering = {}
     for _, p in ipairs(ns.Valuation.GatheringProfessions(ns.Characters.Professions())) do gathering[#gathering + 1] = p.name end
     gatherButton:SetText(string.format("Sell what I gather: %s (%s)", v.sellGathered and "on" or "off",
         #gathering > 0 and table.concat(gathering, ", ") or "no gathering profession here"))
+    W.SetToggled(gatherButton, v.sellGathered == true)
     tagsButton:SetText("Bag tags: " .. (ns.Config.Flag("tagsEverywhere") and "every character" or "bank alt only"))
+    W.SetToggled(tagsButton, ns.Config.Flag("tagsEverywhere") == true)
     glowButton:SetText("Lock glow: " .. (ns.Config.Flag("glowEverywhere") and "always" or "in Mailworthy"))
+    W.SetToggled(glowButton, ns.Config.Flag("glowEverywhere") == true)
     local bindings = #ns.Routes.Personal()
     friendsButton:SetText(bindings == 0 and "Friends..."
         or string.format("Friends (%d binding%s)...", bindings, bindings == 1 and "" or "s"))
     guildButton:SetText(UI.GuildButtonText(ns.Guild.On() and ns.Guild.Mine() ~= nil, ns.Guild.On() and ns.Guild.Template()))
     minimapButton:SetText("Minimap button: " .. (ns.Config.MinimapShown() and "shown" or "hidden"))
+    W.SetToggled(minimapButton, ns.Config.MinimapShown() == true)
     pricesLine:SetText(UI.PricesText())
     return marked
 end

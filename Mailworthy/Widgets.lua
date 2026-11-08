@@ -122,6 +122,12 @@ function Widgets.Fit(b)
     if cut and type(fs.SetWidth) == "function" then pcall(fs.SetWidth, fs, width - Widgets.PAD) end
 end
 
+-- Toggled-on look (operator, 2026-11-08: "make sure this button has a highlight when toggled
+-- on. same with any other toggled button"): a green fill inside the button's border, under its
+-- text, kept in our own table. Made with the button (at login), so nothing is created later.
+Widgets.TOGGLED_COLOR = { 0.2, 0.8, 0.35, 0.45 }
+local toggles = setmetatable({}, { __mode = "k" }) -- button -> { glow = texture, on = bool }
+
 function Widgets.Button(parent, text, width, onClick, name)
     local b = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
     b:SetSize(width, 22)
@@ -131,7 +137,28 @@ function Widgets.Button(parent, text, width, onClick, name)
         pcall(hooksecurefunc, b, "SetText", function(self) Widgets.Fit(self) end)
     end
     Widgets.Fit(b)
+    local glow = b:CreateTexture(nil, "BORDER")
+    glow:SetPoint("TOPLEFT", b, "TOPLEFT", 3, -3)
+    glow:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -3, 3)
+    local c = Widgets.TOGGLED_COLOR
+    glow:SetColorTexture(c[1], c[2], c[3], c[4])
+    glow:Hide()
+    toggles[b] = { glow = glow, on = false }
     return b
+end
+
+--- Show a toggle button (one of ours, made by Widgets.Button) as on or off.
+function Widgets.SetToggled(b, on)
+    local t = toggles[b]
+    if not t then return end
+    t.on = on == true
+    if t.on then t.glow:Show() else t.glow:Hide() end
+end
+
+--- Is this button shown as toggled on? (specs, /mw report)
+function Widgets.IsToggled(b)
+    local t = toggles[b]
+    return t ~= nil and t.on and t.glow:IsShown() == true
 end
 
 function Widgets.Label(parent, font)

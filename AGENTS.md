@@ -12,12 +12,18 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   own Mailworthy reported it (never their bank alt for the AH). A guild template rule
   (`Guild.lua`) is a binding only once the player turned the guild rules on, only when its
   author is a guild master or officer in their own roster (any member may pass a copy on), and
-  only to a player in that roster (operator, 2026-11-07). Never attach money.
+  only to a player in that roster (operator, 2026-11-07). With **Return to sender**
+  (`Returns.lua`) on for the visit, also the player who mailed this character an item, for
+  what the mail ledger shows they mailed it and it hasn't mailed back (whole stacks; no
+  system, COD or returned mail), whatever its price, and only when that player is shown in
+  the preview like any recipient, a "To:" line and the "back to <name>" chip on each row
+  (operator, 2026-11-08: "any new recipient should be shown even if its a return to
+  sender"). Never attach money.
   Never mail a locked item.
 - Never mail an item an active quest's objective names, quest item or not (operator,
   2026-11-08). Without a bank alt (optional), or with it skipped for the visit, its share
   stays in the bags; only bindings mail.
-- A binding never overrides a hard keep (locked, soulbound, quest, in use, tool); at or
+- A binding or a return never overrides a hard keep (locked, soulbound, quest, in use, tool); at or
   above its price cap the normal rule applies and the item goes to the bank alt.
 - Re-check each slot right before attaching it; skip anything that changed.
 - Without Auctionator, the only items mailed are unlocked, tradeable white
@@ -65,7 +71,7 @@ textures / font strings on Blizzard frames kept in our own tables, read-only
 
 `spec/critical_path_spec.lua` is the shipping gate: a mailbox visit with a realistic
 bag, by mouse and by controller, with and without Auctionator, with a binding, with a guild
-template (on and off), and on
+template (on and off), with Return to sender (on a main and on the bank alt), and on
 an older build's SavedVariables; every mail checked against the Safety rules above, and
 what was previewed must be exactly what was sent. CI runs it as its own job,
 `critical-path`, which main's branch protection requires (operator, 2026-11-07); `release.yml`

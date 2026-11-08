@@ -1,9 +1,10 @@
 -- CRITICAL PATH: the shipping gate. Every build must still mail, safely, the way a
 -- player does it: a mailbox visit with a realistic bag, the mouse (the Mailworthy button or
 -- the Send Mail tab alone) and the controller,
--- with and without Auctionator, with TradeSkillMaster alone and with both, with a binding (a profession's or a class's), with a guild
--- template, without a bank alt or with it skipped for the visit, and on SavedVariables an older
--- build left behind. CI runs this file on its own before the rest, and a tag can't publish
+-- with and without Auctionator, with TradeSkillMaster alone and with both, with a binding (a
+-- profession's or a class's), with a guild template, without a bank alt or with it skipped for the
+-- visit, with Return to sender (on a main and on the bank alt itself), and on SavedVariables an
+-- older build left behind. CI runs this file on its own before the rest, and a tag can't publish
 -- unless it passes.
 --
 -- These tests check outcomes, not tuning: what was previewed is exactly what was sent,
@@ -500,6 +501,119 @@ describe("critical path: mailing", function()
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    --- What this character took out of the mailbox (the mail ledger records each take): MAIN mailed
+    --- it the Ore 1 stack; BOB the Wool Cloth, and the locked Silver Ore and the quest's Crisp Spider
+    --- Meat, which must stay whatever Return to sender says.
+    local MAIN = "Mainly Mains"
+    local function taken()
+        local function mail(from, items)
+            local list = {}
+            for _, it in ipairs(items) do list[#list + 1] = { itemID = it[1], name = it[2], count = it[3] } end
+            WowStub.state.inbox = { { sender = from, subject = "for you", daysLeft = 29.9, items = list } }
+            for a, it in ipairs(items) do
+                TakeInboxItem(1, a)
+                ns.Fire("MAIL_SUCCESS", it[1])
+            end
+        end
+        ns.Fire("MAIL_SHOW")
+        mail(MAIN, { { 3001, "Ore 1", 5 } })
+        mail(BOB, { { 2592, "Wool Cloth", 20 }, { 2775, "Silver Ore", 5 }, { 1081, "Crisp Spider Meat", 5 } })
+        WowStub.state.inbox = {}
+        WowStub.runTimers(2)
+    end
+
+    --- Every return recipient is shown before Send (operator, 2026-11-08: "any new recipient should be
+    --- shown even if its a return to sender"): a "To:" line each.
+    local function assertReturnsShown()
+        local lines = table.concat(ns.MailWindow.Texts().to, "\n")
+        for _, item in ipairs(ns.MailWindow.Result().mail) do
+            if item.result.route == "return" then
+                assert.truthy(lines:find(item.result.to, 1, true), item.result.to .. " has no To: line")
+            end
+        end
+    end
+
+    --- Every mail that went back carries the return subject (Mailer.RETURN_SUBJECT).
+    local function assertReturnSubjects(to)
+        for _, mail in ipairs(WowStub.state.sent) do
+            if to[mail.name] then
+                assert.truthy(mail.subject:find("returned to you", 1, true), mail.subject)
+            end
+        end
+    end
+
+    it("Return to sender (mouse): what others mailed goes back to them, hard keeps stay, the bank alt gets the rest", function()
+        -- operator, 2026-11-08: "a button that just allows me to 'queue up' a return to sender list ...
+        -- available to everyone, not just bank alts. clicking it again returns it to normal mode"
+        taken()
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(BANK_ALT, previewed(ns)[2592], "off: the Wool Cloth goes the usual way")
+        _G.MailworthyMailReturn:Click()
+        assert.is_true(ns.Widgets.IsToggled(_G.MailworthyMailReturn), "the toggle is lit while on")
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[2592])
+        assert.equal(MAIN, preview[3001])
+        assert.equal(BANK_ALT, preview[6515], "what nobody mailed still goes to the bank alt")
+        assert.is_nil(preview[2775], "a locked item stays, Return to sender or not")
+        assert.is_nil(preview[1081], "what a quest needs stays")
+        assertReturnsShown()
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true, [MAIN] = true })
+        assertReturnSubjects({ [BOB] = true, [MAIN] = true })
+        ns.Fire("MAIL_CLOSED")
+        assert.is_false(ns.Returns.On(), "off again at the next visit")
+    end)
+
+    it("Return to sender pressed twice: back to normal, nothing goes back", function()
+        taken()
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        _G.MailworthyMailReturn:Click()
+        _G.MailworthyMailReturn:Click()
+        assert.is_false(ns.Widgets.IsToggled(_G.MailworthyMailReturn))
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[2592])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("Return to sender on the bank alt (controller): only the senders get mail, its own share stays", function()
+        -- operator, 2026-11-08: "mailworthy bank alt view should still allow mail automation, it should
+        -- default to returning to sender"
+        taken()
+        ns.Config.SetBankAltHere()
+        WowStub.state.gamepadUI = true
+        mailbox()
+        WowStub.state.activeFrame = MailFrame
+        local watcher = _G.MailworthyPadWatcher
+        local function tick() watcher.scripts.OnUpdate(watcher, 0.2) end
+        local function press(name)
+            WowStub.state.now = WowStub.state.now + 1
+            _G[name]:Click()
+            tick()
+        end
+        tick()
+        press("MailworthyPadTriangle")
+        assert.is_true(ns.MailWindow.Frame():IsShown(), "the bank alt's Triangle opens the window")
+        assert.is_nil(next(previewed(ns)), "nothing to mail from the bank alt until Return to sender")
+        local reachable = false
+        for _, c in ipairs(ns.Nav.Candidates()) do reachable = reachable or c.button == _G.MailworthyMailReturn end
+        assert.is_true(reachable, "Return to sender isn't a controller target")
+        ns.Nav.Select(_G.MailworthyMailReturn)
+        press("MailworthyPadCross")
+        local preview = previewed(ns)
+        assert.same({ [2592] = BOB, [3001] = MAIN }, preview)
+        assertReturnsShown()
+        ns.Nav.Select(_G.MailworthyMailSend)
+        press("MailworthyPadCross")
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BOB] = true, [MAIN] = true })
+        assertReturnSubjects({ [BOB] = true, [MAIN] = true })
     end)
 
     it("bags that change after the preview: Send re-reads them, and a slot that changes mid-run is skipped", function()

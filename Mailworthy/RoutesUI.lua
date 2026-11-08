@@ -380,6 +380,7 @@ local function fillGuildHead(canPublish)
     guildLabel:Show()
     if toggle then
         guildToggle:SetText(toggle)
+        W.SetToggled(guildToggle, ns.Guild.InUse())
         at(guildToggle, -24, GUILD_LINE, "TOPRIGHT")
         guildToggle:Show()
     else
