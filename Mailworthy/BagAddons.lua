@@ -31,8 +31,8 @@
 --     `currentData` (bagid, slotid, itemInfo.itemID, isItemEmpty), `isFreeSlot` and `kind` are read
 --     only. A button drawn empty gets no item/Updated (SetItemFromData returns first), so every
 --     drawn button is redrawn from its item's data at `bags/Draw/Backpack/Done` and
---     `bags/Draw/Bank/Done` (sent after each bag draw). The legend goes under
---     `addon.Bags.Backpack.frame`. BetterBags initialises its events
+--     `bags/Draw/Bank/Done` (sent after each bag draw) and `bags/DesignChanged`. The legend goes
+--     under `addon.Bags.Backpack.frame`. BetterBags initialises its events
 --     at its own ADDON_LOADED, before ours (an OptionalDep).
 --
 -- Every button is drawn by Border.DrawBagSlot / Border.RefreshButton, the one helper the game's
@@ -479,7 +479,9 @@ function BagAddons.InstallBetterBags()
     if ok then ok, err = pcall(events.RegisterMessage, events, "item/Clearing", BagAddons.BetterBagsClearing) end
     -- After each bag draw: a button BetterBags drew empty (or reused for an empty slot) sends no
     -- item/Updated, so its tag and glow are cleared here from its item's current data.
-    for _, done in ipairs({ "bags/Draw/Backpack/Done", "bags/Draw/Bank/Done" }) do
+    -- bags/DesignChanged: the classic / Next switch replaces the backpack and draws it without a
+    -- draw-done message; the legend moves to the new frame at once (Codex review).
+    for _, done in ipairs({ "bags/Draw/Backpack/Done", "bags/Draw/Bank/Done", "bags/DesignChanged" }) do
         if ok then
             ok, err = pcall(events.RegisterMessage, events, done, function()
                 local okRedraw, errRedraw = pcall(redrawBetterBags)

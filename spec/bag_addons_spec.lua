@@ -576,8 +576,10 @@ describe("bag addons: BetterBags", function()
             return WowStub.newWidget("FontString")
         end)
         _G.LibStub("AceAddon-3.0"):GetAddon("BetterBags").Bags.Backpack = { frame = newFrame }
+        bb.send("bags/DesignChanged", "next") -- the switch draws without a draw-done message
+        assert.equal(1, created, "a legend under the new frame at once")
         ns.BankAlt.Redraw()
-        assert.equal(1, created, "a legend under the new frame")
+        assert.equal(1, created, "and only one")
     end)
 
     it("draws nothing on a guild bank tab (its bagid is a tab, not a container)", function()
