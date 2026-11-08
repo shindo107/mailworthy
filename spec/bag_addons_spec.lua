@@ -1,9 +1,10 @@
--- Mailworthy's tags (AH / B / DE / V) and lock glow in the three most-downloaded bag addons with a
--- Forever build (operator, 2026-11-08: "id like to support the top 3 bag addons"): Baganator,
--- Bagnon, ArkInventory. Each addon is stubbed the way its source calls us (BagAddons.lua's header):
--- Baganator's corner widget + "ViewComplete" + region, Bagnon's ContainerItem.Update (its methods
--- copied into each button when it is built), ArkInventory's API.ItemFrameUpdated. Every stub
--- button errors on a Lua field written by Mailworthy, and no frame may be created while drawing.
+-- Mailworthy's tags (AH / B / DE / V) and lock glow in the most-downloaded bag addons with a Forever
+-- build (operator, 2026-11-08: "id like to support the top 3 bag addons", then "those 3 and add
+-- betterbags too"): Baganator, Bagnon, ArkInventory, BetterBags. Each addon is stubbed the way its
+-- source calls us (BagAddons.lua's header): Baganator's corner widget + "ViewComplete", Bagnon's
+-- ContainerItem.Update (its methods copied into each button when it is built), ArkInventory's
+-- API.ItemFrameUpdated, BetterBags' item/Updated and item/Clearing messages. Every stub button
+-- errors on a Lua field written by Mailworthy, and no frame may be created while drawing.
 local loadAddon = require("spec.support.load_addon")
 
 local COPPER, LINEN, RING = 2770, 2589, 6360
@@ -87,7 +88,7 @@ local function noErrors(ns)
 end
 
 local function cleanup()
-    _G.Baganator, _G.Bagnon, _G.ArkInventory, _G.ARKINV_Frame1 = nil, nil, nil, nil
+    _G.Baganator, _G.Bagnon, _G.ArkInventory, _G.ARKINV_Frame1, _G.LibStub = nil, nil, nil, nil, nil
     _G.Auctionator, _G.DisenchantryDB = nil, nil
 end
 
@@ -467,14 +468,116 @@ describe("bag addons: ArkInventory", function()
     end)
 end)
 
--- All three at once, and the report --------------------------------------------------------------------
+-- BetterBags -----------------------------------------------------------------------------------------
 
-describe("bag addons: all three installed", function()
+--- BetterBags as its source has it: LibStub('AceAddon-3.0'):GetAddon('BetterBags'), its Events module's
+--- RegisterMessage(name, fn(ctx, ...)), item/Updated (item, decoration) after a draw, item/Clearing
+--- (item, decoration) on release. The item is a Lua table (currentData, isFreeSlot, kind); the
+--- decoration is the ContainerFrameItemButtonTemplate button that shows it.
+local function stubBetterBags()
+    local stub = { messages = {} }
+    local events = {}
+    function events.RegisterMessage(_, name, fn)
+        stub.messages[name] = stub.messages[name] or {}
+        table.insert(stub.messages[name], fn)
+    end
+    stub.backpack = WowStub.newWidget("Frame", "BetterBagsBagBackpack")
+    local addon = { Bags = { Backpack = { frame = stub.backpack } } }
+    function addon.GetModule(_, name) return name == "Events" and events or nil end
+    local ace = {}
+    function ace.GetAddon(_, name) return name == "BetterBags" and addon or nil end
+    _G.LibStub = function(name) return name == "AceAddon-3.0" and ace or nil end
+    function stub.send(name, ...)
+        for _, fn in ipairs(stub.messages[name] or {}) do fn({ ctx = true }, ...) end
+    end
+    --- BetterBags draws an item (bag, slot, item ID) on a decoration: `opts.free` for a free-slot
+    --- button, `opts.kind` 2 for a guild bank tab.
+    function stub.draw(item, decoration, bag, slot, itemID, opts)
+        opts = opts or {}
+        item.currentData = { bagid = bag, slotid = slot, isItemEmpty = itemID == nil, itemInfo = { itemID = itemID } }
+        item.isFreeSlot = opts.free
+        item.kind = opts.kind or (bag == -1 and 1 or 0)
+        stub.send("item/Updated", item, decoration)
+    end
+    return stub
+end
+
+describe("bag addons: BetterBags", function()
+    local ns, bb
+    before_each(function()
+        ns = setup()
+        bb = stubBetterBags()
+        login(ns)
+    end)
+    after_each(function() noErrors(ns) cleanup() end)
+
+    it("listens to item/Updated and item/Clearing, as its Masque integration does", function()
+        assert.equal(1, #bb.messages["item/Updated"])
+        assert.equal(1, #bb.messages["item/Clearing"])
+        assert.is_true(ns.BagAddons.Installed("betterBags"))
+    end)
+
+    it("tags each decoration by its item's bag slot; free slots, empty and stale items cleared", function()
+        local frames, restore = countFrames()
+        local item, decoration = {}, addonButton()
+        bb.draw(item, decoration, 0, 1, COPPER)
+        assert.equal("AH", tagOf(decoration))
+        bb.draw(item, decoration, 0, 2, LINEN)
+        assert.equal("V", tagOf(decoration), "the same button redrawn for another slot")
+        bb.draw(item, decoration, 0, 2, COPPER)
+        assert.is_nil(tagOf(decoration), "BetterBags shows Copper Ore where Linen Cloth is: drawn on its next update")
+        bb.draw(item, decoration, 0, 3, RING)
+        assert.equal("DE", tagOf(decoration))
+        bb.draw(item, decoration, 0, 3, nil, { free = true })
+        assert.is_nil(tagOf(decoration), "a free-slot button")
+        bb.draw(item, decoration, 0, 1, COPPER)
+        bb.send("item/Clearing", item, decoration)
+        assert.is_nil(tagOf(decoration), "released to the pool")
+        restore()
+        assert.equal(0, frames[1], "no frame created while drawing")
+    end)
+
+    it("draws nothing on a guild bank tab (its bagid is a tab, not a container)", function()
+        local decoration = addonButton()
+        bb.draw({}, decoration, 0, 1, COPPER, { kind = 2 })
+        assert.is_nil(tagOf(decoration))
+    end)
+
+    it("redraws on a lock change and the window, puts the legend under its backpack, and is off cleanly", function()
+        local item, decoration = {}, addonButton()
+        bb.draw(item, decoration, 0, 1, COPPER)
+        assert.truthy(ns.Report.Build():find("bag addon: BetterBags loaded, switch betterBagsTags=on, hooked", 1, true))
+        assert.truthy(ns.Report.Build():find("legend shown under its bags", 1, true))
+        openWindow(ns)
+        ns.Locks.ToggleItem(COPPER, "[Copper Ore]", "spec")
+        assert.is_true(glowing(ns, decoration))
+        assert.is_nil(tagOf(decoration))
+        ns.HandleSlash("feature betterBagsTags off")
+        ns.BankAlt.Redraw()
+        assert.is_false(glowing(ns, decoration), "cleared")
+        local ns2 = loadAddon({ db = MailworthyDB, charDB = MailworthyCharDB })
+        local bb2 = stubBetterBags()
+        login(ns2)
+        assert.is_nil(bb2.messages["item/Updated"], "not registered")
+        assert.is_false(ns2.BagAddons.Installed("betterBags"))
+    end)
+
+    it("without BetterBags nothing is registered and nothing breaks", function()
+        _G.LibStub = nil
+        local ns2 = setup()
+        login(ns2)
+        assert.is_false(ns2.BagAddons.InstallBetterBags())
+    end)
+end)
+
+-- All four at once, and the report --------------------------------------------------------------------
+
+describe("bag addons: all four installed", function()
     after_each(cleanup)
 
     it("each draws its own buttons through the one helper; /mw report has a line for each", function()
         local ns = setup()
-        local reg, bagnon, ark = stubBaganator(), stubBagnon(), stubArk()
+        local reg, bagnon, ark, bb = stubBaganator(), stubBagnon(), stubArk(), stubBetterBags()
         login(ns)
         local widgets = {}
         local b1 = baganatorLive(0, 1)
@@ -486,11 +589,15 @@ describe("bag addons: all three installed", function()
         assert.equal("AH", tagOf(b1))
         assert.equal("V", tagOf(b2))
         assert.equal("DE", tagOf(b3))
+        local b4 = addonButton()
+        bb.draw({}, b4, 0, 1, COPPER)
+        assert.equal("AH", tagOf(b4))
         local report = ns.Report.Build()
         assert.truthy(report:find("bag addon: Baganator loaded, switch baganatorTags=on, hooked, 1 button(s) seen, 0 error(s)",
             1, true), report)
         assert.truthy(report:find("bag addon: Bagnon loaded, switch bagnonTags=on, hooked", 1, true))
         assert.truthy(report:find("bag addon: ArkInventory loaded, switch arkInventoryTags=on, hooked", 1, true))
+        assert.truthy(report:find("bag addon: BetterBags loaded, switch betterBagsTags=on, hooked", 1, true))
         noErrors(ns)
     end)
 end)

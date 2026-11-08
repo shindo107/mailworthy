@@ -60,7 +60,7 @@ must never break the game.
 | `Gamepad.lua` | read-only helpers: button symbols (`labelStyle`, `CreateAtlasMarkup`), API presence |
 | `Locks.lua` | **item locks** (by item ID, per character; follow the item; slot locks migrate); Alt+click via `hooksecurefunc("HandleModifiedItemClick")`; L3 via read-only `SmartNavigation:GetCurrentButton()` |
 | `Border.lua` | blue glow on locked items: Blizzard's quest border texture tinted blue, on bag buttons via `hooksecurefunc(frame, "UpdateItems")` on combined + individual bag frames (`RefreshAll` skips closed frames: opening one runs `UpdateItems`); shown only while the Mailworthy window is open (`Border.WindowOpen`: the window's `IsVisible`; `MailWindow` refreshes it from the window's `OnShow` / `OnHide`; operator, 2026-11-07) unless the `glowEverywhere` flag is set; a glowing item's tooltip says why (`Border.TooltipLine`, `TooltipDataProcessor`, switch `slotBorder`); a fresh lock flashes `Border.FLASH` (3 s) anywhere, via `Locks.OnChanged(itemID, locked)`; Forever's `EnumerateValidItems` yields nil buttons up to `GetBagSize()` (v0.22.0 errored on them), so `RefreshFrame` skips them. **The one drawing helper** for any item button: `RefreshButton(button, bag, slot, itemID, wanted, link)` (glow + decorators; decorators get `(button, bag, slot, itemID, link)`), `Clear(button)`, `DrawBagSlot(button, bag, slot, shownID)` (a bag addon's live slot: draws what is in it now, clears it when empty or showing another item), `AddRefresher(fn)` (run by `RefreshAll`) |
-| `BagAddons.lua` | tags + lock glow in **Baganator** (corner widget `mailworthy_lock`: the tag sits on it, so it follows the player's corner; out of every corner = off; "ViewComplete"; legend under its backpack frame, never in its button row, where Baganator calls SetFrameLevel), **Bagnon** (`Bagnon.ContainerItem.Update` post-hook, installed at our ADDON_LOADED: BagBrother copies class methods into buttons when it builds them) and **ArkInventory** (`ArkInventory.API.ItemFrameUpdated`); live slots only (another character's bags cleared), legend under each bag window; switches `baganatorTags`, `bagnonTags`, `arkInventoryTags`; `/mw report` "bag addon: ..." lines. Picked by CurseForge downloads with a Forever build (2026-11-08) |
+| `BagAddons.lua` | tags + lock glow in **Baganator** (corner widget `mailworthy_lock`: the tag sits on it, so it follows the player's corner; out of every corner = off; "ViewComplete"; legend under its backpack frame, never in its button row, where Baganator calls SetFrameLevel), **Bagnon** (`Bagnon.ContainerItem.Update` post-hook, installed at our ADDON_LOADED: BagBrother copies class methods into buttons when it builds them) **ArkInventory** (`ArkInventory.API.ItemFrameUpdated`) and **BetterBags** (its Events module's `item/Updated` / `item/Clearing` messages, drawn on the decoration button); live slots only (another character's bags cleared), legend under each bag window; switches `baganatorTags`, `bagnonTags`, `arkInventoryTags`, `betterBagsTags`; `/mw report` "bag addon: ..." lines. Picked by CurseForge downloads with a Forever build (2026-11-08) |
 | `MailButton.lua` | "Mailworthy" button under the mail window on both tabs (children of InboxFrame / SendMailFrame, created at login); `Activate` toggles the window; controller on the Inbox gets an "R1 first" hint (we never switch tabs) |
 | `Nav.lua` | Mailworthy's **own** controller navigation for its window: nearest button within 45 degrees, top-left start, gold highlight; `Nav.Follow` (PadKey's watcher, every tick) keeps the highlight on the window on top and returns to the opener's button when that window closes (`Resume`) |
 | `PadKey.lua` | Mailworthy's **own override bindings** (watcher every 0.1 s, re-apply when replaced, clear on focus loss, at `PLAYER_REGEN_DISABLED` and when the interface hides, Alt+Z): set `mail` (Triangle), `window` (Triangle, D-pad, Cross, Circle), `bags` (L3 lock) |
@@ -90,7 +90,7 @@ must never break the game.
 | `LedgerUI.lua` | the ledger window (`/mw ledger`, Settings > Mail ledger..., Friends > Mail ledger..., the Mailworthy window's pay-back line): rows "Bob: 10s more than you've sent back" + what they sent + Mark paid (two presses), Export log... (the copy box) |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), three views (`UI.View`): list (the guild template line first, when there is one or this character can publish: "Guild rules: on / off / Use guild rules" one press, Edit... / Create...; guild rules as rows without buttons) (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step; `UI.Target()` "guild": guild members only, the rule goes to the draft) and guild (guild master / officers: the draft's rules with cap and Remove, Add a rule..., Publish to guild); opens on add while there are no bindings and no guild line; a binding returns to the list |
 
-Tests: `spec/` (busted on LuaJIT, 490 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
+Tests: `spec/` (busted on LuaJIT, 497 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
 `spec/support/wow_stub.lua` (bags, mail send tab, postage, timers with delays,
 override bindings, focused frame, item buttons that **error on any field write**; with
 `WowStub.state.layout` it solves SetPoint / SetSize anchors so `spec/dpad_reach_spec.lua` walks
@@ -318,10 +318,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   settings on/off buttons, the listing hours, the bank alt choice, Skip once / Undo skip, "Guild rules:
   on" (mail window and Guild view), Return to sender. AGENTS.md Safety names the new recipient; the
   critical path has three cases (mouse on a main, pressed twice, controller on the bank alt).
-- Bag addons (operator, 2026-11-08: "id like to support the top 3 bag addons"): picked by CurseForge
-  downloads among bag addons with a Forever 1.60.1 build, read that day with CurseForge's Forever
-  filter: **Bagnon 170.3M, Baganator 41.6M, ArkInventory 14.0M** (BetterBags 4.9M next; AdiBags has
-  no Forever build, only a 1.1K-download fork). Each through its own public interface read in its
+- Bag addons (operator, 2026-11-08: "id like to support the top 3 bag addons", then on the picks
+  "those 3 and add betterbags too"): picked by CurseForge downloads among bag addons with a Forever
+  1.60.1 build, read that day with CurseForge's Forever filter: **Bagnon 170.3M, Baganator 41.6M,
+  ArkInventory 14.0M, BetterBags 4.9M** (AdiBags has no Forever build, only a 1.1K-download fork). Each through its own public interface read in its
   source (BagAddons.lua's header), drawn by the same `Border.RefreshButton` as Blizzard's bags and
   Auctionator's views. Chosen: tags only on live bag slots (another character's bags would show this
   character's verdicts and locks); the bank's locked items glow, bank items get no tag (they aren't
@@ -598,7 +598,8 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    "comms this session: N heard, M copies dropped" with M > 0, and the log has one "hello (...)" line
    per hello and dated lines ("11-08 15:31:21 ...").
 16. In-game check of the bag addons (2026-11-08), one at a time, with the Mailworthy window open at a
-   mailbox and away from it: **Baganator** (single and category view), **Bagnon**, **ArkInventory**.
+   mailbox and away from it: **Baganator** (single and category view), **Bagnon**, **ArkInventory**,
+   **BetterBags**.
    On a character with tags (bank alt, or no bank alt set): AH / B / DE / V on the bag icons, the
    legend under the bag window; lock an item (Alt+click): its tag goes and it glows blue while the
    Mailworthy window is open; move, sort and sell items: no tag left on an empty slot; view another

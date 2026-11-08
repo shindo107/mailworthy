@@ -1,8 +1,9 @@
 -- Mailworthy's bag tags (AH / B / DE / V, BankAlt.lua) and the lock glow (Border.lua) in the bag
 -- addons that replace the game's bags (operator, 2026-11-08: "id like to support the top 3 bag
--- addons"). Picked by CurseForge downloads among bag addons with a Forever 1.60.1 build, read the
--- same day: Bagnon 170.3M, Baganator 41.6M, ArkInventory 14.0M (BetterBags 4.9M; AdiBags has no
--- Forever build of its own). Each through its own public interface, read in its source:
+-- addons"; then "those 3 and add betterbags too"). Picked by CurseForge downloads among bag addons
+-- with a Forever 1.60.1 build, read the same day: Bagnon 170.3M, Baganator 41.6M, ArkInventory
+-- 14.0M, BetterBags 4.9M (AdiBags has no Forever build of its own). Each through its own public
+-- interface, read in its source:
 --
 --   * Baganator (846): a corner widget (`Baganator.API.RegisterCornerWidget`: onInit(itemButton)
 --     once per button, onUpdate(widget, details) whenever the button shows an item), the public
@@ -23,6 +24,13 @@
 --   * ArkInventory: its documented API, `hooksecurefunc(ArkInventory.API, "ItemFrameUpdated")`
 --     (frame, location, window bag, slot), `LocationIsOffline`, `getBlizzardBagIdFromWindowId`,
 --     `ItemFrameItemTableGet` (the item's link as `.h`); bag and bank locations only.
+--   * BetterBags (its Forever build is BetterBags_Camelot.toc, Interface 16001): its Events module's
+--     messages, as its own Masque integration uses them: `item/Updated` (item, decoration) after
+--     each item or free-slot draw, `item/Clearing` (item, decoration) when a button is released.
+--     The decoration is the ContainerFrameItemButtonTemplate button that shows the item; the item's
+--     `currentData` (bagid, slotid, itemInfo.itemID, isItemEmpty), `isFreeSlot` and `kind` are read
+--     only. The legend goes under `addon.Bags.Backpack.frame`. BetterBags initialises its events
+--     at its own ADDON_LOADED, before ours (an OptionalDep).
 --
 -- Every button is drawn by Border.DrawBagSlot / Border.RefreshButton, the one helper the game's
 -- bags and Auctionator's views use too: what is in the bag slot right now, cleared when the slot is
@@ -36,17 +44,19 @@ local _, ns = ...
 local BagAddons = {}
 ns.BagAddons = BagAddons
 
-BagAddons.LIST = { "baganator", "bagnon", "arkInventory" }
-BagAddons.FEATURE = { baganator = "baganatorTags", bagnon = "bagnonTags", arkInventory = "arkInventoryTags" }
-BagAddons.NAME = { baganator = "Baganator", bagnon = "Bagnon", arkInventory = "ArkInventory" }
+BagAddons.LIST = { "baganator", "bagnon", "arkInventory", "betterBags" }
+BagAddons.FEATURE = { baganator = "baganatorTags", bagnon = "bagnonTags", arkInventory = "arkInventoryTags",
+    betterBags = "betterBagsTags" }
+BagAddons.NAME = { baganator = "Baganator", bagnon = "Bagnon", arkInventory = "ArkInventory", betterBags = "BetterBags" }
 -- Kept from v0.2x's lock-glow-only widget: Baganator remembers the corner it auto-added under this ID.
 BagAddons.BAGANATOR_ID = "mailworthy_lock"
 BagAddons.BAGANATOR_LABEL = "Mailworthy tags and lock glow"
 
 local weak = { __mode = "k" }
 local seen = { baganator = setmetatable({}, weak), bagnon = setmetatable({}, weak),
-    arkInventory = setmetatable({}, weak) } -- button -> true (ArkInventory: { loc, bag, slot })
-local installed, errors, legends = {}, { baganator = 0, bagnon = 0, arkInventory = 0 }, {}
+    arkInventory = setmetatable({}, weak), betterBags = setmetatable({}, weak) }
+    -- button -> true (ArkInventory: { loc, bag, slot }; BetterBags: decoration -> its item)
+local installed, errors, legends = {}, { baganator = 0, bagnon = 0, arkInventory = 0, betterBags = 0 }, {}
 local baganatorOwners = setmetatable({}, weak) -- widget -> its item button
 local baganatorWidgets = setmetatable({}, weak) -- item button -> our widget
 local baganatorLegends = setmetatable({}, weak) -- Baganator's backpack frame -> our legend
@@ -379,10 +389,97 @@ function BagAddons.InstallArkInventory()
     return true
 end
 
--- All three ------------------------------------------------------------------------------------------
+-- BetterBags ----------------------------------------------------------------------------------------
+
+local function betterBagsAddon()
+    local libStub = rawget(_G, "LibStub")
+    if type(libStub) ~= "table" and type(libStub) ~= "function" then return nil end
+    local okLib, ace = pcall(libStub, "AceAddon-3.0", true)
+    if not okLib or type(ace) ~= "table" or type(ace.GetAddon) ~= "function" then return nil end
+    local ok, addon = pcall(ace.GetAddon, ace, "BetterBags", true)
+    return ok and type(addon) == "table" and addon or nil
+end
+
+local function betterBagsEvents()
+    local addon = betterBagsAddon()
+    if not addon or type(addon.GetModule) ~= "function" then return nil end
+    local ok, events = pcall(addon.GetModule, addon, "Events", true)
+    if ok and type(events) == "table" and type(events.RegisterMessage) == "function" then return events end
+    return nil
+end
+
+local function betterBagsLegend()
+    if legends.betterBags then return legends.betterBags end
+    local addon = betterBagsAddon()
+    local ok, frame = pcall(function() return addon.Bags.Backpack.frame end)
+    if not ok then return nil end
+    return legendUnder("betterBags", frame)
+end
+
+--- Draw one BetterBags decoration from its item (read only).
+local function drawBetterBags(item, decoration, wanted)
+    if not BagAddons.On("betterBags") or type(item) ~= "table" then
+        ns.Border.Clear(decoration)
+        return
+    end
+    local data = item.currentData
+    local info = type(data) == "table" and data.itemInfo or nil
+    -- Kind 2 is the guild bank (BetterBags Next): its "bagid" is a tab, not a container.
+    if item.isFreeSlot or item.kind == 2 or type(data) ~= "table" or data.isItemEmpty
+        or type(data.bagid) ~= "number" or type(data.slotid) ~= "number" then
+        ns.Border.Clear(decoration)
+        return
+    end
+    ns.Border.DrawBagSlot(decoration, data.bagid, data.slotid, type(info) == "table" and tonumber(info.itemID) or nil,
+        wanted)
+end
+
+--- BetterBags' item/Updated (ctx, item, decoration).
+function BagAddons.BetterBagsUpdated(_, item, decoration)
+    if type(decoration) ~= "table" then return end
+    seen.betterBags[decoration] = item
+    local ok, err = pcall(drawBetterBags, item, decoration)
+    if not ok then logError("betterBags", err) end
+    if not legends.betterBags then setLegend("betterBags", betterBagsLegend()) end
+end
+
+--- BetterBags' item/Clearing (ctx, item, decoration): the button goes back to its pool.
+function BagAddons.BetterBagsClearing(_, _, decoration)
+    if type(decoration) ~= "table" then return end
+    seen.betterBags[decoration] = nil
+    local ok, err = pcall(ns.Border.Clear, decoration)
+    if not ok then logError("betterBags", err) end
+end
+
+local function redrawBetterBags(wanted)
+    for decoration, item in pairs(seen.betterBags) do
+        if visible(decoration) then
+            local ok, err = pcall(drawBetterBags, item, decoration, wanted)
+            if not ok then logError("betterBags", err) end
+        end
+    end
+    setLegend("betterBags", betterBagsLegend())
+end
+
+function BagAddons.InstallBetterBags()
+    if installed.betterBags then return true end
+    local events = betterBagsEvents()
+    if not events then return false end
+    local ok, err = pcall(events.RegisterMessage, events, "item/Updated", BagAddons.BetterBagsUpdated)
+    if ok then ok, err = pcall(events.RegisterMessage, events, "item/Clearing", BagAddons.BetterBagsClearing) end
+    if not ok then
+        ns.Log.Add("bagaddons", "BetterBags messages failed: %s", tostring(err))
+        return false
+    end
+    installed.betterBags = true
+    ns.Log.Add("bagaddons", "BetterBags: tags and lock glow on its item/Updated messages")
+    return true
+end
+
+-- All four -------------------------------------------------------------------------------------------
 
 local INSTALL = { baganator = BagAddons.InstallBaganator, bagnon = BagAddons.InstallBagnon,
-    arkInventory = BagAddons.InstallArkInventory }
+    arkInventory = BagAddons.InstallArkInventory, betterBags = BagAddons.InstallBetterBags }
 
 function BagAddons.Install()
     for _, key in ipairs(BagAddons.LIST) do
@@ -402,6 +499,7 @@ function BagAddons.RefreshAll(wanted)
     end
     if installed.bagnon then redrawBagnon(wanted) end
     if installed.arkInventory then redrawArk(wanted) end
+    if installed.betterBags then redrawBetterBags(wanted) end
 end
 
 local function loaded(name)
@@ -420,7 +518,7 @@ local function version(name)
     return ok and v or nil
 end
 
-local PRESENT = { baganator = baganatorAPI, bagnon = bagnonClass, arkInventory = arkAPI }
+local PRESENT = { baganator = baganatorAPI, bagnon = bagnonClass, arkInventory = arkAPI, betterBags = betterBagsEvents }
 
 --- /mw report: one line per bag addon.
 function BagAddons.ReportLines()

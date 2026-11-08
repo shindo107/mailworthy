@@ -30,7 +30,7 @@ ns.Features = { DEFAULTS = {
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
     tiers = true, tierCheck = true, guildTemplate = true, ledger = true, questNeeds = true, autoOpen = true,
     returnToSender = true, bankAltMail = true, peerMark = true,
-    baganatorTags = true, bagnonTags = true, arkInventoryTags = true,
+    baganatorTags = true, bagnonTags = true, arkInventoryTags = true, betterBagsTags = true,
 } }
 
 function ns.Features.Describe()
@@ -110,7 +110,7 @@ local HELP = {
     "/mw summary - on your bank alt (or without one): what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
         .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|peerMark"
-        .. "|baganatorTags|bagnonTags|arkInventoryTags> on|off"
+        .. "|baganatorTags|bagnonTags|arkInventoryTags|betterBagsTags> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",
     "/mw help - this list",
