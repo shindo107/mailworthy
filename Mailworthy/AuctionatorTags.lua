@@ -54,23 +54,33 @@ function AuctionatorTags.Where(info)
     return where
 end
 
-local function idOf(link)
-    return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
+--- Pure: "itemID:suffixID" for an item link (field 7 of "item:...": the random suffix, "of the
+--- Bear"), nil for a link with no item ID (a battle pet, a keystone). Auctionator replaces the bag's
+--- hyperlink with GetItemInfo's, which may differ in other fields, so the whole link can't be compared.
+function AuctionatorTags.Variant(link)
+    local body = type(link) == "string" and link:match("item:([%-%d:]+)") or nil
+    if not body then return nil end
+    local fields = {}
+    for f in (body .. ":"):gmatch("([^:]*):") do fields[#fields + 1] = f end
+    local id = tonumber(fields[1])
+    if not id then return nil end
+    return id .. ":" .. tostring(tonumber(fields[7]) or 0)
 end
 
 --- What to draw for a button: bag, slot (the first of its stacks still holding its item: the bags
 --- may have changed since Auctionator last drew, Codex review) and its link (while Auctionator
 --- counts some in the bags; a favourite that isn't there gets nothing). All nil: no tag.
---- A stack counts only when the slot provably holds the button's item: the same item ID, or, for a
---- link with none (a battle pet, a keystone), the same link; no link, no stack (Codex review).
+--- A stack counts only when the slot provably holds the button's item: the same item ID and random
+--- suffix (two "of the Bear" / "of the Whale" pieces share an ID, not a price), or, for a link with
+--- no item ID (a battle pet, a keystone), the same link; no link, no stack (Codex reviews).
 function AuctionatorTags.Pick(where)
-    if not where then return nil, nil, nil end
-    local id = idOf(where.link)
+    if not where or where.link == nil then return nil, nil, nil end
+    local variant = AuctionatorTags.Variant(where.link)
     local link = where.count > 0 and where.link or nil
-    if where.link == nil then return nil, nil, nil end
     for _, s in ipairs(where.slots) do
         local now = ns.Locks.ItemAt(s[1], s[2])
-        local same = now and (id ~= nil and tonumber(now.itemID) == id or id == nil and now.hyperlink == where.link)
+        local same = now ~= nil and (variant ~= nil and AuctionatorTags.Variant(now.hyperlink) == variant
+            or variant == nil and now.hyperlink == where.link)
         if same then return s[1], s[2], link end
     end
     return nil, nil, link

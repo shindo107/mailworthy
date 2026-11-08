@@ -152,6 +152,37 @@ describe("Mailworthy tags on Auctionator's Selling tab", function()
         assert.not_equal("AH", tagOf(buttons[2]), "the Linen Cloth button never shows Copper Ore's AH")
     end)
 
+    it("tells random-suffix variants of one item ID apart (Codex review)", function()
+        local bear = "|cff1eff00|Hitem:15210:0:0:0:0:0:1191:0:8|h[Raider's Shortsword of the Bear]|h|r"
+        local whale = "|cff1eff00|Hitem:15210:0:0:0:0:0:1192:0:8|h[Raider's Shortsword of the Whale]|h|r"
+        local function sword(link)
+            local it = WowStub.item(15210, "Raider's Shortsword", { quality = 2, class = 2, sell = 50 })
+            it.hyperlink = link
+            return it
+        end
+        assert.equal("15210:1191", ns.AuctionatorTags.Variant(bear))
+        assert.equal("2770:0", ns.AuctionatorTags.Variant(ore))
+        assert.is_nil(ns.AuctionatorTags.Variant("|Hbattlepet:261:1:3|h[Pet]|h"))
+        WowStub.setBag(0, 4, sword(bear))
+        prices[bear] = { ah = 5000 }
+        WowStub.setBag(0, 5, sword(whale))
+        prices[whale] = { ah = 60 }
+        ns.Fire("BAG_UPDATE_DELAYED")
+        local buttons = newView():Show({ info(bear, 0, 4), info(whale, 0, 5) })
+        local bearTag, whaleTag = tagOf(buttons[1]), tagOf(buttons[2])
+        assert.equal("AH", bearTag)
+        assert.not_equal(bearTag, whaleTag)
+        WowStub.setBag(0, 4, sword(whale))
+        WowStub.setBag(0, 5, sword(bear))
+        ns.Fire("BAG_UPDATE_DELAYED") -- before Auctionator redraws
+        assert.equal(bearTag, tagOf(buttons[1]), "the Bear icon keeps the Bear's tag")
+        assert.equal(whaleTag, tagOf(buttons[2]))
+        -- Auctionator's GetItemInfo link may differ in other fields (the level): still the same item
+        local atrOre = "|cffffffff|Hitem:2770::::::::60:::::|h[Copper Ore]|h|r"
+        buttons[1]:SetItemInfo(info(atrOre, 0, 1, 5))
+        assert.equal("AH", tagOf(buttons[1]))
+    end)
+
     it("never trusts a slot it can't match: no link, or a link without an item ID (Codex review)", function()
         local view = newView()
         local buttons = view:Show({ { itemCount = 1, locations = { location(0, 1) } }, -- no link
