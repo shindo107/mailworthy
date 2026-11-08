@@ -269,6 +269,12 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   The mailbox window's binding rows show the recipient's skill ("(guild, skill
   120)"), so a material past it going to the bank alt explains itself. Button labels fit
   their border (`Widgets.Fit` after every SetText: small font, then "...").
+- The Send Mail tab opens the window (operator, 2026-11-08: "when you click send mail
+  mailworthy should open. if you open mailworthy before that in the mailbox ui the button should
+  be greyed out with a 'click send mail' text"): `MailWindow.AutoOpen`, the tab watcher's third
+  job (reads `SendMailFrame:IsVisible()`, opens once per showing, switch `autoOpen`); on the
+  Inbox Send shows disabled with `UI.InboxSendText` ("Click Send Mail", controller "Send Mail
+  tab: R1") instead of being hidden, and `UI.Send` refuses there. Still never clicks a tab.
 - Feedback of 2026-11-08 (operator): (1) "missing sharp tooth data" / "more items missing, all
   of these gems": Sharp Claw and Jade were in the data (`TierData.lua`, Blacksmithing keeps them
   while levelling); the tooltip only spoke for AH / B / DE / V verdicts, so a kept item was

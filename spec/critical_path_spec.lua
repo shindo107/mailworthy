@@ -1,5 +1,6 @@
 -- CRITICAL PATH: the shipping gate. Every build must still mail, safely, the way a
--- player does it: a mailbox visit with a realistic bag, the mouse and the controller,
+-- player does it: a mailbox visit with a realistic bag, the mouse (the Mailworthy button or
+-- the Send Mail tab alone) and the controller,
 -- with and without Auctionator, with a binding (a profession's or a class's), with a guild
 -- template, without a bank alt or with it skipped for the visit, and on SavedVariables an older
 -- build left behind. CI runs this file on its own before the rest, and a tag can't publish
@@ -192,6 +193,32 @@ describe("critical path: mailing", function()
         ns.Fire("BAG_UPDATE_DELAYED")
         assert.equal(0, #ns.MailWindow.Result().mail, "after sending, the window has nothing left to mail")
         ns.Fire("MAIL_CLOSED")
+    end)
+
+    it("the Send Mail tab opens the window by itself; on the Inbox Send is greyed out and sends nothing", function()
+        -- operator, 2026-11-08: "when you click send mail mailworthy should open ... greyed out with a
+        -- 'click send mail' text ... flip to the standard send to button"
+        local watcher = _G.MailworthyTabWatcher
+        local function tick() watcher.scripts.OnUpdate(watcher, 0.3) end
+        ns.Fire("MAIL_SHOW")
+        MailFrame:Show()
+        InboxFrame:Show()
+        _G.MailworthyInboxButton:Click()
+        assert.equal("Click Send Mail", _G.MailworthyMailSend:GetText())
+        _G.MailworthyMailSend:Click()
+        WowStub.runTimers()
+        assert.equal(0, #WowStub.state.sent, "nothing goes from the Inbox")
+        ns.MailWindow.Frame():Hide()
+        tick()
+        InboxFrame:Hide()
+        SendMailFrame:Show() -- the player clicks the Send Mail tab, nothing else
+        tick()
+        assert.is_true(ns.MailWindow.Frame():IsVisible())
+        assert.equal("Send to Roknua", _G.MailworthyMailSend:GetText())
+        local preview = previewed(ns)
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
     end)
 
     it("controller: Triangle opens the window, Send is a D-pad target, Cross sends", function()
