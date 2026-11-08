@@ -95,6 +95,7 @@ function WowStub.itemButton(bag, slot)
     local b = { bag = bag, slot = slot, textures = {}, fontStrings = {}, buttonContext = "ButtonContext_ContainerFrameItemButton" }
     function b.GetBagID() return b.bag end
     function b.GetID() return b.slot end
+    function b.IsVisible() return b.hidden ~= true end -- rawset(b, "hidden", true): pooled / its bags closed
     function b.CreateTexture()
         local t = WowStub.newWidget("Texture")
         table.insert(b.textures, t)

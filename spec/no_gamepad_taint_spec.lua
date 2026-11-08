@@ -16,6 +16,17 @@ describe("no mail tab switching from Mailworthy's code", function()
     end)
 end)
 
+describe("bag addons draw without frames or controller UI (BagAddons.lua)", function()
+    it("creates no frame, never touches focus, menus or smart navigation", function()
+        local source = assert(io.open("Mailworthy/BagAddons.lua")):read("*a")
+        local code = source:gsub("%-%-[^\n]*", "") -- comments may name them
+        for _, banned in ipairs({ "CreateFrame", "SetFocus", "ModifyMenu", "SmartNavigation", "FrameControlsManager",
+            "GamepadSharedUtility", "ShowUIPanel", "smartNavigation", "OnSmartNav", "buttonContext" }) do
+            assert.is_nil(code:find(banned, 1, true), banned)
+        end
+    end)
+end)
+
 describe("no writes into the controller UI", function()
     local saved
     before_each(function()
@@ -77,5 +88,24 @@ describe("no writes into the controller UI", function()
         _G.MailworthyLedgerExport:Click()
         assert.equal(0, #InboxFrame.gamepadFooter.calls)
         assert.falsy(table.concat(MailworthyDB.log, "\n"):find("Mailworthy called", 1, true))
+    end)
+
+    it("tags Auctionator's Selling tab buttons without touching them (AuctionatorTags.lua)", function()
+        local ns = loadAddon()
+        _G.Auctionator = { API = { v1 = { GetAuctionPriceByItemLink = function() return 174 end } } }
+        _G.AuctionatorGroupsViewItemMixin = { SetItemInfo = function() end }
+        ns.Fire("PLAYER_LOGIN")
+        ns.Config.SetBankAltHere() -- tags show on the bank alt
+        WowStub.setBag(0, 1, WowStub.item(2770, "Copper Ore", { count = 20, sell = 5 }))
+        ns.Fire("BAG_UPDATE_DELAYED")
+        -- an Auctionator item button (no Lua field may be written on it), created after login
+        local button = WowStub.itemButton(nil, nil)
+        WowStub.state.gamepadUI = true
+        _G.AuctionatorGroupsViewItemMixin.SetItemInfo(button, { itemLink = WowStub.link(2770, "Copper Ore"), itemCount = 20,
+            locations = { { GetBagAndSlot = function() return 0, 1 end } } })
+        assert.equal("AH", button.fontStrings[1] and button.fontStrings[1].text)
+        _G.Auctionator, _G.AuctionatorGroupsViewItemMixin = nil, nil
+        assert.falsy(table.concat(MailworthyDB.log, "\n"):find("Mailworthy called", 1, true))
+        assert.falsy(table.concat(MailworthyDB.log, "\n"):find("error", 1, true))
     end)
 end)
