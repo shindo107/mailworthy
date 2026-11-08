@@ -19,8 +19,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 ## Using it
 
 - **At a mailbox:** click the **Send Mail** tab and the Mailworthy window opens beside it
-  (or click **Mailworthy** under the mail window; controller: Send Mail tab with R1, then
-  Triangle). Opened on the Inbox, its Send button is greyed out and says "Click Send Mail". The window shows who gets the mail, what goes and why,
+  (or click **Mailworthy** under the mail window; controller: R1 to the Send Mail tab opens
+  it, Triangle closes and reopens it). Opened on the Inbox, its Send button is greyed out and says "Click Send Mail". The window shows who gets the mail, what goes and why,
   what stays and why, and the total gain. **Send** mails it all in one press, 12 stacks
   per mail. Pressing an item locks it, so it stays. **Skip once** beside your bank alt keeps
   its share in the bags for this visit (bindings still go). Hovering an item says what the

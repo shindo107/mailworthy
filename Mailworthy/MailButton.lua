@@ -50,7 +50,8 @@ function MailButton.Activate(source)
     end
     if tab == "inbox" and MailButton.GamepadUI() then
         ns.Log.Add("mailbutton", "%s on the Inbox (controller UI): hint shown", tostring(source))
-        ns.Print("Switch to the Send Mail tab (R1), then press Triangle or the Mailworthy button.")
+        ns.Print(ns.Features.On("autoOpen") and "Switch to the Send Mail tab (R1): Mailworthy opens there."
+            or "Switch to the Send Mail tab (R1), then press Triangle or the Mailworthy button.")
         return
     end
     ns.Log.Add("mailbutton", "%s on the %s tab (%s UI)", tostring(source), tab,

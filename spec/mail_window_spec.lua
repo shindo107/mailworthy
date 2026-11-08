@@ -196,6 +196,36 @@ describe("mail window", function()
         assert.equal(0, WowStub.tabClicks)
     end)
 
+    it("auto-open: never on the bank alt; a mailbox reopened between ticks still opens (Codex review)", function()
+        local watcher = _G.MailworthyTabWatcher
+        local function tick() watcher.scripts.OnUpdate(watcher, 0.3) end
+        ns.Config.SetBankAltHere() -- this character is the bank alt: its button opens the summary
+        SendMailFrame:Show()
+        tick()
+        assert.is_false(ns.MailWindow.Frame():IsShown() and ns.MailWindow.Frame():IsVisible())
+        ns.Config.SetBankAlt("Roknua Themicrulah")
+        SendMailFrame:Hide()
+        tick()
+        SendMailFrame:Show()
+        tick()
+        assert.is_true(ns.MailWindow.Frame():IsVisible())
+        ns.MailWindow.Frame():Hide()
+        ns.Fire("MAIL_CLOSED") -- closed and reopened on Send Mail before the next tick
+        tick()
+        assert.is_true(ns.MailWindow.Frame():IsVisible(), "a new visit opens it again")
+    end)
+
+    it("on the Inbox Send stays greyed out while a send runs (Codex review)", function()
+        _G.MailworthyMailButton:Click()
+        _G.MailworthyMailSend:Click()
+        assert.is_true(ns.Mailer.Busy())
+        SendMailFrame:Hide()
+        InboxFrame:Show()
+        ns.MailWindow.Refresh(true)
+        assert.is_false(_G.MailworthyMailSend:IsEnabled())
+        assert.equal("Sending...", text("MailworthyMailSend"))
+    end)
+
     it("opened on the Inbox, follows the player to the Send Mail tab, where Send works", function()
         SendMailFrame:Hide()
         InboxFrame:Show()

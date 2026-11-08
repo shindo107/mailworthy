@@ -641,13 +641,13 @@ function UI.Refresh(keepScan)
     sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt, skipped))
     renderedInbox = UI.OnInbox()
     sendButton:Show()
-    if renderedInbox and not ns.Mailer.Busy() then
+    if renderedInbox then
         -- Mail goes out from the Send Mail tab only, and we never switch tabs ourselves
         -- (MailFrameTab_OnClick taints the controller UI). Send is greyed out here and names the
         -- tab (operator, 2026-11-08: "the button should be greyed out with a 'click send mail'
         -- text"); on Send Mail the watcher redraws it as "Send to ..." and the list follows.
-        sendButton:SetText(UI.InboxSendText(pad))
-        sendButton:Disable()
+        if not ns.Mailer.Busy() then sendButton:SetText(UI.InboxSendText(pad)) end -- else "Sending..."
+        sendButton:Disable() -- busy or not: nothing is sent from the Inbox (Codex review)
     else
         sendButton:Enable()
     end
@@ -783,8 +783,9 @@ function UI.AutoOpen()
     local send, mail = rawget(_G, "SendMailFrame"), rawget(_G, "MailFrame")
     local visible = type(send) == "table" and send:IsVisible() == true and type(mail) == "table"
     local opened = false
+    -- Not on the bank alt: its Mailworthy button opens the summary, not a list to send (Codex review).
     if visible and not sendWasVisible and ns.Features.On("autoOpen") and not ns.Mailer.Busy()
-        and not (frame and frame:IsVisible()) then
+        and not ns.Config.IsBankAltHere() and not (frame and frame:IsVisible()) then
         ns.Log.Add("ui", "Send Mail tab shown: window opened")
         UI.Show("send")
         opened = true
@@ -847,6 +848,8 @@ ns.On("PLAYER_LOGIN", function()
     local friends = ns.RoutesUI.Frame()
     if friends then friends:HookScript("OnHide", refreshIfShown) end
 end)
+-- A mailbox closed and reopened on Send Mail between two watcher ticks still opens the window.
+ns.On("MAIL_CLOSED", function() sendWasVisible = false end)
 ns.On("BAG_UPDATE_DELAYED", function()
     if not ns.Mailer.Busy() then refreshIfShown() end
 end)
