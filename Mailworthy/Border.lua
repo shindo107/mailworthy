@@ -5,7 +5,8 @@
 -- and kept in our own weak table: no field is ever written on a Blizzard frame.
 -- Buttons are pooled, so every refresh recomputes from GetBagID / GetID.
 -- Refreshed by a post-hook on each container frame's UpdateItems (combined bags
--- and the individual bag frames), whenever a lock changes, and when the Mailworthy
+-- and the individual bag frames; the bag addons' buttons through BagAddons.lua and
+-- Border.AddRefresher), whenever a lock changes, and when the Mailworthy
 -- window shows or hides: the glow shows only while that window is open at the
 -- mailbox (operator, 2026-11-07: "only when looking at the mailbox with the addon
 -- open"; before, any open mailbox lit it, and a CurseForge user, 2026-10-21, found
@@ -158,8 +159,12 @@ function Border.RefreshFrame(frame)
     end
 end
 
---- One bag button: the lock glow (by `itemID`, else the item at bag / slot) and the decorators.
-function Border.RefreshButton(button, bag, slot, itemID, wanted)
+--- The one drawing helper for any item button (Blizzard's bags, the bag addons in BagAddons.lua,
+--- Auctionator's views): the lock glow (by `itemID`, else the item at bag / slot) and the
+--- decorators (BankAlt's AH / B / DE / V tag), all kept in our own weak tables keyed by button.
+--- `bag` / `slot` may be nil (a view with no bag slot): decorators then find the item by `link`,
+--- then `itemID`. Called with only `button`, it clears everything we drew on that button.
+function Border.RefreshButton(button, bag, slot, itemID, wanted, link)
     if wanted == nil then wanted = Border.Wanted() end
     if ns.Features.On("slotBorder") then
         if itemID == nil and bag ~= nil and slot ~= nil then
@@ -170,76 +175,40 @@ function Border.RefreshButton(button, bag, slot, itemID, wanted)
         Border.Show(button, locked and (wanted or Border.Flashing(itemID)))
     end
     for _, fn in ipairs(decorators) do
-        local okDecorate, err = pcall(fn, button, bag, slot)
+        local okDecorate, err = pcall(fn, button, bag, slot, itemID, link)
         if not okDecorate then ns.Log.Add("border", "decorator error: %s", tostring(err)) end
     end
 end
 
--- Baganator (2026-11-07: "I'm not seeing the icon borders anymore on my bag menu": Baganator
--- replaces the game's bags, so the UpdateItems hooks never see its buttons). Its public API,
--- read from Baganator's source (API/Main.lua, ItemViewCommon/ItemButton.lua): a "corner
--- widget" (RegisterCornerWidget(label, id, onUpdate, onInit, defaultPosition)) is built once
--- per item button by onInit(itemButton) and updated by onUpdate(widget, details) with the
--- button's item details (details.itemID, details.itemLink); RequestItemButtonsRefresh() redraws
--- every button. Our widget is an empty texture (never shown: onUpdate returns false, so the
--- corner stays free for other widgets); its onUpdate draws the lock glow on the whole button,
--- in our own weak table like the game's bags. Baganator's buttons are its own, not Blizzard's.
--- All pcall'd (README "Beta unknowns").
-Border.BAGANATOR_ID = "mailworthy_lock"
-local baganatorOwners = setmetatable({}, { __mode = "k" }) -- widget -> its item button
-local baganatorReady = false
-
-local function baganatorAPI()
-    local b = rawget(_G, "Baganator")
-    local api = type(b) == "table" and b.API or nil
-    if type(api) == "table" and type(api.RegisterCornerWidget) == "function" then return api end
-    return nil
+--- Clear the glow and every decorator on a button (an empty slot, another character's bags).
+function Border.Clear(button)
+    Border.RefreshButton(button, nil, nil, nil, false, nil)
 end
 
---- Baganator's onInit: an empty, never-shown texture that remembers its button. A texture,
---- not a frame: Baganator may build buttons while a gamepad panel is open, and AGENTS.md
---- allows no CreateFrame then (textures are fine, like the glow itself).
-function Border.BaganatorInit(itemButton)
-    local widget = itemButton:CreateTexture(nil, "OVERLAY")
-    widget:SetSize(1, 1)
-    widget:Hide()
-    baganatorOwners[widget] = itemButton
-    return widget
+--- Pure: the item ID in an item link, or nil.
+function Border.LinkID(link)
+    return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
 end
 
---- Baganator's onUpdate: the glow for the button's item; false keeps the widget hidden.
-function Border.BaganatorUpdate(widget, details)
-    local button = baganatorOwners[widget]
-    if not button then return false end
-    local itemID = type(details) == "table" and tonumber(details.itemID) or nil
-    local bag, slot
-    local okParent, parent = pcall(button.GetParent, button)
-    if okParent and type(parent) == "table" and type(parent.GetID) == "function" then
-        local okBag, b = pcall(parent.GetID, parent)
-        local okSlot, sl = pcall(button.GetID, button)
-        if okBag and okSlot then bag, slot = b, sl end
+--- A bag addon's button for a live bag slot: draw what is in that slot now. `shownID` is the item
+--- the addon says the button shows (nil when it didn't say): when the slot holds something else
+--- (a recycled button drawn before the addon caught up, another character's bags laid over the
+--- same slot numbers) or nothing, the button is cleared instead. Returns the drawn item's ID.
+function Border.DrawBagSlot(button, bag, slot, shownID, wanted)
+    local info = bag ~= nil and slot ~= nil and ns.Locks.ItemAt(bag, slot) or nil
+    local itemID = info and tonumber(info.itemID)
+    if itemID == nil or (shownID ~= nil and shownID ~= itemID) then
+        Border.Clear(button)
+        return nil
     end
-    local ok, err = pcall(Border.RefreshButton, button, bag, slot, itemID)
-    if not ok then ns.Log.Add("border", "Baganator refresh error: %s", tostring(err)) end
-    return false
+    Border.RefreshButton(button, bag, slot, itemID, wanted, info.hyperlink)
+    return itemID
 end
 
-function Border.InstallBaganator()
-    if baganatorReady then return true end
-    local api = baganatorAPI()
-    if not api then return false end
-    -- Created at login (no CreateFrame while a gamepad panel is open): Baganator builds the
-    -- widgets for its buttons, and our onInit only runs from its item button setup.
-    local ok, err = pcall(api.RegisterCornerWidget, "Mailworthy lock glow", Border.BAGANATOR_ID,
-        Border.BaganatorUpdate, Border.BaganatorInit, { corner = "top_left", priority = 1 })
-    if not ok then
-        ns.Log.Add("border", "Baganator corner widget failed: %s", tostring(err))
-        return false
-    end
-    baganatorReady = true
-    ns.Log.Add("border", "Baganator: lock glow registered (Baganator settings, Icons, top left corner)")
-    return true
-end
+local refreshers = {} -- fn(wanted): redraw the buttons another bag view keeps (BagAddons)
+
+--- Run `fn(wanted)` on every RefreshAll, after the game's bags.
+function Border.AddRefresher(fn) table.insert(refreshers, fn) end
 
 --- Whether a container frame is closed: nothing on it to redraw. Opening one redraws it anyway:
 --- ContainerFrame_GenerateFrame -> Update -> AddItemsForRefresh -> UpdateItems (Forever's
@@ -258,8 +227,12 @@ function Border.RefreshAll()
     for _, frame in ipairs(frames) do
         if not closed(frame) then Border.RefreshFrame(frame) end
     end
-    local api = baganatorReady and baganatorAPI()
-    if api and type(api.RequestItemButtonsRefresh) == "function" then pcall(api.RequestItemButtonsRefresh) end
+    local wanted
+    for _, fn in ipairs(refreshers) do
+        if wanted == nil then wanted = Border.Wanted() end
+        local ok, err = pcall(fn, wanted)
+        if not ok then ns.Log.Add("border", "refresher error: %s", tostring(err)) end
+    end
 end
 
 local function containerFrames()
@@ -293,7 +266,6 @@ function Border.Install()
             end
         end
     end
-    Border.InstallBaganator()
     if ns.Features.On("slotBorder") then Border.InstallTooltip() end
     ns.Locks.OnChanged(Border.OnLockChanged)
     ns.Log.Add("border", "UpdateItems hooked on %d container frames", hooked)
