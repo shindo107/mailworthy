@@ -94,6 +94,12 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   follows the name when that player runs Mailworthy too (their Mailworthy said hello, one of
   their characters it listed, or one of your own characters); the window's bottom line says
   what the icon means. `/mw feature peerMark off` hides it.
+- **Update nudge:** when a player in your guild or group runs a newer Mailworthy, one chat line
+  says so ("Mailworthy v0.31.0 is out (Bob has it); you have v0.30.0. Update from CurseForge."),
+  once a session, and a line at the bottom of the Mailworthy window and of the settings says the
+  same until you update. Each Mailworthy says its version after its hello (from this release on;
+  older ones keep working and just don't say it). Only versions heard straight from a player
+  count: nothing is passed on. `/mw feature versionNotice off` hides it.
 - **Tags in Auctionator too:** with Auctionator installed, the same AH / B / DE / V tags the
   bags show appear on the item icons of Auctionator's Selling tab (its bag list and the item
   being posted), on the characters whose bags show them. `/mw feature auctionatorTags off`

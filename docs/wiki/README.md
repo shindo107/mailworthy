@@ -5,6 +5,6 @@ it. Pages a PR adds or changes live here, whole, and are copied into the wiki af
 merges (images are linked from `main`, so they show once it has merged). Copy every page here (not this README)
 over the wiki's, commit, push, then empty this folder in a follow-up.
 
-Last published: the v0.30.0 pages (wiki commit `26871b6`, 2026-11-08): every page brought up to
-date with v0.25-v0.30, plus the new Price Sources, Return to Sender, Mail Ledger and Bag Addons
-pages (PR #70). Nothing is waiting here now.
+Last published: the update nudge pages, Mailworthy-Talks-to-Mailworthy and
+Commands-and-Troubleshooting (`versionNotice`, PR #72; wiki commit `8421bb3`, 2026-11-08), on top of
+the v0.30.0 pages (wiki `26871b6`, PR #70). Nothing is waiting here now.

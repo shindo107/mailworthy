@@ -29,6 +29,7 @@ Routes.lua
 Comms.lua
 Guild.lua
 Stale.lua
+Version.lua
 Bags.lua
 Mailer.lua
 Ledger.lua

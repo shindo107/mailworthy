@@ -738,8 +738,10 @@ function UI.Refresh(keepScan)
     W.SetToggled(returnButton, ns.Returns.On())
     if ns.Returns.Available() then returnButton:Show() else returnButton:Hide() end
     if ns.Mailer.Busy() then returnButton:Disable() else returnButton:Enable() end
-    legend:SetText(W.Footer(pad, marked, "\n"))
-    shown.legend = (marked and 1 or 0) + (pad and 1 or 0) -- footer lines, under the buttons
+    local footer, notice = W.Footer(pad, marked, "\n"), ns.Version.Text() -- notice: a newer Mailworthy is out
+    if notice then footer = footer ~= "" and (notice .. "\n" .. footer) or notice end
+    legend:SetText(footer)
+    shown.legend = (marked and 1 or 0) + (pad and 1 or 0) + (notice and 1 or 0) -- footer lines, under the buttons
     frame:SetHeight(UI.Layout(shown))
     ns.Nav.Revalidate()
 end
@@ -996,6 +998,10 @@ ns.On("MAIL_CLOSED", function() sendWasVisible = false end)
 -- A new Mailworthy user can be a name on screen (Comms.Mark): redraw what shows, from the scan on
 -- screen (no new scan, so the list the player sees doesn't change under them).
 ns.Comms.OnMarksChanged(function()
+    if frame and frame:IsShown() and not ns.Mailer.Busy() then UI.Refresh(true) end
+end)
+-- A newer Mailworthy heard of: its line in the footer.
+ns.Version.OnChanged(function()
     if frame and frame:IsShown() and not ns.Mailer.Busy() then UI.Refresh(true) end
 end)
 ns.On("BAG_UPDATE_DELAYED", function()
