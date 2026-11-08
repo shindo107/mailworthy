@@ -84,22 +84,41 @@ function Bags.SkipBankAlt(on)
 end
 function Bags.BankAltSkipped() return bankAltSkipped end
 
---- Why the bank alt's share stays in the bags at this mailbox, or nil when it goes.
+--- Why the bank alt's share stays in the bags at this mailbox, or nil when it goes. On the bank
+--- alt itself (operator, 2026-11-08: its window mails too) that share is what it sells here.
 function Bags.HoldReason()
     if not ns.Config.BankAlt() then return "no bank alt" end
+    if ns.Config.IsBankAltHere() then return "this is your bank alt" end
     if bankAltSkipped then return "bank alt skipped" end
     return nil
 end
 
---- The window's settings (and /mw scan's): the saved ones, and whether the bank alt's share is held.
+--- The window's settings (and /mw scan's): the saved ones, whether the bank alt's share is held,
+--- and, while Return to sender is on (Returns.lua), what goes back to whom.
 function Bags.CurrentSettings()
     local s = ns.Config.Values()
     s.hold = Bags.HoldReason()
+    if ns.Returns.On() then s.returns = ns.Returns.Current() end
     return s
 end
 
+--- A copy of a bag item with only `slots` of it (Return to sender sends some stacks back and
+--- values the rest as usual); `result` when already known.
+function Bags.Part(item, slots, result)
+    local part = {}
+    for k, v in pairs(item) do part[k] = v end
+    part.slots, part.count, part.stacks, part.result = {}, 0, #slots, result
+    for i, s in ipairs(slots) do
+        part.slots[i] = s
+        part.count = part.count + s.count
+    end
+    return part
+end
+
 --- Scan and value the bags. `settings.hold` (Bags.HoldReason): the bank alt's share is kept, with
---- result.held saying why and result.route what it would have been. Returns { settings, priced,
+--- result.held saying why and result.route what it would have been. `settings.returns`
+--- (Returns.Owed, Return to sender on): stacks another character mailed this one go back to them
+--- (route "return"), whatever the rule says, except hard keeps. Returns { settings, priced,
 --- mail = {items}, keep = {items},
 --- unmailable = {items} (soulbound / quest: never listed in the window), totals }.
 function Bags.Evaluate(settings)
@@ -120,7 +139,7 @@ function Bags.Evaluate(settings)
     local classRoutes = false
     for _, r in ipairs(routes) do classRoutes = classRoutes or r.class ~= nil end
     local mine = classRoutes and ns.Classes.Mine() or nil
-    for _, item in ipairs(Bags.Group(Bags.Slots())) do
+    local function value(item)
         item.locked = ns.Locks.IsItemLocked(item.itemID)
         if classRoutes then item.classes, item.myClass = ns.Classes.Of(item.itemID), mine end
         item.questFor = ns.Quests.For(item.link)
@@ -135,6 +154,8 @@ function Bags.Evaluate(settings)
         if settings.hold and item.result.action == "mail" and not item.result.to then
             item.result.action, item.result.held = "keep", settings.hold
         end
+    end
+    local function file(item)
         if item.result.action == "mail" then
             table.insert(result.mail, item)
             local t = result.totals
@@ -143,11 +164,13 @@ function Bags.Evaluate(settings)
             local to = item.result.to or "" -- "" = the bank alt
             if item.result.to then t.routed = t.routed + item.stacks else t.gain = t.gain + (item.result.gain or 0) end
             if not stacksTo[to] then
-                stacksTo[to] = 0
+                stacksTo[to] = {}
                 t.recipients[#t.recipients + 1] = to
                 t.byRecipient[to] = { items = 0, stacks = 0, mails = 0, what = {}, crafter = item.result.crafter }
             end
-            stacksTo[to] = stacksTo[to] + item.stacks
+            -- Mails per recipient as Mailer.Plan makes them: one run per binding (or return) to them.
+            local group = item.result.to and tostring(item.result.what) or ""
+            stacksTo[to][group] = (stacksTo[to][group] or 0) + item.stacks
             local each = t.byRecipient[to]
             each.items, each.stacks = each.items + item.count, each.stacks + item.stacks
             if item.result.what and not each.what[item.result.what] then
@@ -160,10 +183,33 @@ function Bags.Evaluate(settings)
             table.insert(result.keep, item)
         end
     end
-    for to, n in pairs(stacksTo) do
-        local mails = math.ceil(n / Bags.ATTACHMENTS)
-        result.totals.mails = result.totals.mails + mails
-        result.totals.byRecipient[to].mails = mails
+    local owed = settings.returns
+    for _, item in ipairs(Bags.Group(Bags.Slots())) do
+        value(item)
+        local list = owed and owed[item.itemID]
+        local r = item.result
+        local hard = ns.Valuation.Unmailable(r) or (r.action == "keep" and ns.Routes.HARD_KEEPS[r.reason])
+        local parts, rest = {}, nil
+        if list and not hard then parts, rest = ns.Returns.Split(item.slots, list) end
+        if #parts == 0 then
+            file(item)
+        else
+            for _, p in ipairs(parts) do
+                file(Bags.Part(item, p.slots, ns.Returns.Result(p.to, #p.slots, settings)))
+            end
+            if #rest > 0 then -- what wasn't mailed to this character (or won't split): the usual rule
+                local left = Bags.Part(item, rest)
+                value(left)
+                file(left)
+            end
+        end
+    end
+    for to, groups in pairs(stacksTo) do
+        for _, n in pairs(groups) do
+            local mails = math.ceil(n / Bags.ATTACHMENTS)
+            result.totals.mails = result.totals.mails + mails
+            result.totals.byRecipient[to].mails = result.totals.byRecipient[to].mails + mails
+        end
     end
     for i, to in ipairs(result.totals.recipients) do -- the bank alt first
         if to == "" and i > 1 then
@@ -202,7 +248,7 @@ end
 
 local money = function(c) return ns.Valuation.Money(c) end
 
-local ROUTE = { ah = "AH", de = "DE", common = "COMMON", bank = "BANK", friend = "FRIEND" }
+local ROUTE = { ah = "AH", de = "DE", common = "COMMON", bank = "BANK", friend = "FRIEND", ["return"] = "RETURN" }
 
 local function itemName(item)
     local name = item.link:match("%[(.-)%]") or item.link
@@ -324,7 +370,8 @@ function Bags.Report(result)
     local lines = {
         string.format("Mailworthy %s scan at %s (sends nothing)", ns.VERSION, date("%Y-%m-%d %H:%M")),
         "bank alt: " .. tostring(ns.Config.BankAlt() or "none (its share stays in the bags; /mw settings)")
-            .. (bankAltSkipped and ", skipped this visit" or ""),
+            .. (bankAltSkipped and ", skipped this visit" or "")
+            .. (s.returns and "; return to sender: on (what other characters mailed you goes back)" or ""),
         "prices: " .. (result.priced and "Auctionator" or "none (no Auctionator: mailing common items)")
             .. ((result.priced and (s.serverDay or math.huge) < ns.Valuation.FRESH_REALM_DAYS)
                 and " (fresh realm: unpriced white trade goods are mailed)" or ""),

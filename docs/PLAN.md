@@ -488,10 +488,39 @@ bank alt's own, fresh Auctionator data** ([media/bank-alt-prototype.png](../medi
 - **On a main after Send** (operator, 2026-10-14): **V** tags only, on what the window
   kept because a vendor pays more (grey junk too), for the rest of the session, with the
   window's own settings (postage included). Locking an item removes its V at once.
-- **As built:** no postage in the bank alt's verdicts (nothing is mailed from there);
-  V = the vendor wins today; the Mailworthy button (Triangle) on the bank alt opens the
-  summary, also `/mw summary` and the settings' "Bank alt summary" button; switches
-  `bankAltTags`, `tooltipLines`; setting "Bag tags: every character".
+- **As built:** no postage in the bank alt's verdicts (its tags; nothing it sells is mailed);
+  V = the vendor wins today; the summary: `/mw summary`, the settings' "Bank alt summary" button
+  and the Mailworthy window's Summary... on the bank alt; switches `bankAltTags`, `tooltipLines`;
+  setting "Bag tags: every character".
+- **The bank alt mails too** (operator, 2026-11-08: "bank alt view should still allow mail
+  automation"): the Mailworthy button (Triangle) opens the window there; what it would mail to a
+  bank alt stays ("this is your bank alt"), bindings mail, and **Return to sender** sends back
+  what other characters mailed it (below). `/mw feature bankAltMail off`: the button opens only
+  the summary, as before.
+
+## Return to sender (operator, 2026-11-08)
+
+"A button that just allows me to 'queue up' a return to sender list. it should be a toggle so you
+click it on the interface and everything that was mailed to you by someone gets put on the same
+list we use for regular mailworthy evaluations to mail back to them. the button should be available
+to everyone, not just bank alts. clicking it again returns it to normal mode. make sure this button
+has a highlight when toggled on. same with any other toggled button."
+
+- **The toggle** (`Returns.lua`, `MailworthyMailReturn` beside Settings): off by default, for this
+  mailbox visit only (off at `MAIL_CLOSED`, like Skip once), lit green while on (`Widgets.SetToggled`,
+  now on every toggle in every window). Mouse click or the controller's Cross on it.
+- **Who sent what:** the mail ledger's log of takes on this character: per sender and item, what was
+  received, less what this character has mailed that player since; system mail (AH, GM), COD and
+  returned mail don't count. Several senders of one item: the latest first. The ledger is per
+  account, so a bank alt on a second account knows its own takes; nothing taken before the ledger
+  (v0.25.0) is known.
+- **What goes:** whole stacks only (the mailer attaches whole slots), the biggest first, never past
+  what is owed; a stack bigger than that stays and follows the usual rule. Whatever the price, never
+  a hard keep (locked, soulbound, quest, a quest needs it, in use, a tool). A return beats a binding
+  and the bank alt. The rest of the list is the usual one.
+- **How:** shown under Mailing with a "back to <name>" chip and its own "To:" line ("Returned
+  items"); Send mails them in their own mails, "Mailworthy 1/2: returned to you". The Send-time check
+  (`UI.Changed`) and the slot re-check apply as for any mail.
 - **B (bank)** (2026-10-20): the fourth tag and summary row, for items the rule says to
   hold for a later phase (decision rule above); the tooltip says why and what listing
   it today would bring. Tags are advice: the bank alt can list a B item any time.
@@ -596,7 +625,8 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
 | `Valuation.lua` | the decision rule: item facts + prices + settings -> mail-AH / mail-DE / keep + reason + gain | busted (pure, most tests live here) |
 | `Bags.lua` | bag scan -> item facts, applies locks and filters | busted with stubbed `C_Container` |
 | `Mailer.lua` | batch queue and state machine (attach, send, wait, next, stop); each run's timers die with it | busted with stubbed mail events |
-| `MailWindow.lua` | the window at the mailbox: recipient, mail / staying lists (rows lock / unlock), totals, Send / Settings; fits its rows; follows Inbox -> Send Mail | busted + in game |
+| `MailWindow.lua` | the window at the mailbox: recipient, mail / staying lists (rows lock / unlock), totals, Send / Settings / Return to sender; fits its rows; follows Inbox -> Send Mail | busted + in game |
+| `Returns.lua` | Return to sender: what other characters mailed this one (the ledger's takes) and which whole stacks go back to whom | busted (pure) + critical path |
 | `MailButton.lua` | the Mailworthy button under the mail window (mouse; controller via Triangle, `PadKey.lua`; writes nothing into the controller UI) | busted + in game |
 | `Nav.lua` / `PadKey.lua` | Mailworthy's own controller highlight and override bindings for its windows | busted + in game |
 | `Locks.lua` / `Border.lua` | item locks (Alt+click, L3) and their blue glow | busted + in game |

@@ -196,13 +196,21 @@ describe("mail window", function()
         assert.equal(0, WowStub.tabClicks)
     end)
 
-    it("auto-open: never on the bank alt; a mailbox reopened between ticks still opens (Codex review)", function()
+    it("auto-open: on the bank alt only while its window mails; a mailbox reopened between ticks still opens", function()
         local watcher = _G.MailworthyTabWatcher
         local function tick() watcher.scripts.OnUpdate(watcher, 0.3) end
-        ns.Config.SetBankAltHere() -- this character is the bank alt: its button opens the summary
+        ns.Config.SetBankAltHere()
+        ns.HandleSlash("feature bankAltMail off") -- its button opens the summary: no window by itself (Codex review)
         SendMailFrame:Show()
         tick()
         assert.is_false(ns.MailWindow.Frame():IsShown() and ns.MailWindow.Frame():IsVisible())
+        ns.HandleSlash("feature bankAltMail on") -- the default since 2026-11-08: the bank alt mails too
+        SendMailFrame:Hide()
+        tick()
+        SendMailFrame:Show()
+        tick()
+        assert.is_true(ns.MailWindow.Frame():IsVisible())
+        ns.MailWindow.Frame():Hide()
         ns.Config.SetBankAlt("Roknua Themicrulah")
         SendMailFrame:Hide()
         tick()

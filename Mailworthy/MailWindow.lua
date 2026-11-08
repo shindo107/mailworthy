@@ -15,6 +15,13 @@
 -- bags) or unlocks it, so the controller can change the list without a menu.
 -- Everything the mouse tooltip shows is also on the row itself.
 --
+-- Return to sender (operator, 2026-11-08; Returns.lua): a toggle beside Settings, on every
+-- character. While it is on (lit green, like every toggle that is on), what other characters
+-- mailed this one joins the Mailing list, to go back to them; pressed again, the list is back to
+-- normal. On the bank alt the window works too ("bank alt view should still allow mail
+-- automation"): its own share stays (it sells it), bindings and returns mail, and a Summary
+-- button opens the old summary (switch bankAltMail off: the button opens only the summary).
+--
 -- Created at login (never while a gamepad panel is open), parented to the
 -- showing mail tab; nothing is written into Blizzard's frames or tables.
 local _, ns = ...
@@ -34,6 +41,7 @@ local renderedInbox
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
 local guildButton
 local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine, owedLine, owedButton, skipAltButton
+local returnButton, summaryButton
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
@@ -46,6 +54,7 @@ UI.CHIPS = {
     common = { "Common", 0.4, 0.4, 0.4 },
     bank = { "Bank", 0.15, 0.5, 0.45 },
     friend = { "to a friend", 0.55, 0.35, 0.12 }, -- the chip says "to <first name>"
+    ["return"] = { "back to sender", 0.5, 0.3, 0.5 }, -- the chip says "back to <first name>"
 }
 
 function UI.Frame() return frame end
@@ -132,11 +141,12 @@ function UI.Recipients(totals, bankAlt, isBankAlt, skipped)
     local several = #recipients > 1
     local lines = {}
     local function bankLine(each)
-        local note = isBankAlt and "this is your bank alt" or (bankAlt and "your bank alt" or "optional: Settings")
+        local note = isBankAlt and "sell it here" or (bankAlt and "your bank alt" or "optional: Settings")
         if skipped and bankAlt and not isBankAlt then note = "your bank alt · skipped this time" end
-        if several and each and bankAlt then note = note .. " · " .. mailsText(each.mails) end
-        lines[#lines + 1] = { name = bankAlt or "|cffaaaaaaNo bank alt: what's worth selling stays|r", note = note,
-            bank = true }
+        if several and each and bankAlt and not isBankAlt then note = note .. " · " .. mailsText(each.mails) end
+        local name = isBankAlt and "|cffaaaaaaThis is your bank alt: what's worth selling stays|r"
+            or bankAlt or "|cffaaaaaaNo bank alt: what's worth selling stays|r"
+        lines[#lines + 1] = { name = name, note = note, bank = true }
     end
     if #recipients == 0 or (skipped and bankAlt) then bankLine() end
     for _, to in ipairs(recipients) do
@@ -246,6 +256,10 @@ local function createRouteRows()
         UI.Refresh()
     end, "MailworthyMailGuildRules")
     guildButton:Hide()
+    -- On the bank alt, where Skip once doesn't apply: the summary of what to sell (BankAlt.lua).
+    summaryButton = W.Button(frame, "Summary...", 84, function() ns.BankAlt.ShowWindow(frame) end,
+        "MailworthyMailSummary")
+    summaryButton:Hide()
     -- Skip once for the bank alt too (operator, 2026-11-08): its share stays this visit, bindings go.
     skipAltButton = W.Button(frame, "Skip once", 84, function()
         if ns.Mailer.Busy() then return end
@@ -312,6 +326,7 @@ local function fillRoutes()
                 .. UI.RouteTags(r.scope == "guild", ns.Routes.Skill(r))
                 .. (skipped and " |cff888888skipped this time|r" or ""))
             row.skip:SetText(skipped and "Undo skip" or "Skip once")
+            W.SetToggled(row.skip, skipped)
             row.skip:Show()
             if r.scope == "guild" then row.remove:Hide() else row.remove:Show() end
         end
@@ -334,6 +349,7 @@ local function fillRoutes()
         friendsButton:Hide()
     end
     if guild then guildButton:Show() else guildButton:Hide() end
+    W.SetToggled(guildButton, guild) -- "Guild rules: on" shows only while they are
     return shown
 end
 
@@ -409,6 +425,7 @@ function UI.Create()
 
     sendButton = W.Button(frame, "Send", 190, function() UI.Send() end, "MailworthyMailSend")
     settingsButton = W.Button(frame, "Settings", 110, function() ns.SettingsUI.Show(frame) end, "MailworthyMailSettings")
+    returnButton = W.Button(frame, "Return to sender", 150, function() UI.ToggleReturns() end, "MailworthyMailReturn")
     legend = W.Label(frame, "GameFontHighlightSmall")
 
     frame:SetScript("OnHide", function(self)
@@ -448,7 +465,8 @@ local function fillMailRow(row, item)
     local chip = UI.CHIPS[item.result.route] or UI.CHIPS.common
     row.icon:SetTexture(item.icon)
     row.name:SetText(UI.ItemText(item.link, item.count, item.stacks))
-    row.chip:SetText(item.result.to and ("to " .. firstName(item.result.to)) or chip[1])
+    local to = item.result.to and firstName(item.result.to)
+    row.chip:SetText(to and ((item.result.route == "return" and "back to " or "to ") .. to) or chip[1])
     row.chipBg:SetColorTexture(chip[2], chip[3], chip[4], 0.9)
     row.gain:SetText(item.result.gain and ("+" .. money(item.result.gain)) or "")
 end
@@ -547,7 +565,11 @@ function UI.Layout(n)
     y = y - 50
     at(sendButton, 20, y)
     at(settingsButton, 220, y)
-    at(legend, -24, y - 5, "TOPRIGHT")
+    at(returnButton, 336, y)
+    if n.legend then -- the controller legend under the buttons (Return to sender sits where it was)
+        y = y - 24
+        at(legend, -24, y - 5, "TOPRIGHT")
+    end
     return -(y - 22) + 18
 end
 
@@ -570,9 +592,12 @@ function UI.Refresh(keepScan)
     toNote:SetText(recipients[1].note)
     local canSkip = recipients[1].bank and bankAlt ~= nil and not isBankAlt and not ns.Mailer.Busy()
     skipAltButton:SetText(skipped and "Undo skip" or "Skip once")
+    W.SetToggled(skipAltButton, skipped)
     if canSkip then skipAltButton:Show() else skipAltButton:Hide() end
     at(skipAltButton, -20, -44, "TOPRIGHT")
-    at(toNote, canSkip and -112 or -26, -52, "TOPRIGHT")
+    if isBankAlt then summaryButton:Show() else summaryButton:Hide() end
+    at(summaryButton, -20, -44, "TOPRIGHT")
+    at(toNote, (canSkip or isBankAlt) and -112 or -26, -52, "TOPRIGHT")
     local more = 0
     for i, line in ipairs(toLines) do
         local r = recipients[i + 1]
@@ -651,9 +676,46 @@ function UI.Refresh(keepScan)
     else
         sendButton:Enable()
     end
+    returnButton:SetText(ns.Returns.On() and "Return to sender: on" or "Return to sender")
+    W.SetToggled(returnButton, ns.Returns.On())
+    if ns.Returns.Available() then returnButton:Show() else returnButton:Hide() end
+    if ns.Mailer.Busy() then returnButton:Disable() else returnButton:Enable() end
     legend:SetText(pad and W.Legend() or "")
+    shown.legend = pad
     frame:SetHeight(UI.Layout(shown))
     ns.Nav.Revalidate()
+end
+
+--- Pure: the chat line after Return to sender is pressed: `on`, and the scan's recipients of
+--- returned items (Bags totals) as { name = stacks }.
+function UI.ReturnsText(on, back)
+    if not on then return "Return to sender off: the list is back to normal." end
+    local names, stacks = {}, 0
+    for name, n in pairs(back or {}) do
+        names[#names + 1] = firstName(name)
+        stacks = stacks + n
+    end
+    table.sort(names)
+    if #names == 0 then
+        return "Return to sender on: nothing in your bags was mailed to you by another character "
+            .. "(Mailworthy counts what you took from the mailbox since its mail ledger came in)."
+    end
+    return string.format("Return to sender on: %d stack%s back to %s. Check the list, then press Send.", stacks,
+        stacks == 1 and " goes" or "s go", table.concat(names, ", "))
+end
+
+--- The Return to sender button (mouse, or Cross on it): on for this visit, or back to normal.
+function UI.ToggleReturns()
+    if ns.Mailer.Busy() or not ns.Returns.Available() then return end
+    ns.lastCommand = "Mailworthy Return to sender"
+    local on = ns.Returns.Toggle()
+    pages.mail, pages.stay = 1, 1
+    UI.Refresh()
+    local back = {}
+    for _, item in ipairs(result and result.mail or {}) do
+        if item.result.route == "return" then back[item.result.to] = (back[item.result.to] or 0) + item.stacks end
+    end
+    ns.Print(UI.ReturnsText(on, back))
 end
 
 --- Pure: the items of a fresh scan (`fresh`, its mail list, for bank alt `freshAlt`) going
@@ -783,9 +845,11 @@ function UI.AutoOpen()
     local send, mail = rawget(_G, "SendMailFrame"), rawget(_G, "MailFrame")
     local visible = type(send) == "table" and send:IsVisible() == true and type(mail) == "table"
     local opened = false
-    -- Not on the bank alt: its Mailworthy button opens the summary, not a list to send (Codex review).
+    -- On the bank alt only while its window mails (switch bankAltMail): else its Mailworthy button
+    -- opens the summary, not a list to send (Codex review).
+    local bankAltWindow = not ns.Config.IsBankAltHere() or ns.Features.On("bankAltMail")
     if visible and not sendWasVisible and ns.Features.On("autoOpen") and not ns.Mailer.Busy()
-        and not ns.Config.IsBankAltHere() and not (frame and frame:IsVisible()) then
+        and bankAltWindow and not (frame and frame:IsVisible()) then
         ns.Log.Add("ui", "Send Mail tab shown: window opened")
         UI.Show("send")
         opened = true

@@ -1,6 +1,8 @@
 -- Sending: the scan's mail list goes to the saved bank alt, 12 stacks per mail,
 -- after one press of Send; items a binding diverts (Routes) go to that player in
--- their own mails, after the bank alt's. Every recipient is shown in the window. Each mail: clear the send tab, re-check every slot
+-- their own mails, after the bank alt's, and so do items going back to their sender
+-- (Return to sender, Returns.lua: their own mails, subject "returned to you").
+-- Every recipient is shown in the window. Each mail: clear the send tab, re-check every slot
 -- right before attaching it (same item, same count, not locked by the game or by
 -- Mailworthy, not bound; anything that changed is skipped), attach with
 -- UseContainerItem, zero money and COD (as Blizzard's Send button does), then
@@ -18,6 +20,8 @@ Mailer.TIMEOUT = 10
 Mailer.SUBJECT = "Mailworthy %d/%d"
 Mailer.FRIEND_SUBJECT = "Mailworthy %d/%d: %s"
 Mailer.FRIEND_BODY = "Your %s, sent by %s with Mailworthy."
+Mailer.RETURN_SUBJECT = "Mailworthy %d/%d: returned to you"
+Mailer.RETURN_BODY = "What you mailed %s, sent back with Mailworthy."
 Mailer.KEEP_DAYS = 30
 
 local state = { busy = false, run = 0 }
@@ -68,14 +72,15 @@ function Mailer.Busy() return state.busy end
 --- bank alt's mails first, then one run per binding (an item's result.to and what) in the
 --- order they appear. Returns { { to, what, stacks = { {bag, slot, count, itemID, link,
 --- item} ... } }, ... }; `to` is nil for the bank alt's mails when no bank alt is given,
---- `what` ("Enchanting materials") only for a binding's.
+--- `what` ("Enchanting materials") only for a binding's (and a return's, with `returning`).
 function Mailer.Plan(items, bankAlt)
     local groups, order = {}, {}
     for _, item in ipairs(items) do
         local r = item.result or {}
         local key = r.to and (r.to .. "|" .. tostring(r.what)) or ""
         if not groups[key] then
-            groups[key] = { to = r.to or bankAlt, what = r.to and r.what or nil, items = {} }
+            groups[key] = { to = r.to or bankAlt, what = r.to and r.what or nil, items = {},
+                returning = r.to ~= nil and r.route == "return" or nil }
             if key == "" then table.insert(order, 1, key) else order[#order + 1] = key end
         end
         table.insert(groups[key].items, item)
@@ -86,7 +91,7 @@ function Mailer.Plan(items, bankAlt)
         for _, item in ipairs(group.items) do
             for _, s in ipairs(item.slots) do
                 if not currentMail or #currentMail.stacks >= Mailer.PER_MAIL then
-                    currentMail = { to = group.to, what = group.what, stacks = {} }
+                    currentMail = { to = group.to, what = group.what, returning = group.returning, stacks = {} }
                     mails[#mails + 1] = currentMail
                 end
                 currentMail.stacks[#currentMail.stacks + 1] = { bag = s.bag, slot = s.slot, count = s.count,
@@ -196,7 +201,10 @@ local function sendMail(index)
     state.waiting = index
     ns.lastCommand = string.format("Mailworthy send %d/%d", index, #state.mails)
     local subject, body = string.format(Mailer.SUBJECT, index, #state.mails), ""
-    if mail.what then
+    if mail.returning then
+        subject = string.format(Mailer.RETURN_SUBJECT, index, #state.mails)
+        body = string.format(Mailer.RETURN_BODY, tostring(ns.PlayerName()))
+    elseif mail.what then
         subject = string.format(Mailer.FRIEND_SUBJECT, index, #state.mails, mail.what)
         body = string.format(Mailer.FRIEND_BODY, mail.what:lower(), tostring(ns.PlayerName()))
     end
