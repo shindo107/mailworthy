@@ -181,11 +181,59 @@ describe("Mailworthy mark", function()
             assert.equal(ns.Comms.MARK_KEY, ns.MailWindow.Footer())
         end)
 
+        it("a binding row delivered to the friend's crafter marks both: the crafter and the friend", function()
+            ns.Routes.Add(BOB, 165) -- Leatherworking: Bob's hello says Alice Alt has it
+            _G.MailworthyMailButton:Click()
+            local line = ns.MailWindow.RouteLine(1)
+            assert.truthy(line:find("to Alice " .. ns.Comms.MARK, 1, true), line)
+            assert.truthy(line:find("Bob's crafter " .. ns.Comms.MARK, 1, true), line)
+        end)
+
         it("with a controller the key and the legend stack", function()
             knowCharacter(BANK)
             ns.MailButton.GamepadUI = function() return true end
             _G.MailworthyMailButton:Click()
             assert.equal(ns.Comms.MARK_KEY .. "\n" .. ns.Widgets.Legend(), ns.MailWindow.Footer())
+        end)
+    end)
+
+    describe("a hello while a window is open", function()
+        local CAROL = "Carol Late"
+        local function heard() hello(CAROL, "H2|197|") end
+
+        it("the friends window's binding rows pick up the mark", function()
+            ns.Routes.Add(CAROL, ENCHANTING)
+            ns.RoutesUI.Show()
+            assert.equal("list", ns.RoutesUI.View())
+            assert.is_false(ns.RoutesUI.Marked())
+            heard()
+            assert.is_true(ns.RoutesUI.Marked())
+            assert.equal(ns.Comms.MARK_KEY, ns.RoutesUI.Footer())
+        end)
+
+        it("the settings picker and the ledger pick it up", function()
+            ns.Config.SetBankAlt(CAROL)
+            ns.SettingsUI.Show()
+            assert.equal("", ns.SettingsUI.Footer())
+            ns.Ledger.Debts = function() return { { name = CAROL, net = 1000, items = "", gold = 0 } } end
+            ns.LedgerUI.Show()
+            assert.is_false(marked(ns.LedgerUI.RowLine(1)))
+            heard()
+            assert.equal(ns.Comms.MARK_KEY, ns.SettingsUI.Footer())
+            assert.is_true(marked(ns.LedgerUI.RowLine(1)))
+        end)
+
+        it("the mailbox window redraws from the scan on screen", function()
+            ns.Config.SetBankAlt(CAROL)
+            WowStub.setBag(0, 1, WowStub.item(2589, "Linen Cloth", { count = 20, sell = 10 }))
+            MailFrame:Show()
+            SendMailFrame:Show()
+            _G.MailworthyMailButton:Click()
+            local before = ns.MailWindow.Result()
+            assert.is_false(marked(ns.MailWindow.Texts().to[1]))
+            heard()
+            assert.is_true(marked(ns.MailWindow.Texts().to[1]), ns.MailWindow.Texts().to[1])
+            assert.equal(before, ns.MailWindow.Result(), "no new scan: the list shown stays the list sent")
         end)
     end)
 

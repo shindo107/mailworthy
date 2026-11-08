@@ -53,6 +53,8 @@ function UI.Frame() return frame end
 function UI.Result() return result end
 --- The footer (the Mailworthy mark's key, the controller legend), for specs.
 function UI.Footer() return legend and legend:GetText() end
+--- A binding row's text while it shows, for specs.
+function UI.RouteLine(i) return routeRows[i] and routeRows[i].text:IsShown() and routeRows[i].text:GetText() or nil end
 --- The texts at the top ("To:" and the recipient lines) and the fees / status line, for specs and the report.
 function UI.Texts()
     local to = { toName and toName:GetText() }
@@ -318,7 +320,7 @@ local function fillRoutes()
             local to, crafter = ns.Routes.Recipient(r)
             local skipped = ns.Routes.Skipped(r.key)
             row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. withMark(to, firstName(to)) .. "|r"
-                .. (crafter and (" |cff888888(" .. firstName(r.to) .. "'s crafter)|r") or "")
+                .. (crafter and (" |cff888888(" .. withMark(r.to, firstName(r.to) .. "'s crafter") .. ")|r") or "")
                 .. UI.RouteTags(r.scope == "guild", ns.Routes.Skill(r))
                 .. (skipped and " |cff888888skipped this time|r" or ""))
             row.skip:SetText(skipped and "Undo skip" or "Skip once")
@@ -868,6 +870,13 @@ ns.On("PLAYER_LOGIN", function()
 end)
 -- A mailbox closed and reopened on Send Mail between two watcher ticks still opens the window.
 ns.On("MAIL_CLOSED", function() sendWasVisible = false end)
+-- A hello can make a name on screen a Mailworthy user (Comms.Mark): redraw what shows, from the
+-- scan on screen (no new scan, so the list the player sees doesn't change under them).
+ns.On("CHAT_MSG_ADDON", function(prefix)
+    if ns.Comms and prefix == ns.Comms.PREFIX and frame and frame:IsShown() and not ns.Mailer.Busy() then
+        UI.Refresh(true)
+    end
+end)
 ns.On("BAG_UPDATE_DELAYED", function()
     if not ns.Mailer.Busy() then refreshIfShown() end
 end)

@@ -444,7 +444,8 @@ function UI.Options(candidate, forGuild)
 end
 
 local function fillProfessions()
-    stepLabel:SetText("|cffaaaaaa2 of 2|r  |cffffd100What should " .. (tostring(picked.name):match("^(%S+)") or picked.name)
+    stepLabel:SetText("|cffaaaaaa2 of 2|r  |cffffd100What should "
+        .. withMark(picked.name, tostring(picked.name):match("^(%S+)") or picked.name)
         .. " get" .. (target == "guild" and " from the guild" or "") .. "?|r")
     chosenLabel:SetText(ns.Routes.CandidateText(picked, withMark(picked.name)))
     chosenLabel:Show()
@@ -642,5 +643,8 @@ ns.On("PLAYER_LOGIN", function() UI.Create() end)
 ns.On("GUILD_ROSTER_UPDATE", function() reloadIfShown("roster") end)
 ns.On("GROUP_ROSTER_UPDATE", function() reloadIfShown("group") end)
 ns.On("CHAT_MSG_ADDON", function(prefix)
-    if ns.Comms and prefix == ns.Comms.PREFIX then reloadIfShown("hello") end
+    if not ns.Comms or prefix ~= ns.Comms.PREFIX then return end
+    reloadIfShown("hello")
+    -- Any other view: a hello can make a name on screen a Mailworthy user (Comms.Mark).
+    if frame and frame:IsShown() and not (view == "add" and not picked) then UI.Refresh() end
 end)

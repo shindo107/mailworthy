@@ -176,3 +176,7 @@ ns.On("PLAYER_LOGIN", function()
     UI.Create()
     ns.Ledger.OnChanged(UI.RefreshIfShown)
 end)
+-- A hello can make a name on screen a Mailworthy user (Comms.Mark): redraw.
+ns.On("CHAT_MSG_ADDON", function(prefix)
+    if ns.Comms and prefix == ns.Comms.PREFIX then UI.RefreshIfShown() end
+end)
