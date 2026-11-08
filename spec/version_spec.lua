@@ -249,6 +249,17 @@ describe("version notice", function()
             assert.equal(before + 20, ns.SettingsUI.Frame():GetHeight())
         end)
 
+        it("a peer already known (hello first) still redraws the open windows (Codex review)", function()
+            say(BOB, "H2||")
+            ns.SettingsUI.Show()
+            assert.equal("", ns.SettingsUI.VersionLine())
+            local calls = 0
+            ns.Version.OnChanged(function() calls = calls + 1 end)
+            say(BOB, "U2|v0.31.0")
+            assert.equal(1, calls)
+            assert.equal(ns.Version.Text(), ns.SettingsUI.VersionLine())
+        end)
+
         it("the Mailworthy window's footer: the line, then the mark's key and the controller legend", function()
             ns.Config.SetBankAlt(BANK)
             _G.Auctionator = { API = { v1 = {
