@@ -26,8 +26,9 @@
 -- Grey junk with a vendor price is V too (the AH has no price for it). Without
 -- Auctionator: only that, plus the "Mailed for" line.
 --
--- Taint: tags are textures and font strings on the game's bag buttons, kept in
--- our own weak table (the lock glow's technique, via Border's hooks); tooltip
+-- Taint: tags are textures and font strings on the game's bag buttons (and the bag
+-- addons' buttons, BagAddons.lua), kept in our own weak table (the lock glow's
+-- technique, via Border's hooks and Border.RefreshButton); tooltip
 -- lines go through TooltipDataProcessor, which runs addon callbacks insecurely
 -- by design (forceinsecure behind an attribute delegate). Switches:
 -- /mw feature bankAltTags off, /mw feature tooltipLines off.
@@ -155,10 +156,20 @@ local function tagFor(button)
     return t
 end
 
---- Border decorator: show the slot's tag, or hide ours if there's none.
-function BankAlt.Decorate(button, bag, slot)
-    local want = ns.Features.On("bankAltTags") and BankAlt.Active() and bag ~= nil
-    local item = want and current().bySlot[bag .. ":" .. tostring(slot)]
+--- Border decorator: show the item's tag, or hide ours if there's none. The item is the one in
+--- bag / slot; a view without bag slots (Auctionator's) passes nil for them and its item's link,
+--- else its item ID (Border.RefreshButton).
+function BankAlt.Decorate(button, bag, slot, itemID, link)
+    local want = ns.Features.On("bankAltTags") and BankAlt.Active()
+    local item
+    if want then
+        local c = current()
+        if bag ~= nil then
+            item = c.bySlot[bag .. ":" .. tostring(slot)]
+        else
+            item = (link and c.byLink[link]) or (itemID and c.byItemID[itemID]) or nil
+        end
+    end
     local tag = item and item.verdict and BankAlt.TAGS[item.verdict]
     if not tag then
         local t = tags[button]
@@ -172,32 +183,35 @@ function BankAlt.Decorate(button, bag, slot)
     t.text:Show()
 end
 
---- The tag for an item shown outside the bags (Auctionator's Selling tab: AuctionatorTags.lua):
---- by bag and slot when known, else by link; nil when there's none or tags don't show here.
-function BankAlt.TagAt(bag, slot, link)
-    if not BankAlt.Active() then return nil end
-    local c = current()
-    local item = (bag ~= nil and slot ~= nil and c.bySlot[bag .. ":" .. tostring(slot)]) or (link and c.byLink[link])
-    return item and item.verdict or nil
+--- Does this button show one of our tags right now? (Baganator: our corner widget holds its corner
+--- while it does.)
+function BankAlt.TagShown(button)
+    local t = tags[button]
+    return t ~= nil and t.bg:IsShown() == true
 end
 
-local redrawListeners = {}
---- `fn()` after every redraw of the bag tags (AuctionatorTags redraws its own tags then).
-function BankAlt.OnRedraw(fn) redrawListeners[#redrawListeners + 1] = fn end
+--- Place a button's tag on `region` (Baganator: our corner widget, wherever the player put it), or
+--- back in the top-left corner with nil.
+function BankAlt.AnchorTag(button, region)
+    local t = tags[button]
+    if not t then return end
+    t.bg:ClearAllPoints()
+    if region then t.bg:SetAllPoints(region) else t.bg:SetPoint("TOPLEFT", 2, -2) end
+end
+
+--- The legend under the bags ("" while no tags show), shared by Blizzard's bags and the bag addons.
+function BankAlt.LegendText()
+    local mode = ns.Features.On("bankAltTags") and BankAlt.Mode()
+    if mode == "vendor" then return "Mailworthy: |cffd0b070V|r sell to a vendor" end
+    if not mode then return "" end
+    return "Mailworthy: |cff6f9fffAH|r auction   |cff40b0a0B|r bank for later   |cffb080e0DE|r disenchant"
+        .. "   |cffd0b070V|r vendor now"
+end
 
 local function redraw()
     BankAlt.Invalidate()
     ns.Border.RefreshAll()
-    for _, fn in ipairs(redrawListeners) do
-        local ok, err = pcall(fn)
-        if not ok then ns.Log.Add("bankalt", "redraw listener error: %s", tostring(err)) end
-    end
-    if legend then
-        local mode = ns.Features.On("bankAltTags") and BankAlt.Mode()
-        legend:SetText(mode == "vendor" and "Mailworthy: |cffd0b070V|r sell to a vendor"
-            or mode and "Mailworthy: |cff6f9fffAH|r auction   |cff40b0a0B|r bank for later   |cffb080e0DE|r disenchant"
-                .. "   |cffd0b070V|r vendor now" or "")
-    end
+    if legend then legend:SetText(BankAlt.LegendText()) end
     if frame and frame:IsShown() then BankAlt.RefreshWindow() end
 end
 BankAlt.Redraw = redraw

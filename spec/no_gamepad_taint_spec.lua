@@ -16,6 +16,17 @@ describe("no mail tab switching from Mailworthy's code", function()
     end)
 end)
 
+describe("bag addons draw without frames or controller UI (BagAddons.lua)", function()
+    it("creates no frame, never touches focus, menus or smart navigation", function()
+        local source = assert(io.open("Mailworthy/BagAddons.lua")):read("*a")
+        local code = source:gsub("%-%-[^\n]*", "") -- comments may name them
+        for _, banned in ipairs({ "CreateFrame", "SetFocus", "ModifyMenu", "SmartNavigation", "FrameControlsManager",
+            "GamepadSharedUtility", "ShowUIPanel", "smartNavigation", "OnSmartNav", "buttonContext" }) do
+            assert.is_nil(code:find(banned, 1, true), banned)
+        end
+    end)
+end)
+
 describe("no writes into the controller UI", function()
     local saved
     before_each(function()

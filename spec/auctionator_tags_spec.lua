@@ -136,6 +136,8 @@ describe("Mailworthy tags on Auctionator's Selling tab", function()
         first:SetItemInfo(info(ore, nil, nil, 0))
         ns.Border.RefreshButton = refresh
         assert.same({ first, nil, nil, nil, nil, linen }, calls[1])
+        first:SetItemInfo({ itemLink = linen, itemCount = 20 })
+        assert.equal("V", tagOf(first), "BankAlt.Decorate finds it by link")
         assert.same({ first, nil, nil, nil, nil, nil }, calls[2], "a favourite not in the bags: no link either")
     end)
 
@@ -158,7 +160,21 @@ describe("Mailworthy tags on Auctionator's Selling tab", function()
         for i = 1, 3 do assert.is_nil(tagOf(buttons[i]), "button " .. i .. ": Copper Ore sits in that slot") end
     end)
 
-    it("counts only tags on screen:a released button or a closed auction house shows none", function()
+    it("a fresh lock's glow on Auctionator's icon ends with its flash (Codex review)", function()
+        local buttons = newView():Show({ info(ore, 0, 1, 5) })
+        local function glowing()
+            for _, t in ipairs(ns.Border.Glow(buttons[1])) do if not t:IsShown() then return false end end
+            return true
+        end
+        ns.Locks.ToggleItem(2770, ore, "spec") -- away from the mailbox: a 3 s flash
+        assert.is_true(glowing())
+        assert.is_nil(tagOf(buttons[1]), "a locked item has no tag")
+        WowStub.state.now = WowStub.state.now + ns.Border.FLASH + 1
+        WowStub.runTimers(ns.Border.FLASH)
+        assert.is_false(glowing(), "Border.RefreshAll ran the Auctionator refresher")
+    end)
+
+    it("counts only tags on screen: a released button or a closed auction house shows none", function()
         local view = newView()
         view:Show({ info(ore, 0, 1, 5), info(linen, 0, 2, 20) })
         assert.equal(2, ns.AuctionatorTags.Shown())

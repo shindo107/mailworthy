@@ -5,7 +5,7 @@
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1743661
 ## IconTexture: Interface\AddOns\Mailworthy\Textures\Icon
-## OptionalDeps: Auctionator, TradeSkillMaster, DisenchantValue, Disenchantry
+## OptionalDeps: Auctionator, TradeSkillMaster, DisenchantValue, Disenchantry, Baganator, Bagnon, ArkInventory
 ## SavedVariables: MailworthyDB
 ## SavedVariablesPerCharacter: MailworthyCharDB
 
@@ -43,5 +43,6 @@ LedgerUI.lua
 MinimapButton.lua
 MailWindow.lua
 BankAlt.lua
+BagAddons.lua
 AuctionatorTags.lua
 Report.lua
