@@ -498,10 +498,23 @@ function Contributions.Export(guildName)
     local _, realm, faction = ns.Characters.Current()
     local templates, peers, given = tableOr(MailworthyDB.guildTemplates), tableOr(MailworthyDB.peers),
         tableOr(MailworthyDB.guildGiven)
+    -- This account's names, read without Ledger.IsOwn: its Config.BankAlt() creates missing settings tables,
+    -- and the export writes nothing (Codex review).
+    local realmKey = tostring(realm) .. "|" .. tostring(faction)
+    local own = {}
+    local function addOwn(name)
+        name = type(name) == "string" and ns.Routes.Clean(name) or nil
+        if name then own[name:lower()] = true end
+    end
+    addOwn(ns.PlayerName())
+    addOwn(tableOr(MailworthyDB.bankAlts)[realmKey])
+    for _, c in pairs(tableOr(MailworthyDB.characters)) do
+        if type(c) == "table" and c.realm == realm and c.faction == faction then addOwn(c.name) end
+    end
     return Contributions.Build({ now = now(), template = templates[key],
-        peers = peers[tostring(realm) .. "|" .. tostring(faction)], roster = Contributions.Roster(guild),
+        peers = peers[realmKey], roster = Contributions.Roster(guild),
         givers = given[key], heard = tableOr(MailworthyDB.guildHeard)[key],
-        isOwn = function(name) return ns.Ledger.IsOwn(name) end })
+        isOwn = function(name) return own[name:lower()] == true end })
 end
 
 --- Lines for /mw report: counts only, never names.

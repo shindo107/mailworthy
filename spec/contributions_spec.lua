@@ -678,6 +678,33 @@ describe("guild contributions", function()
             assert.is_nil(MailworthyAPI.v1.GetGuildExport(), "nothing left to export")
         end)
 
+        it("checking own names writes nothing: no settings tables appear when an export runs", function()
+            hearG(BOB, ns.Contributions.Encode({ total = 30, since = NOW - 86400, days = { [TODAY] = 30 } }, NOW - 100))
+            MailworthyDB.settings, MailworthyDB.realms, MailworthyDB.bankAlts, MailworthyDB.names = nil, nil, nil, nil
+            assert.equal(BOB, MailworthyAPI.v1.GetGuildExport().givers[1].characterName)
+            assert.is_nil(MailworthyDB.settings)
+            assert.is_nil(MailworthyDB.realms)
+            assert.is_nil(MailworthyDB.bankAlts)
+            assert.is_nil(MailworthyDB.names)
+            MailworthyDB.bankAlts = { ["Classic Beta PvP|Alliance"] = BOB } -- as the bank alt picker saves it
+            assert.is_nil(MailworthyAPI.v1.GetGuildExport())
+            -- the whole of MailworthyDB, with a template, peers, own and heard givers: unchanged by an export
+            MailworthyDB.bankAlts = nil
+            publish({ { profession = ENCHANTING, to = BOB } })
+            ns.Comms.Peers()[BOB:lower()] = { name = BOB, at = NOW - 5 }
+            MailworthyDB.guildGiven = { [KEY] = { [ME:lower()] = { name = ME, total = 3, since = NOW, days = { [TODAY] = 3 } } } }
+            local function copy(t)
+                if type(t) ~= "table" then return t end
+                local out = {}
+                for k, v in pairs(t) do out[k] = copy(v) end
+                return out
+            end
+            local before = copy(MailworthyDB)
+            local e = MailworthyAPI.v1.GetGuildExport()
+            assert.equal(2, #e.givers)
+            assert.same(before, MailworthyDB, "an export changed MailworthyDB")
+        end)
+
         it("a saved asOf in the future is dropped at login and never blocks a real update", function()
             ns = loadAddon({ db = { guildHeard = { [KEY] = { [BOB:lower()] = { name = BOB, total = 5, since = NOW - 86400,
                 asOf = 4102444800, days = {} } } } }, charDB = {} })
