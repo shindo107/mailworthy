@@ -120,7 +120,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   only its rules for guild members. `/mw feature guildTemplate off` turns all of it off.
 - **Stale auction prices** get a nudge at the mailbox: once your Auctionator prices are over
   3 days old, the Mailworthy button gets a **!** and the window says so (past 7 days
-  Mailworthy stops trusting them, and those items stay in your bags). When another Mailworthy user in
+  Mailworthy stops trusting them, and those items go to the bank alt to wait for a fresh price,
+  like items with no price yet). When another Mailworthy user in
   your guild or group has scanned in the last 2 days, it says who, and one chat line tells
   you at the mailbox. Only the day of each player's scan is shared (with the addon messages
   above), never prices, and it never changes what gets mailed. `/mw feature staleNudge off`
