@@ -116,8 +116,13 @@ function Bags.Evaluate(settings)
     local result = { settings = settings, priced = priced, routes = routes, mail = {}, keep = {}, unmailable = {},
         totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, recipients = {}, byRecipient = {} } }
     local stacksTo = {}
+    -- Class bindings (Routes, Classes.lua) need each item's class line: read only when there's one.
+    local classRoutes = false
+    for _, r in ipairs(routes) do classRoutes = classRoutes or r.class ~= nil end
+    local mine = classRoutes and ns.Classes.Mine() or nil
     for _, item in ipairs(Bags.Group(Bags.Slots())) do
         item.locked = ns.Locks.IsItemLocked(item.itemID)
+        if classRoutes then item.classes, item.myClass = ns.Classes.Of(item.itemID), mine end
         item.questFor = ns.Quests.For(item.link)
         item.classID, item.subclassID = ns.Prices.ClassID(item.link)
         item.vendor = item.noValue and 0 or ns.Prices.Vendor(item.link)

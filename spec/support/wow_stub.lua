@@ -30,6 +30,7 @@ local function defaultState()
         attached = {}, cursor = nil, used = {}, sent = {}, sentItems = {}, postage = 30, money = 0, cod = 0, moneyCalls = {},
         inbox = {}, invoices = {}, takes = {},
         quests = {}, -- the quest log: { { title, header = true?, objectives = { { text, type } } } }
+        itemClasses = {}, -- itemID -> "Mage" / "Mage, Warlock": the tooltip's "Classes: ..." line
         mods = {}, bindings = {}, bindingOwners = {}, activeFrame = nil, now = 1000, gamepadUI = false,
         navButton = nil,
         -- bindings: guild = nil (not in one) or { clubId, name, rank (this character's 0-based rank index, default 3),
@@ -322,7 +323,7 @@ _G.C_Club = {
         local m = g and g.clubId == clubId and g.members[i]
         if not m then return nil end
         return { isSelf = m.name == s().name, memberId = i, name = m.name .. (m.realm and ("-" .. m.realm) or ""),
-            presence = m.online and 1 or 3, level = m.level, classID = 1,
+            presence = m.online and 1 or 3, level = m.level, classID = m.classID,
             profession1ID = m.professions and m.professions[1], profession2ID = m.professions and m.professions[2],
             profession1Rank = m.ranks and m.ranks[1], profession2Rank = m.ranks and m.ranks[2],
             guildRankOrder = (m.rank or 3) + 1 }
@@ -422,6 +423,17 @@ _G.SendMail = function(name, subject, body)
         cod = s().cod })
 end
 _G.C_Mail = { IsCommandPending = function() return false end }
+-- Item tooltip data (TooltipInfoDocumentation.lua): a name line, and a "Classes: ..." line
+-- (TooltipDataLineType.UsageRequirement = 43) for a class-only item.
+_G.ITEM_CLASSES_ALLOWED = "Classes: %s"
+_G.C_TooltipInfo = {
+    GetItemByID = function(id)
+        local lines = { { type = 22, leftText = "Item " .. tostring(id) } }
+        local classes = s().itemClasses[id]
+        if classes then lines[#lines + 1] = { type = 43, leftText = "Classes: " .. classes } end
+        return { id = id, lines = lines }
+    end,
+}
 -- The quest log (QuestLogDocumentation.lua): numShownEntries, GetInfo -> { title, questID, isHeader },
 -- GetQuestObjectives(questID) -> { { text, type, ... } }.
 _G.C_QuestLog = {

@@ -1,8 +1,9 @@
 -- CRITICAL PATH: the shipping gate. Every build must still mail, safely, the way a
 -- player does it: a mailbox visit with a realistic bag, the mouse and the controller,
--- with and without Auctionator, with a binding, with a guild template, without a bank alt or
--- with it skipped for the visit, and on SavedVariables an older build left behind. CI runs
--- this file on its own before the rest, and a tag can't publish unless it passes.
+-- with and without Auctionator, with a binding (a profession's or a class's), with a guild
+-- template, without a bank alt or with it skipped for the visit, and on SavedVariables an older
+-- build left behind. CI runs this file on its own before the rest, and a tag can't publish
+-- unless it passes.
 --
 -- These tests check outcomes, not tuning: what was previewed is exactly what was sent,
 -- to exactly the recipients shown, and the AGENTS.md safety rules hold for every mail.
@@ -258,6 +259,24 @@ describe("critical path: mailing", function()
         _G.MailworthyMailButton:Click()
         local preview = previewed(ns)
         assert.equal(BOB, preview[10940])
+        assert.equal("Send to Roknua, Bob", _G.MailworthyMailSend:GetText())
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+    end)
+
+    it("a class binding: the mage friend gets the mage-only scroll, the bank alt the rest, nobody else", function()
+        -- operator, 2026-11-08: "this is a mage only item, id like to be able to friend mail these types of items too"
+        WowStub.setBag(0, 13, WowStub.item(211234, "Scroll: VOCE WELL", { sell = 15, class = 0 }))
+        prices[WowStub.link(211234, "Scroll: VOCE WELL")] = 100
+        WowStub.state.itemClasses[211234] = "Mage"
+        WowStub.state.itemClasses[6515] = "Paladin" -- another class's item: not the mage's
+        ns.Routes.Add(BOB, "MAGE")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[211234])
+        assert.equal(BANK_ALT, preview[6515])
         assert.equal("Send to Roknua, Bob", _G.MailworthyMailSend:GetText())
         _G.MailworthyMailSend:Click()
         deliver(ns)

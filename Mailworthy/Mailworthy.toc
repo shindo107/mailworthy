@@ -24,6 +24,7 @@ TierCheck.lua
 Quests.lua
 Valuation.lua
 Config.lua
+Classes.lua
 Routes.lua
 Comms.lua
 Guild.lua

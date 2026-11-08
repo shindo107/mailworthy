@@ -76,6 +76,7 @@ must never break the game.
 | `SettingsUI.lua` | settings window, two views (`UI.View`): main (bank alt row with Change..., "What gets mailed": steppers, 2/8/24h, disenchant, profession materials; "In your bags": tags, glow; "More": friends, summary, minimap; the prices source) and pick (opened by Change..., and first while no bank alt is set: known characters, "This character is my bank alt" for a second account, optional typed name with "not seen" second press, Back); a pick returns to main; controller via `PadKey` set `settings` (works away from the mailbox) |
 | `MinimapButton.lua` | LedgerLink's minimap button (click: settings; drag: move); feature `minimapButton` |
 | `Report.lua` | `/mw report` (one copyable report: build, controller, switches, bank alt, settings, locks, last send, bindings, peers, blocked actions, log), the copy box `/mw scan` uses, and the AH sale-mail reader (house cut). Replaced the discovery self-test in Phase 5 |
+| `Classes.lua` | class-only items (`Classes.Of(itemID)` -> `{ MAGE = true }` from the tooltip data's "Classes: ..." line, cached; `Token` for names and C_Club class IDs; `Mine`); class bindings in `Routes` read it, only when one exists |
 | `Routes.lua` | **bindings** (2026-10-26): a crafting profession's materials to one player (`MailworthyDB.routes[realm\|faction]` for all the account's characters, `MailworthyCharDB.routes` for this one; this character's win). Pure `Divert(item, verdict, price, settings, routes)`: route `friend`, `to`, `what`; never over a hard keep; at or above the binding's `cap` (copper per unit, `CAP_STEPS`, 5g default, nil = none) the normal verdict stands with `capped`. `SkipOnce` per mailbox visit. `Candidates()`: party / raid units, guild via `C_Club` (`GetGuildRosterInfo` fallback), known characters, peers; `Clean` drops "-Realm". Pure `Crafter(route, peer)` / `Recipient(route)`: the bound player, or the character of theirs that has the profession (from their hello) |
 | `TierData.lua` | **generated** by `tools/tiers/build.py` from `tools/tiers/data.py` (edit those, rerun): `Tiers.DONE` (rows), `Tiers.KEEP` (items kept beyond the subclasses), `Tiers.CONVERT` (leather up-conversions). Source: the 2026-11-06 recipe-by-recipe research of every profession, checked against Blizzard's Forever Game Data API the same day (PLAN "Material tiers") |
 | `Tiers.lua` | **material tiers** (2026-11-06): the rules over `TierData.lua`'s tables; pure `Threshold`, `Outgrown`, `OutgrownNames`, `PastText`, `Step`, `WorthConverting` (a leather past its recipes stays while converting it pays at the AH). First Aid cloth: the next bandage's learn skill; the rest: the last recipe's grey, through the profession's own parts. No row = never outgrown. Used by `Valuation.NeededBy` (own rank) and `Routes.Matches` (the recipient's `route.skill`). Switch `tiers`; all of it only while `keepProfessionMats` is on |
@@ -284,7 +285,11 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   is kept with `result.held` and its route, "Auction +5s: no bank alt" under Staying; bindings
   still mail; `Mailer.Blocker` refuses only a mail actually for a missing bank alt). Without a
   bank alt the bag tags show on that character (`BankAlt.Mode` "self"). Critical path cases:
-  no bank alt, Skip once, and a quest item in every bag.
+  no bank alt, Skip once, and a quest item in every bag. (5) "this is a mage only item, id like
+  to be able to friend mail these types of items too": class bindings, `{ to, class = "MAGE" }`
+  beside the profession ones (`Routes.KeyOf` "class:MAGE|name", `What` "Mage items"; taken only
+  when this character's class can't use the item; same cap, hard keeps, Skip once; not in guild
+  templates). The friends window offers the picked player's class first when it is known.
 - Popups beside their opener (operator, same day: the new popups "overlap the existing menus
   and you cant read the new popup easily without closing the old one"): `Widgets.PlaceBeside`
   puts settings / friends / the bank alt summary to the right of the Mailworthy window that

@@ -22,7 +22,7 @@ local _, ns = ...
 local UI = {}
 ns.RoutesUI = UI
 
-UI.BINDING_ROWS, UI.CANDIDATE_ROWS, UI.PROFESSION_ROWS = 4, 6, 8
+UI.BINDING_ROWS, UI.CANDIDATE_ROWS, UI.PROFESSION_ROWS = 4, 6, 9
 local WIDTH = 560
 local BIND_ROW, LIST_ROW = 50, 26
 local BIND_TOP = -92
@@ -409,18 +409,36 @@ local function fillCandidates()
     return LIST_TOP - shown * LIST_ROW
 end
 
-local function fillProfessions()
+--- Step 2's choices for the picked player: their class's items first when their class is known
+--- (operator, 2026-11-08: a mage-only scroll to a mage friend; not for guild rules, which are
+--- per profession), then every crafting profession. { { id, class, text, suggested }, ... }.
+function UI.Options(candidate, forGuild)
+    local list = {}
+    local class = candidate and ns.Classes.Token(candidate.class)
+    if class and not forGuild then
+        local name = ns.Classes.Name(class)
+        list[#list + 1] = { class = class, suggested = true,
+            text = string.format("%s items (only a %s can use them)", name, name:lower()) }
+    end
     local suggested = {}
-    for _, p in ipairs(ns.Routes.Suggested(picked)) do suggested[p.id] = true end
+    for _, p in ipairs(candidate and ns.Routes.Suggested(candidate) or {}) do suggested[p.id] = true end
+    for _, p in ipairs(ns.Routes.Professions()) do
+        list[#list + 1] = { id = p.id, text = p.name .. " (" .. p.mats .. ")", suggested = suggested[p.id] == true }
+    end
+    return list
+end
+
+local function fillProfessions()
     stepLabel:SetText("|cffaaaaaa2 of 2|r  |cffffd100What should " .. (tostring(picked.name):match("^(%S+)") or picked.name)
         .. " get" .. (target == "guild" and " from the guild" or "") .. "?|r")
     chosenLabel:SetText(ns.Routes.CandidateText(picked))
     chosenLabel:Show()
     local shown = 0
+    local options = UI.Options(picked, target == "guild")
     for i, b in ipairs(professionRows) do
-        local p = ns.Routes.Professions()[i]
+        local p = options[i]
         if p then
-            b:SetText(selected(p.name .. " (" .. p.mats .. ")", suggested[p.id] == true))
+            b:SetText(selected(p.text, p.suggested))
             b:Show()
             shown = shown + 1
         else
@@ -530,9 +548,9 @@ end
 --- Step 2: the profession; a binding is saved for all the account's characters here, a
 --- guild rule goes to the draft (published with Publish to guild).
 function UI.Bind(i)
-    local p = ns.Routes.Professions()[i]
+    local p = picked and UI.Options(picked, target == "guild")[i]
     if not p or not picked then return end
-    if target == "guild" then
+    if target == "guild" and not p.class then
         local rule, err = ns.Guild.DraftAdd(picked.name, p.id)
         if not rule then
             setHint("|cffff8040Not added: " .. tostring(err) .. ".|r")
@@ -544,7 +562,7 @@ function UI.Bind(i)
         UI.Refresh()
         return
     end
-    local route, err = ns.Routes.Add(picked.name, p.id)
+    local route, err = ns.Routes.Add(picked.name, p.class or p.id)
     if not route then
         setHint("|cffff8040Not bound: " .. tostring(err) .. ".|r")
         return
