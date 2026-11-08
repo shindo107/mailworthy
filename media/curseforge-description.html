@@ -15,7 +15,7 @@
 <h2>What gets mailed</h2>
 <p>For every item in your bags (all its stacks together, in every bag you carry, reagent bag included), Mailworthy compares what you'd get from a vendor with what it's worth on the auction house after the 5% auction cut, the listing deposit and the postage (30 copper per stack). An item is mailed when it's clearly worth it: by default at least <strong>1 silver</strong> and <strong>25%</strong> more than the vendor pays. Both numbers are adjustable.</p>
 <p>No math needed on your side. The price is your last Auctionator scan, or the <strong>3-day median</strong> of your scans when that's lower, so one empty-market spike can't make a dud look valuable. Half the deposit counts, since the game refunds it on a sale; a flooded market is valued at its floor; and the rule knows your realm's launch day. Before the first raids, enchanting materials, herbs and elementals get a <strong>B</strong> verdict: bank them on your alt, they sell for more later. As the realm ages and gold piles up, the minimum gain grows with it.</p>
-<p><strong>No auction price yet?</strong> On a fresh realm plenty of things haven't been listed yet. Instead of sitting in your main's bags, an item with no auction price (or only one more than 7 days old) goes to your bank alt to wait for a price, and the window says so. Common trade goods are always mailed, price or not: cloth, leather and hides, ore, bars and stone, herbs, elementals, and enchanting dust, essences and shards. Grey junk stays for the vendor.</p>
+<p><strong>No auction price yet?</strong> On a fresh realm plenty of things haven't been listed yet. Instead of sitting in your main's bags, an item with no auction price (or only one more than 7 days old) goes to your bank alt to wait for a price, and the window says so. Common trade goods don't wait for a price: with none (or an old one) they're mailed anyway, and with a price they follow the usual rule. They are cloth, leather and hides, ore, bars and stone, herbs, elementals, and enchanting dust, essences and shards. Grey junk stays for the vendor.</p>
 <p>Mailworthy never mails:</p>
 <ul>
 <li>items you've locked;</li>
@@ -48,10 +48,10 @@
 </ul>
 
 <h2>One template for the whole guild</h2>
-<p>Guild masters and officers can set who gets each profession's materials for the whole guild: herbs to the alchemist, dust and greens to the enchanter, cloth to the tailor. Open <code>/mw friends</code>, press <strong>Create...</strong>, add a rule per profession (each with its price cap) and press <strong>Publish to guild</strong>.</p>
+<p>Guild masters and officers can set who gets each profession's materials for the whole guild: herbs to the alchemist, dust and greens to the enchanter, cloth to the tailor. Open <code>/mw guild</code> (or <strong>Guild...</strong> in the settings), press <strong>Add a rule...</strong> for each profession (each with its price cap) and press <strong>Publish to guild</strong>.</p>
 <ul>
-<li>Guildmates running Mailworthy get it in chat and in their Friends window. Nothing is mailed until they press <strong>Use guild rules</strong> once; after that, updates apply on their own, each with a chat line.</li>
-<li><strong>One press turns it off</strong>: <em>Guild rules: on</em>, in Friends or on the mailbox window's Bindings heading.</li>
+<li>Guildmates running Mailworthy get it in chat and in their Guild window. Nothing is mailed until they press <strong>Use guild rules</strong> once; after that, updates apply on their own, each with a chat line.</li>
+<li><strong>One press turns it off</strong>: <em>Guild rules: on</em>, in the Guild window or on the mailbox window's Bindings heading.</li>
 <li>Your own bindings and your own professions always come first: a tailor keeps their cloth. Skip once works on guild rules too.</li>
 <li>Any guildmate running Mailworthy passes a copy on, so the guild master doesn't need to be online. A copy is taken only when your own guild roster shows its author as the guild master or an officer, and only its rules for guild members.</li>
 </ul>
@@ -120,7 +120,7 @@
 <li>Mail only goes between characters on the same realm and faction, so that's who Mailworthy offers as your bank alt and as friends.</li>
 <li>Mailworthy doesn't post auctions. It gets the items to your bank alt; you list them there (Auctionator makes that quick).</li>
 <li>Nothing is sent without your click, nothing happens in combat, no gold is ever attached, and the window always shows who gets each item and why it's mailed or kept.</li>
-<li>Mailworthys talk to each other over hidden addon messages, to your guild and group only: which characters craft what, their skill, the day of the last price scan, your guild's template, and the value of a mail between you two so both ledgers agree. Never your bags or gold.</li>
+<li>Mailworthys talk to each other over hidden addon messages to your guild and group: which characters craft what, their skill, the day of the last price scan and your guild's template. The value of a mail goes in a whisper only between the two players who exchanged it, so both ledgers agree. Never your bags or gold.</li>
 <li>Want the numbers? <code>/mw scan</code> shows the price, deposit, postage and gain behind every decision.</li>
 <li>The full guide, page by page, is on the <a href="https://github.com/sjdodge123/mailworthy/wiki">Mailworthy wiki</a>.</li>
 </ul>

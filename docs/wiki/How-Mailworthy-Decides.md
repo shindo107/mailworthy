@@ -2,7 +2,7 @@
 
 For every item in your bags, Mailworthy asks one question: **is it worth clearly more on the auction house (or disenchanted) than at a vendor, after every fee?** If yes, it's mailed. If not, it stays for the vendor.
 
-All the stacks of one item count together, so you never get "mail 20 Linen Cloth, keep 3".
+All the stacks of one item count together, so you never get "mail 20 Linen Cloth, keep 3". (The one exception is [[Return to Sender]]: it sends back whole stacks up to what was mailed to you, and the rest is judged as usual.)
 
 ## The order of things
 
@@ -34,7 +34,7 @@ A brand-new realm has lots of items nobody has listed yet. When your price addon
 
 - A price **older than 7 days** counts as no price ("auction price too old (8 days)").
 - **Grey junk** with no price stays, for the vendor.
-- If the **price lookup failed**, the item stays. A failure never counts as "no price yet".
+- If the **price lookup failed**, the item stays. A failure never counts as "no price yet". (Return to sender needs no price, so it can still send it back.)
 - **Staple trade goods** (cloth, leather, ore, bars, stone, herbs, elementals, dust, essences, shards) are always mailed when they have no price, as a **Common** item.
 
 Where prices come from, and what happens without a price addon: see [[Price Sources]].

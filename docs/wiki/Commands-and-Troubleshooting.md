@@ -23,7 +23,7 @@ Open the Mailworthy window and hover the item in your bags: the tooltip says whe
 
 ## Something looks wrong
 
-1. Run `/mw report`, copy the text and attach it to your bug report on CurseForge or GitHub. It has your settings, the scan, your bindings, the guild template, the Mailworthys you've heard from, the bag addons Mailworthy found, recent errors, and which game functions were available.
+1. Run `/mw report`, copy the text and attach it to your bug report on CurseForge or GitHub. It has your settings, your bindings, the guild template, the Mailworthys you've heard from, the bag addons Mailworthy found, recent errors, and which game functions were available. For a pricing question, add the text from `/mw scan` (the item-by-item numbers).
 2. If a piece of Mailworthy misbehaves (especially with a controller), turn just that piece off and `/reload`:
 
 | Switch | Turns off |
@@ -53,7 +53,7 @@ Open the Mailworthy window and hover the item in your bags: the tooltip says whe
 
 **An item shows "No price".** Your price addon hasn't seen it on the auction house yet. It goes to your bank alt to wait for a price. See [[Price Sources]].
 
-**It says "the price lookup failed".** Auctionator or TSM couldn't answer for that item, so it stays. Mailworthy never mails on a failed lookup.
+**It says "the price lookup failed".** Auctionator or TSM couldn't answer for that item, so it stays: it never goes to your bank alt or a friend on a failed lookup. (Return to sender needs no price, so it can still send it back.)
 
 **Send is greyed out and says "Click Send Mail".** You're on the Inbox tab. Mail only goes out from Send Mail; click that tab and the window follows you.
 

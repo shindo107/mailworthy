@@ -9,15 +9,18 @@ Mailworthy only ever mails what you see in the window, and only after you press 
 | **Items an active quest asks for** | Crisp Spider Meat while Redridge Goulash is in your quest log, even though it isn't a "quest item". The window says *Redridge Goulash needs it*, and it never gets a vendor tag. Turn the quest in and it's judged like anything else. |
 | **Items the game is using** | For example, an item on your cursor or in a trade window. |
 | **Profession tools** | Fishing poles, Mining Pick, Blacksmith Hammer, Skinning Knife, Flint and Tinder, Arclight Spanner, Gyromatic Micro-Adjustor, enchanting rods. |
-| **Your professions' materials** | Cloth for your tailor, herbs for your alchemist, and so on, until you've levelled past them. See [[Profession Materials]]. |
 | **Items not loaded yet** | Right after login the game may not have an item's details; it's listed next time. |
 | **Gold** | Never attached, never sent as cash on delivery. |
+
+These stay too, unless you asked for them to go:
+
+- **Your professions' materials**: cloth for your tailor, herbs for your alchemist, and so on, until you've levelled past them (see [[Profession Materials]]). A binding or guild rule you turned on for that profession, or [[Return to Sender]], still sends them.
 
 And these stay because of the numbers:
 
 - Anything that sells **better at a vendor**, or not enough better on the AH to be worth the trip (the minimum gain, see [[How Mailworthy Decides]]).
 - **Grey junk** with no auction price: sell it at a vendor.
-- An item whose **price lookup failed**: Mailworthy never mails on a failed lookup.
+- An item whose **price lookup failed**: it never goes to your bank alt or a friend on a failed lookup. ([[Return to Sender]] needs no price, so it can still send an item back to whoever mailed it.)
 - Without Auctionator or TSM, anything green or better that isn't a staple trade good (unless one of your bindings takes it). See [[Price Sources]].
 
 ## Your bank alt's share

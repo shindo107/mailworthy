@@ -14,9 +14,10 @@ When you and your guildmates (or party) all run Mailworthy, the addons quietly s
 
 ## What's never shared
 
-- **Your prices.** Only the day you scanned, and the value of what you mailed a player, sent to that player alone.- Your bags, your gold, your bank alt, your ledger balances.
+- **Your prices.** Only the day you scanned, and the value of what you mailed a player, sent to that player alone.
+- Your bags, your gold, your bank alt, your ledger balances.
 
-Everything received is checked and treated as information only: it can never make your Mailworthy mail something it otherwise wouldn't, or to anyone not shown in your window. The one exception is your guild's [[Guild Template]], and only after you turn it on yourself; even then every recipient is shown before you press Send.
+Everything received is checked and treated as information only. It can only change mail you already set up: a friend's hello can move a binding's mail to their crafter alt, and their skill can stop a material they've levelled past from going to them. Your guild's [[Guild Template]] adds rules only after you turn it on yourself. It never mails to anyone not shown in your window, and every recipient is shown before you press Send.
 
 ## Who runs Mailworthy
 
@@ -30,7 +31,7 @@ Wherever Mailworthy's windows name a player (Friends, the Guild window, the "To:
 - At the mailbox, after you've levelled past a material (so friends stop sending it).
 - After you mail a player, to tell their Mailworthy what it was worth (as soon as they're online in your guild or group).
 
-It talks to your **guild** and your **party or raid**, and whispers only the players you mailed.
+It talks to your **guild** and your **party or raid**, and whispers only the players you've exchanged mail with (what a mail was worth, so both ledgers agree).
 
 ## "Your auction prices are old"
 

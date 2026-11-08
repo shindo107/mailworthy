@@ -7,7 +7,7 @@ Mailworthy never scans the auction house itself. It reads the prices another add
 | **Auctionator** | Prices: Auctionator | Auctionator's scans (recommended) |
 | **TradeSkillMaster** only | Prices: TradeSkillMaster | TSM's prices for your realm |
 | Both | Prices: Auctionator (TSM installed, not used) | Auctionator |
-| Neither | Prices: none (install Auctionator or TSM; only white items are mailed) | No prices: the simple rule below |
+| Neither | Prices: none (install Auctionator or TSM; white items and staple trade goods only) | No prices: the simple rule below |
 
 ## Auctionator
 
@@ -33,7 +33,7 @@ Without a price addon there's nothing to compare, so Mailworthy keeps it simple:
 - It mails every unlocked, tradeable **white** item.
 - It mails the **staple trade goods** below, whatever their colour (so green and blue essences and shards go too).
 - **Grey** items stay ("junk: sell it at a vendor").
-- Anything **green or better** stays ("uncommon: needs Auctionator prices").
+- Anything **green or better** stays ("uncommon: needs auction prices").
 - Your [[bindings|Friends and Bindings]] still send their profession's materials and recipes.
 
 The total line in the window says "No Auctionator: white items and staple trade goods go."
@@ -45,7 +45,7 @@ With Auctionator or TSM installed, an item they have no auction price for goes *
 | Item | What happens |
 |---|---|
 | Grey junk | Stays, for the vendor |
-| The price lookup failed | Stays ("the price lookup failed") |
+| The price lookup failed | Stays ("the price lookup failed"); only Return to sender, which needs no price, can still send it back |
 | A staple trade good | Mailed as a **Common** item (and tagged **Bank** if raiders will want it later) |
 | A recipe with a binding for its profession | Goes to that friend (see [[Friends and Bindings]]) |
 | Anything that always stays | Stays: locks, soulbound and quest items, tools ([[What Stays in Your Bags]]) |
