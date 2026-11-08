@@ -212,6 +212,24 @@ describe("mail ledger", function()
             assert.equal(0, #whispers(before))
         end)
 
+        it("never a whisper to a player last heard over a minute ago (they may be offline): ask, wait", function()
+            WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = { { name = BOB, online = true } } }
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB)
+            WowStub.state.now = WowStub.state.now + 120
+            local before = #WowStub.state.addonMessages
+            sendByHand(BOB, ORE, 20)
+            assert.equal(0, #whispers(before), "a whisper to an offline player shows a chat error")
+            local asked = false
+            for i = before + 1, #WowStub.state.addonMessages do
+                asked = asked or WowStub.state.addonMessages[i].message == "A2"
+            end
+            assert.is_true(asked, "asks for hellos instead")
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB) -- Bob answers: online
+            local sent = whispers(before)
+            assert.equal(1, #sent)
+            assert.truthy(sent[1].message:find("^V2|Rettana Quilwrit|Bob Surname|"))
+        end)
+
         it("answer back while the sender is offline: held until their Mailworthy is heard from", function()
             ages[WowStub.link(LINEN.id, LINEN.name)] = 1
             local at = WowStub.state.serverTime - 3600

@@ -543,6 +543,12 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   and an item takes one answer. Until the answer arrives, the sender shows its own value.
   Still unmatched: a mail whose values never reached the receiver before it was taken (the
   receiver then used its own price and has nothing to answer to).
+- **Never seen by the players** (operator: "as long as these messages back and forth are all
+  obscured by the player"): values and answers are addon messages, which no chat window shows,
+  and whispers, so only the two players' clients get them. A whisper to an offline player would
+  print "No player named ... is currently playing", so one goes at once only to a player heard
+  within `HEARD_FRESH` (60 s); otherwise Mailworthy asks for hellos (`A2`, guild and group) and
+  sends when their reply proves they're online.
 - Not built: face-to-face trades (Mark paid covers them), a shared "who owes whom" view (on
   purpose), merging characters of a player who doesn't run Mailworthy.
 - Switch `/mw feature ledger off` (no hooks, nothing logged).

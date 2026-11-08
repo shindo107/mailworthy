@@ -359,7 +359,12 @@ function Ledger.DecodeValues(rest)
     return { from = from, to = to, at = tonumber(at), items = items }
 end
 
-local heard = {} -- lower-case name -> name, heard from this session (online, running Mailworthy)
+-- lower-case name -> { name, at = GetTime() } of the last message heard from them. A whisper to
+-- an offline player prints "No player named ... is currently playing" in the sender's chat, so
+-- messages go at once only to a player heard within HEARD_FRESH seconds; otherwise Mailworthy
+-- asks for hellos and waits for theirs, which proves they're online.
+local heard = {}
+Ledger.HEARD_FRESH = 60
 
 local function namesOf(name)
     local names = { [tostring(name):lower()] = true }
@@ -395,7 +400,7 @@ end
 function Ledger.Heard(name)
     name = clean(name)
     if not name then return end
-    heard[name:lower()] = name
+    heard[name:lower()] = { name = name, at = call(GetTime) or 0 }
     Ledger.Flush(name)
 end
 
@@ -407,8 +412,9 @@ local function queueFor(name, at, messages)
     local outbox = store().outbox
     outbox[key] = tableOr(outbox[key])
     table.insert(outbox[key], { at = at, messages = messages })
-    for lower, online in pairs(heard) do
-        if namesOf(lower)[key] then return Ledger.Flush(online) end
+    local t = call(GetTime) or 0
+    for lower, h in pairs(heard) do
+        if namesOf(lower)[key] and t - h.at <= Ledger.HEARD_FRESH then return Ledger.Flush(h.name) end
     end
     ns.Comms.Ask() -- whoever is online answers with a hello, and the messages follow it
 end
