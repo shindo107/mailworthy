@@ -233,6 +233,36 @@ describe("return to sender", function()
     end)
 end)
 
+describe("return to sender beside the Mailworthy mark (merged with PR #62)", function()
+    local ns
+
+    before_each(function()
+        ns = loadAddon()
+        ns.Fire("PLAYER_LOGIN")
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", "H2|333|", "GUILD", ANN) -- Ann runs Mailworthy
+    end)
+
+    it("folded recipients keep their mark; the footer sits under the buttons and the window grows for it", function()
+        local r = { { name = "Roknua Themicrulah" }, { name = BOB }, { name = ANN }, { name = "Cid Third" } }
+        local text = ns.MailWindow.MoreRecipientsText(r, 3, function(name, first) return (ns.Comms.Mark(name, first)) end)
+        assert.truthy(text:find("Ann " .. ns.Comms.MARK, 1, true), text)
+        assert.is_nil(text:find("Cid " .. ns.Comms.MARK, 1, true), text)
+        local base = { routes = 0, mail = 1, stay = 0 }
+        local two = { routes = 0, mail = 1, stay = 0, legend = 2 }
+        assert.equal(ns.MailWindow.Layout(base) + 38, ns.MailWindow.Layout(two))
+    end)
+
+    it("on the bank alt its own grey line carries no mark", function()
+        ns.Config.SetBankAltHere() -- one of this account's characters: Comms.Runs says yes
+        MailFrame:Show()
+        SendMailFrame:Show()
+        ns.MailWindow.Show("send")
+        local to = ns.MailWindow.Texts().to[1]
+        assert.truthy(to:find("This is your bank alt", 1, true))
+        assert.is_nil(to:find(ns.Comms.MARK, 1, true), to)
+    end)
+end)
+
 describe("toggled buttons are lit while on", function()
     local ns
 

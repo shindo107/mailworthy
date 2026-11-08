@@ -81,6 +81,11 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   `/mw feature comms off` stops them), and the mail goes to **whichever of their characters
   has the profession**: the friend when they do, their crafter alt when they don't, and the
   friend when nothing is known. Never their bank alt. The window names the recipient.
+- **Who runs Mailworthy:** wherever Mailworthy's windows name a player (the friends and guild
+  windows, the "To:" lines at the mailbox, the ledger, the bank alt picker), the Mailworthy icon
+  follows the name when that player runs Mailworthy too (their Mailworthy said hello, one of
+  their characters it listed, or one of your own characters); the window's bottom line says
+  what the icon means. `/mw feature peerMark off` hides it.
 - **Class-only items to a friend of that class:** a scroll or piece of gear whose tooltip says
   "Classes: Mage" can go to your mage friend. In `/mw friends`, pick the player; when their
   class is known (party, guild, your own characters), "Mage items" is the first choice. It
@@ -234,6 +239,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Items an active quest needs: `C_QuestLog.GetNumQuestLogEntries` / `GetInfo` (`title`, `questID`, `isHeader`) / `GetQuestObjectives` (`text`, `type` "item") from Forever's `QuestLogDocumentation.lua`; the Vanilla quest log's `GetNumQuestLogEntries` / `GetQuestLogTitle` / `GetNumQuestLeaderBoards` / `GetQuestLogLeaderBoard` as the fallback; the objective text as "Name: 3/5" (or "3/5 Name"), matched to the bag item's name; event `QUEST_LOG_UPDATE`. A quest under a collapsed header may not be counted | with Redridge Goulash in the log, Crisp Spider Meat: Staying "Redridge Goulash needs it", `/mw scan` "KEEP [Crisp Spider Meat] ...: a quest needs it (Redridge Goulash)", no V tag; turn the quest in and it's valued again | open (operator, 2026-11-08) |
 | Class-only items: `C_TooltipInfo.GetItemByID(itemID).lines[i].leftText` (TooltipDataLineType.UsageRequirement, RaceClass; `args` with `field = "leftText"` as the fallback) starting with `ITEM_CLASSES_ALLOWED` ("Classes: %s"), class names through `LOCALIZED_CLASS_NAMES_MALE` / `_FEMALE`; a guild member's class from `C_Club.GetMemberInfo` `classID` | a "Mage items" binding to a mage friend: a mage-only scroll shows "to Bob" in the Mailworthy window and arrives; `/mw report` "binding: Mage items to ..." | open (operator, 2026-11-08) |
 | Lock glow only while the Mailworthy window is open (its `OnShow` / `OnHide`, `IsVisible` under the mail frame), "always" setting; a new lock flashes 3 s anywhere; a tooltip line on a glowing item (`TooltipDataProcessor.AddTooltipPostCall`, item type, `data.id`) | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: still nothing; open the Mailworthy window: glow, and hovering a glowing item shows "Locked in Mailworthy: ..."; close the window or the mailbox: gone | open (operator, 2026-11-07; before: any open mailbox, 2026-10-21) |
+| The Mailworthy mark: the addon icon inline after a name (`\|TInterface\AddOns\Mailworthy\Textures\Icon:0\|t`, the same file as the minimap button; a texture escape in our own font strings, no frame) | `/mw friends` with a guild member who runs Mailworthy: the icon after their name, the footer "(icon) runs Mailworthy"; the bank alt's "To:" line at the mailbox | open (2026-11-08) |
 
 ## Picking up the work
 

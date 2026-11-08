@@ -548,9 +548,10 @@ function Routes.Suggested(candidate)
     return list
 end
 
---- Pure: "Bob Surname - Enchanting, Tailoring - online - guild, Mailworthy".
-function Routes.CandidateText(c)
-    local parts = { c.name }
+--- Pure: "Bob Surname - Enchanting, Tailoring - online - guild, Mailworthy". `nameText` shows in
+--- place of the name (the friends window's: the name with the Mailworthy mark, Comms.Mark).
+function Routes.CandidateText(c, nameText)
+    local parts = { nameText or c.name }
     local profs = {}
     for _, p in ipairs(Routes.Suggested(c)) do profs[#profs + 1] = p.name end
     if #profs > 0 then parts[#parts + 1] = table.concat(profs, ", ") end
