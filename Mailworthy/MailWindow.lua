@@ -870,12 +870,10 @@ ns.On("PLAYER_LOGIN", function()
 end)
 -- A mailbox closed and reopened on Send Mail between two watcher ticks still opens the window.
 ns.On("MAIL_CLOSED", function() sendWasVisible = false end)
--- A hello can make a name on screen a Mailworthy user (Comms.Mark): redraw what shows, from the
--- scan on screen (no new scan, so the list the player sees doesn't change under them).
-ns.On("CHAT_MSG_ADDON", function(prefix)
-    if ns.Comms and prefix == ns.Comms.PREFIX and frame and frame:IsShown() and not ns.Mailer.Busy() then
-        UI.Refresh(true)
-    end
+-- A new Mailworthy user can be a name on screen (Comms.Mark): redraw what shows, from the scan on
+-- screen (no new scan, so the list the player sees doesn't change under them).
+ns.Comms.OnMarksChanged(function()
+    if frame and frame:IsShown() and not ns.Mailer.Busy() then UI.Refresh(true) end
 end)
 ns.On("BAG_UPDATE_DELAYED", function()
     if not ns.Mailer.Busy() then refreshIfShown() end

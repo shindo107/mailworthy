@@ -643,8 +643,9 @@ ns.On("PLAYER_LOGIN", function() UI.Create() end)
 ns.On("GUILD_ROSTER_UPDATE", function() reloadIfShown("roster") end)
 ns.On("GROUP_ROSTER_UPDATE", function() reloadIfShown("group") end)
 ns.On("CHAT_MSG_ADDON", function(prefix)
-    if not ns.Comms or prefix ~= ns.Comms.PREFIX then return end
-    reloadIfShown("hello")
-    -- Any other view: a hello can make a name on screen a Mailworthy user (Comms.Mark).
+    if ns.Comms and prefix == ns.Comms.PREFIX then reloadIfShown("hello") end
+end)
+-- Any other view: a new Mailworthy user can be a name on screen (Comms.Mark).
+ns.Comms.OnMarksChanged(function()
     if frame and frame:IsShown() and not (view == "add" and not picked) then UI.Refresh() end
 end)

@@ -453,7 +453,7 @@ function UI.Toggle()
 end
 
 ns.On("PLAYER_LOGIN", function() UI.Create() end)
--- A hello can make a name on screen a Mailworthy user (Comms.Mark): redraw.
-ns.On("CHAT_MSG_ADDON", function(prefix)
-    if ns.Comms and prefix == ns.Comms.PREFIX and frame and frame:IsShown() then UI.Refresh() end
+-- A new Mailworthy user can be a name on screen (Comms.Mark): redraw.
+ns.Comms.OnMarksChanged(function()
+    if frame and frame:IsShown() then UI.Refresh() end
 end)

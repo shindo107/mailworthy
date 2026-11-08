@@ -328,6 +328,45 @@ function Comms.Runs(name)
     return false
 end
 
+-- Windows that show marks redraw when the names behind them change (a new peer, a peer's
+-- characters changed), once per burst of messages: never on every addon packet (Codex review).
+Comms.MARK_DELAY = 1 -- seconds
+local markListeners, markPending = {}, false
+
+--- Call `fn` (no arguments) after the set of names known to run Mailworthy changed.
+function Comms.OnMarksChanged(fn)
+    if type(fn) == "function" then markListeners[#markListeners + 1] = fn end
+end
+
+local function notifyMarks()
+    markPending = false
+    for _, fn in ipairs(markListeners) do
+        local ok, err = pcall(fn)
+        if not ok then ns.Log.Add("error", "mark redraw: %s", tostring(err)) end
+    end
+end
+
+-- Pure: the names a stored peer marks (the sender and the characters its hello listed), as text.
+local function markNames(peer)
+    if type(peer) ~= "table" then return "" end
+    local names = { tostring(peer.name):lower() }
+    for _, c in ipairs(type(peer.characters) == "table" and peer.characters or {}) do
+        if type(c) == "table" then names[#names + 1] = tostring(c.name):lower() end
+    end
+    table.sort(names)
+    return table.concat(names, ";")
+end
+
+local function marksChanged(old, new)
+    if markNames(old) == markNames(new) or markPending then return end
+    markPending = true
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(Comms.MARK_DELAY, notifyMarks)
+    else
+        notifyMarks()
+    end
+end
+
 --- `text` (default: the name) with the Mailworthy mark after it when `name` runs Mailworthy, and
 --- whether it was marked (the window then shows MARK_KEY in its footer).
 function Comms.Mark(name, text)
@@ -384,6 +423,7 @@ function Comms.Hear(sender, text, channel)
             end
             peer = { name = name, professions = ids, characters = characters, version = msg.version }
             store()[name:lower()] = peer
+            marksChanged(old, peer)
         end
         peer.skills, peer.at = skills, serverTime()
         ns.Log.Add("comms", "skills from %s: %s", name, Comms.SkillText(msg.skills))
@@ -396,6 +436,7 @@ function Comms.Hear(sender, text, channel)
     local peer = { name = name, professions = msg.professions, characters = characters, version = msg.version, at = serverTime(),
         skills = type(old) == "table" and old.skills or nil }
     store()[name:lower()] = peer
+    marksChanged(old, peer)
     ns.Log.Add("comms", "hello from %s: professions %s, %d other character(s)", name,
         #peer.professions > 0 and table.concat(peer.professions, ",") or "none", #characters)
     return peer

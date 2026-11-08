@@ -199,7 +199,10 @@ describe("Mailworthy mark", function()
 
     describe("a hello while a window is open", function()
         local CAROL = "Carol Late"
-        local function heard() hello(CAROL, "H2|197|") end
+        local function heard()
+            hello(CAROL, "H2|197|")
+            WowStub.runTimers(ns.Comms.MARK_DELAY)
+        end
 
         it("the friends window's binding rows pick up the mark", function()
             ns.Routes.Add(CAROL, ENCHANTING)
@@ -234,6 +237,24 @@ describe("Mailworthy mark", function()
             heard()
             assert.is_true(marked(ns.MailWindow.Texts().to[1]), ns.MailWindow.Texts().to[1])
             assert.equal(before, ns.MailWindow.Result(), "no new scan: the list shown stays the list sent")
+        end)
+
+        it("one redraw per burst, none for a peer already known or a message that names nobody new", function()
+            WowStub.runTimers(ns.Comms.MARK_DELAY) -- Bob's first hello (before_each)
+            local redraws = 0
+            ns.Comms.OnMarksChanged(function() redraws = redraws + 1 end)
+            hello(BOB, "H2|333|" .. ALICE .. "=165") -- known: same names
+            hello(BOB, "A2")
+            hello(BOB, "Q2|0")
+            WowStub.runTimers(ns.Comms.MARK_DELAY)
+            assert.equal(0, redraws)
+            hello(CAROL, "H2|197|")
+            hello("Dan New", "H2|197|")
+            hello(BOB, "H2|333|" .. ALICE .. "=165;Eve Alt=197") -- a new character of Bob's
+            assert.equal(0, redraws, "not before the timer")
+            WowStub.runTimers(ns.Comms.MARK_DELAY)
+            assert.equal(1, redraws)
+            assert.is_true(ns.Comms.Runs("Eve Alt"))
         end)
     end)
 
