@@ -477,6 +477,9 @@ function Comms.Hear(sender, text, channel)
     local name = ns.Routes.Clean(sender)
     if not msg or not name or #name > Comms.MAX_NAME or name:find("%c") then return nil end
     if name:lower() == tostring(ns.PlayerName()):lower() then return nil end
+    -- G2 counts only on GUILD: a copy on another channel is dropped before it could make the guild's copy a
+    -- "duplicate" (Codex review).
+    if msg.kind == "giving" and channel ~= "GUILD" then return nil end
     if Comms.Duplicate(name, text, channel, now()) then
         Comms.stats.copies = Comms.stats.copies + 1
         return nil

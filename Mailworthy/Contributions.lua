@@ -135,7 +135,8 @@ function Contributions.Migrate(at)
         else
             for who, c in pairs(guild) do
                 local asOf = type(c) == "table" and unixTime(c.asOf)
-                local kept = asOf and asOf >= cutoff and type(who) == "string"
+                -- never after now: a saved asOf in the future would refuse every real update (Codex review)
+                local kept = asOf and asOf >= cutoff and asOf <= (unixTime(at or now()) or 0) and type(who) == "string"
                     and Contributions.Clean(c, Contributions.Day(asOf)) or nil
                 if kept and kept.name:lower() == who and kept.since <= asOf then
                     kept.asOf = asOf
@@ -218,6 +219,16 @@ function Contributions.Encode(c, asOf)
         end
     end
     table.sort(entries, function(a, b) return a.back < b.back end)
+    -- A counter saturated at COUNT_MAX can hold days summing past it: keep the newest days that fit, so a
+    -- receiver never sees days above the total (Codex review).
+    local sum = 0
+    for i, e in ipairs(entries) do
+        if sum + e.units > total then
+            for j = #entries, i, -1 do entries[j] = nil end
+            break
+        end
+        sum = sum + e.units
+    end
     local version = ns.Comms and ns.Comms.VERSION or 2
     local maxLen = ns.Comms and ns.Comms.MAX_MESSAGE or 255
     local function head(i, n) return string.format("G%d|%d|%d/%d|%d|%d|", version, asOf, i, n, total, since) end
@@ -262,7 +273,7 @@ function Contributions.DecodePart(rest)
     return { asOf = asOf, index = index, count = count, total = total, since = since, days = days }
 end
 
-local partial = {} -- lower sender -> the counter being assembled from its parts
+local partial = {} -- "guild key\nlower sender" -> the counter being assembled from its parts
 
 --- Take part of `sender`'s counter (Comms.Hear: a decoded "G" message). GUILD only; this account's own
 --- characters are skipped (their counters are here already). Returns "taken", "partial" or why not.
@@ -275,17 +286,18 @@ function Contributions.Hear(sender, part, channel)
     if not key then return "no guild" end
     if part.asOf > unixTime(now()) then return "asOf in the future" end
     local lower = name:lower()
-    local p = partial[lower]
+    local slot = key .. "\n" .. lower -- per guild: parts heard in another guild never join (Codex review)
+    local p = partial[slot]
     if not p or p.asOf ~= part.asOf or p.count ~= part.count or p.total ~= part.total or p.since ~= part.since then
         p = { asOf = part.asOf, count = part.count, total = part.total, since = part.since, parts = {}, got = 0 }
-        partial[lower] = p
+        partial[slot] = p
     end
     if not p.parts[part.index] then
         p.parts[part.index] = part.days
         p.got = p.got + 1
     end
     if p.got < p.count then return "partial" end
-    partial[lower] = nil
+    partial[slot] = nil
     local today, days, sum = Contributions.Day(p.asOf), {}, 0
     for i = 1, p.count do
         for _, d in ipairs(p.parts[i]) do
@@ -299,7 +311,8 @@ function Contributions.Hear(sender, part, channel)
     local guild = tableOr(MailworthyDB.guildHeard[key])
     MailworthyDB.guildHeard[key] = guild
     local old = guild[lower]
-    if type(old) == "table" and (tonumber(old.asOf) or 0) >= p.asOf then return "not newer" end
+    local oldAsOf = type(old) == "table" and tonumber(old.asOf) or 0
+    if oldAsOf >= p.asOf and oldAsOf <= unixTime(now()) then return "not newer" end
     guild[lower] = { name = name, total = p.total, since = p.since, asOf = p.asOf, days = days }
     return "taken"
 end
@@ -382,7 +395,8 @@ end
 
 --- Pure: the export table from what Mailworthy holds, every table new. `input`: now (server time),
 --- template (Guild's saved template), peers (Comms' peers here), roster (Contributions.Roster, nil =
---- unknown: no peers), givers (this guild's counters). Nil when nothing is left.
+--- unknown: no peers), givers (this guild's counters), heard (guildmates' counters, Hear), isOwn (name ->
+--- this account's character: never exported as heard; Codex review). Nil when nothing is left.
 function Contributions.Build(input)
     input = tableOr(input)
     local at = unixTime(input.now)
@@ -429,7 +443,8 @@ function Contributions.Build(input)
     for _, c in pairs(tableOr(input.heard)) do
         local asOf = type(c) == "table" and unixTime(c.asOf)
         local name = type(c) == "table" and cleanName(c.name)
-        if asOf and asOf <= at and name and type(input.roster) == "table" and input.roster[name:lower()] then
+        local own = name and type(input.isOwn) == "function" and input.isOwn(name)
+        if asOf and asOf <= at and name and not own and type(input.roster) == "table" and input.roster[name:lower()] then
             sources[#sources + 1] = { c = c, asOf = asOf, heard = true }
         end
     end
@@ -449,6 +464,9 @@ function Contributions.Build(input)
             while #days > Contributions.DAYS do table.remove(days, 1) end -- the newest DAYS
             for _, d in ipairs(days) do sum = sum + d.items end
             local total = math.min(Contributions.COUNT_MAX, math.max(whole(c.total) or 0, sum))
+            while sum > total do -- saturated: the oldest days go, so itemsAllTime >= sum(days) (Codex review)
+                sum = sum - table.remove(days, 1).items
+            end
             if total > 0 then
                 named[name:lower()] = true
                 givers[#givers + 1] = { characterName = name, itemsAllTime = total, countingSince = since, days = days,
@@ -482,7 +500,8 @@ function Contributions.Export(guildName)
         tableOr(MailworthyDB.guildGiven)
     return Contributions.Build({ now = now(), template = templates[key],
         peers = peers[tostring(realm) .. "|" .. tostring(faction)], roster = Contributions.Roster(guild),
-        givers = given[key], heard = tableOr(MailworthyDB.guildHeard)[key] })
+        givers = given[key], heard = tableOr(MailworthyDB.guildHeard)[key],
+        isOwn = function(name) return ns.Ledger.IsOwn(name) end })
 end
 
 --- Lines for /mw report: counts only, never names.
