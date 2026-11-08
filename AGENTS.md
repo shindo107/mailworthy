@@ -15,7 +15,10 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   only to a player in that roster (operator, 2026-11-07). With **Return to sender**
   (`Returns.lua`) on for the visit, also the player who mailed this character an item, for
   what the mail ledger shows they mailed it and it hasn't mailed back (whole stacks; no
-  system, COD or returned mail), whatever its price (operator, 2026-11-08). Never attach money.
+  system, COD or returned mail), whatever its price, and only when that player is shown in
+  the preview like any recipient, a "To:" line and the "back to <name>" chip on each row
+  (operator, 2026-11-08: "any new recipient should be shown even if its a return to
+  sender"). Never attach money.
   Never mail a locked item.
 - Never mail an item an active quest's objective names, quest item or not (operator,
   2026-11-08). Without a bank alt (optional), or with it skipped for the visit, its share

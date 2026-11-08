@@ -129,6 +129,15 @@ function UI.SendText(recipients, bankAlt, isBankAlt, skipped)
     return "Send to " .. table.concat(names, ", ")
 end
 
+--- Pure: the last "To:" line when more recipients mail than lines show: every one of them still
+--- named (operator, 2026-11-08: "any new recipient should be shown even if its a return to sender").
+--- `recipients` from UI.Recipients; lines from `from` on are folded into this one.
+function UI.MoreRecipientsText(recipients, from)
+    local names = {}
+    for i = from, #recipients do names[#names + 1] = firstName(recipients[i].name) end
+    return string.format("|cffaaaaaa+ %d more: %s (see Mailing)|r", #names, table.concat(names, ", "))
+end
+
 local function mailsText(n) return string.format("%d mail%s", n, n == 1 and "" or "s") end
 
 --- Pure: who this scan mails to, one line each, the bank alt first: { { name, note, bank }, ... }.
@@ -602,7 +611,7 @@ function UI.Refresh(keepScan)
     for i, line in ipairs(toLines) do
         local r = recipients[i + 1]
         if r and i == UI.TO_LINES and #recipients > UI.TO_LINES + 1 then
-            line.name:SetText(string.format("|cffaaaaaa+ %d more (see Mailing)|r", #recipients - UI.TO_LINES))
+            line.name:SetText(UI.MoreRecipientsText(recipients, UI.TO_LINES + 1))
             line.note:SetText("")
         elseif r then
             line.name:SetText(r.name)

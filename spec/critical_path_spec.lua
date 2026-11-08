@@ -456,6 +456,17 @@ describe("critical path: mailing", function()
         WowStub.runTimers(2)
     end
 
+    --- Every return recipient is shown before Send (operator, 2026-11-08: "any new recipient should be
+    --- shown even if its a return to sender"): a "To:" line each.
+    local function assertReturnsShown()
+        local lines = table.concat(ns.MailWindow.Texts().to, "\n")
+        for _, item in ipairs(ns.MailWindow.Result().mail) do
+            if item.result.route == "return" then
+                assert.truthy(lines:find(item.result.to, 1, true), item.result.to .. " has no To: line")
+            end
+        end
+    end
+
     --- Every mail that went back carries the return subject (Mailer.RETURN_SUBJECT).
     local function assertReturnSubjects(to)
         for _, mail in ipairs(WowStub.state.sent) do
@@ -480,6 +491,7 @@ describe("critical path: mailing", function()
         assert.equal(BANK_ALT, preview[6515], "what nobody mailed still goes to the bank alt")
         assert.is_nil(preview[2775], "a locked item stays, Return to sender or not")
         assert.is_nil(preview[1081], "what a quest needs stays")
+        assertReturnsShown()
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true, [MAIN] = true })
@@ -528,6 +540,7 @@ describe("critical path: mailing", function()
         press("MailworthyPadCross")
         local preview = previewed(ns)
         assert.same({ [2592] = BOB, [3001] = MAIN }, preview)
+        assertReturnsShown()
         ns.Nav.Select(_G.MailworthyMailSend)
         press("MailworthyPadCross")
         deliver(ns)

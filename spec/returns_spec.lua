@@ -69,6 +69,11 @@ describe("return to sender", function()
         end)
     end)
 
+    it("more recipients than To: lines: the last line still names each one", function()
+        local r = { { name = "Roknua Themicrulah" }, { name = BOB }, { name = ANN }, { name = "Cid Third" } }
+        assert.equal("|cffaaaaaa+ 2 more: Ann, Cid (see Mailing)|r", ns.MailWindow.MoreRecipientsText(r, 3))
+    end)
+
     describe("Split (pure)", function()
         local function slot(bag, i, count) return { bag = bag, slot = i, count = count } end
 
@@ -134,6 +139,21 @@ describe("return to sender", function()
             _G.MailworthyMailReturn:Click()
             assert.is_false(ns.Widgets.IsToggled(_G.MailworthyMailReturn))
             for _, item in ipairs(ns.MailWindow.Result().mail) do assert.is_nil(item.result.to) end
+        end)
+
+        it("three senders and the bank alt: every one of them is named above the list", function()
+            take(BOB, WOOL, 20)
+            for i, who in ipairs({ ANN, "Cid Third" }) do
+                local id = 3000 + i
+                WowStub.setBag(1, i, WowStub.item(id, "Thing " .. i, { count = 5, sell = 5, class = 7, subclass = 7 }))
+                take(who, { id, "Thing " .. i }, 5)
+            end
+            ns.MailWindow.Show("send")
+            _G.MailworthyMailReturn:Click()
+            local to = table.concat(ns.MailWindow.Texts().to, "\n")
+            for _, name in ipairs({ "Roknua", "Bob", "Ann", "Cid" }) do
+                assert.truthy(to:find(name, 1, true), name .. " isn't shown:\n" .. to)
+            end
         end)
 
         it("nothing received: says so, and the list is the usual one", function()
