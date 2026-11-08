@@ -177,6 +177,21 @@ describe("bag addons: Baganator", function()
         assert.is_nil(tagOf(button), "ViewComplete clears it")
     end)
 
+    it("ViewComplete goes by the item Baganator shows on the button (its details, read only)", function()
+        local button = baganatorLive(0, 1)
+        baganatorShow(reg, button, widgets, COPPER)
+        assert.equal("AH", tagOf(button))
+        rawset(button, "BGR", { itemID = LINEN }) -- Baganator hasn't caught up with the slot yet
+        reg.callbacks.ViewComplete.fn(reg.callbacks.ViewComplete.owner)
+        assert.is_nil(tagOf(button), "not drawn over an item Baganator doesn't show")
+        rawset(button, "BGR", {}) -- an empty button
+        reg.callbacks.ViewComplete.fn(reg.callbacks.ViewComplete.owner)
+        assert.is_nil(tagOf(button))
+        rawset(button, "BGR", { itemID = COPPER })
+        reg.callbacks.ViewComplete.fn(reg.callbacks.ViewComplete.owner)
+        assert.equal("AH", tagOf(button))
+    end)
+
     it("draws nothing on another character's bags or a guild bank tab (no GetBagID)", function()
         local cached = addonButton({ GetID = function() return 1 end })
         assert.is_false(baganatorShow(reg, cached, widgets, COPPER))

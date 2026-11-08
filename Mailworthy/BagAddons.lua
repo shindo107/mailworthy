@@ -146,10 +146,24 @@ function BagAddons.BaganatorUpdate(widget, details)
     return shown == true
 end
 
+--- What Baganator itself says the button shows (its `BGR` details, read only): the item ID, or
+--- false for an empty button, or nil when it doesn't say.
+local function baganatorShown(button)
+    local ok, details = pcall(rawget, button, "BGR")
+    if not ok or type(details) ~= "table" then return nil end
+    return tonumber(details.itemID) or false
+end
+
 local function redrawBaganator(wanted)
     for button in pairs(seen.baganator) do
         if visible(button) then
-            local ok, err = pcall(drawBaganator, button, nil, wanted)
+            local shownID = baganatorShown(button)
+            local ok, err
+            if shownID == false then
+                ok, err = pcall(ns.Border.Clear, button) -- Baganator shows nothing there
+            else
+                ok, err = pcall(drawBaganator, button, shownID, wanted)
+            end
             if not ok then logError("baganator", err) end
         end
     end
