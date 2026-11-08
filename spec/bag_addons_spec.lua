@@ -537,6 +537,22 @@ describe("bag addons: BetterBags", function()
         assert.equal(0, frames[1], "no frame created while drawing")
     end)
 
+    it("clears a button drawn empty, which gets no item/Updated, once the bag draw is done", function()
+        local item, decoration = {}, addonButton()
+        bb.draw(item, decoration, 0, 1, COPPER)
+        MailworthyCharDB.lockedItems[COPPER] = { link = "Copper Ore" }
+        openWindow(ns)
+        assert.is_true(glowing(ns, decoration))
+        -- BetterBags reuses the button for an empty slot: SetItemFromData sets currentData and
+        -- returns before item/Updated.
+        item.currentData = { bagid = 0, slotid = 4, isItemEmpty = true, itemInfo = {} }
+        assert.is_true(glowing(ns, decoration), "nothing has told us yet")
+        bb.send("bags/Draw/Backpack/Done")
+        assert.is_false(glowing(ns, decoration), "cleared after the draw")
+        assert.is_nil(tagOf(decoration))
+        assert.equal(1, #bb.messages["bags/Draw/Bank/Done"], "the bank's draw too")
+    end)
+
     it("draws nothing on a guild bank tab (its bagid is a tab, not a container)", function()
         local decoration = addonButton()
         bb.draw({}, decoration, 0, 1, COPPER, { kind = 2 })
