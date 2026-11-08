@@ -71,8 +71,10 @@ Notes:
 
 1. **Open a mailbox.** The **Mailworthy** button is on the mail window, and a
    gamepad button is bound to it while the mailbox is open.
-2. **First time:** the button opens the settings panel. Pick the bank alt from
-   the characters Mailworthy has seen (or type a name). Leave "Include
+2. **First time:** a bank alt is optional (operator, 2026-11-08): without one the
+   window opens anyway, mails only bindings, and lists what would go under Staying
+   ("Auction +5s: no bank alt"). To pick one, Settings -> Choose...: the characters
+   Mailworthy has seen (or type a name). Leave "Include
    disenchant value" on. Optionally lock items. Close the settings panel
    and you're back at the mailbox.
 3. **Preview.** The button opens the preview:
@@ -123,7 +125,7 @@ the same pattern that made the More-menu entry taint gamepad input (alpha2).
 | Postage | **30c per attached item** (measured 2026-10-13) | account |
 | Locked items | none | **per character** |
 | Minimap button | shown | account |
-| Bindings ("send my Enchanting materials to Bob", operator 2026-10-26) | none; `/mw friends` or the settings' "Send materials to friends" button: pick a player (party, guild, own characters, Mailworthy users; online first, their professions suggested from the guild roster's `profession1ID` / `profession2ID`, the known-character record or their Mailworthy's hello), then the profession. Each binding: price cap stepper (5g each by default; at or above it the normal rule applies and the item goes to the bank alt), scope, Remove; the mail goes to the friend, or to the character of theirs that has the profession when their Mailworthy has said so. The Mailworthy window shows them with Skip once (until the mailbox closes) and Remove | account (per realm + faction) or **per character**; this character's bindings win |
+| Bindings ("send my Enchanting materials to Bob", operator 2026-10-26) | none; `/mw friends` or the settings' "Send materials to friends" button: pick a player (party, guild, own characters, Mailworthy users; online first, their professions suggested from the guild roster's `profession1ID` / `profession2ID`, the known-character record or their Mailworthy's hello), then the profession. Each binding: price cap stepper (5g each by default; at or above it the normal rule applies and the item goes to the bank alt), scope, Remove; the mail goes to the friend, or to the character of theirs that has the profession when their Mailworthy has said so. Or a class instead of a profession (operator, 2026-11-08): "Mage items" takes what only a mage can use and this character can't (the tooltip's "Classes: Mage"), offered first when the player's class is known. The Mailworthy window shows them with Skip once (until the mailbox closes) and Remove | account (per realm + faction) or **per character**; this character's bindings win |
 
 ### Bank alt picker (no mistypes)
 
@@ -197,13 +199,16 @@ reason) when any of these hold:
 - it's locked (item lock; there's no separate never-mail list, operator 2026-10-13);
 - it's soulbound or a quest item (never listed in the window: it can't be mailed),
   or currently locked by the game;
+- an active quest's objective names it, quest item or not ("Redridge Goulash needs it":
+  Crisp Spider Meat; operator 2026-11-08; `Quests.lua`, by item name);
 - it's a profession tool (fishing poles, Mining Pick, Blacksmith Hammer, Skinning
   Knife, Flint and Tinder, Arclight Spanner, enchanting rods): the v0.2.0 scan put
   a Fishing Pole on the mail list;
 - it has no price while Auctionator is installed (missing data for one item never
   means "mail it"; without Auctionator at all, the common-items rule above applies);
 - its price is older than the age limit;
-- the player is the bank alt, or no bank alt is set.
+- the player is the bank alt, or no bank alt is set, or the bank alt is skipped for this
+  mailbox visit (Skip once beside its "To:" line): its share stays, bindings still go.
 
 `hasNoValue` items have `vendor = 0`, so any AH price above the threshold mails them.
 

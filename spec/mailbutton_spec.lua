@@ -25,13 +25,14 @@ describe("mail button", function()
         assert.is_false(ns.MailWindow.Frame():IsShown())
     end)
 
-    it("opens the settings instead while no bank alt is set", function()
+    it("opens the window without a bank alt too (operator, 2026-11-08: a bank alt is optional)", function()
         MailworthyDB.bankAlts = {}
         MailFrame:Show()
         SendMailFrame:Show()
         _G.MailworthyMailButton:Click()
-        assert.is_false(ns.MailWindow.Frame():IsShown())
-        assert.is_true(ns.SettingsUI.Frame():IsShown())
+        assert.is_true(ns.MailWindow.Frame():IsShown())
+        assert.truthy(ns.MailWindow.Texts().to[1]:find("No bank alt", 1, true))
+        assert.is_false(_G.MailworthyMailSkipBankAlt:IsShown(), "nothing to skip")
     end)
 
     it("mouse / keyboard: the Inbox has its own button, and the window opens right there", function()

@@ -18,6 +18,11 @@
 -- don't, the player when nothing is known (operator, 2026-10-26: the goal is
 -- the friend who actually has the profession, never their alt for the AH).
 --
+-- A class binding (operator, 2026-11-08: "this is a mage only item, id like to be able to friend
+-- mail these types of items too"): { to, class = "MAGE" } instead of a profession. It takes
+-- items only that class may use (the tooltip's "Classes: Mage", Classes.lua) and this character
+-- can't, with the same hard keeps and price cap; the mail goes to the player named.
+--
 -- Who can be bound: the party / raid (unit tokens), the guild (C_Club member
 -- info, which carries each member's two professions and presence, as Blizzard's
 -- Communities roster reads it on Forever; GetGuildRosterInfo as the fallback),
@@ -38,9 +43,18 @@ Routes.ROUTE = "friend"     -- the verdict route of a diverted item
 -- Verdicts a binding never overrides (AGENTS safety: never a locked item, and
 -- nothing the game wouldn't let us attach).
 Routes.HARD_KEEPS = {
-    locked = true, soulbound = true, ["quest item"] = true, ["in use"] = true,
+    locked = true, soulbound = true, ["quest item"] = true, ["a quest needs it"] = true, ["in use"] = true,
     ["profession tool"] = true, ["item info not loaded yet"] = true,
 }
+
+-- Verdicts a class binding doesn't override either: AGENTS safety keeps an unpriced item (with
+-- Auctionator) and anything but white items (without it) in the bags (Codex review, 2026-11-08).
+function Routes.PriceKeep(verdict)
+    if not (verdict and verdict.action == "keep") then return false end
+    local reason = tostring(verdict.reason)
+    return reason == "no price" or reason == "uncommon or better (no price data)"
+        or reason == "junk (no price data)" or reason:find("^price too old") ~= nil
+end
 
 local skipped = {} -- route key -> true for this mailbox visit
 
@@ -105,13 +119,20 @@ function Routes.ProfessionName(id)
     return p and p.name or nil
 end
 
---- Pure: "Enchanting materials" (the profession's materials, for rows and subjects).
+--- Pure: "Enchanting materials" (the profession's materials, for rows and subjects), or
+--- "Mage items" for a class binding.
 function Routes.What(route)
+    if route.class then return (ns.Classes.Name(route.class) or tostring(route.class)) .. " items" end
     return (Routes.ProfessionName(route.profession) or "?") .. " materials"
 end
 
 function Routes.Key(profession, to)
     return tostring(profession) .. "|" .. tostring(to):lower()
+end
+
+--- A saved binding's key: "333|bob" for a profession, "class:MAGE|bob" for a class.
+function Routes.KeyOf(r)
+    return Routes.Key(r.class and ("class:" .. tostring(r.class)) or r.profession, r.to)
 end
 
 --- Pure: the item is one of the binding's profession's primary materials: a trade good of its
@@ -123,6 +144,9 @@ end
 --- (Tiers) doesn't match, unless `tiers` is false or converting it still pays
 --- (Tiers.WorthConverting with `priceOf`: the friend converts it); the second return is then true.
 function Routes.Matches(route, item, tiers, priceOf)
+    if route.class then -- a class binding: what only that class may use, and this character can't
+        return ns.Classes.ForOther(item.classes, route.class, item.myClass) == true
+    end
     if tonumber(route.profession) == Routes.ENCHANTING and Routes.GEAR_QUALITIES[tonumber(item.quality) or -1]
         and ns.Valuation.CanDisenchant(item) then
         return true
@@ -149,6 +173,7 @@ end
 --- or nil): the player when they have the profession or nothing is known, else the first
 --- of their characters that has it. Second return: true when it's another character.
 function Routes.Crafter(route, peer)
+    if route.class then return route.to, false end -- the player named: they're the class
     if not peer or has(peer.professions, route.profession) then return route.to, false end
     for _, c in ipairs(peer.characters or {}) do
         if has(c.professions, route.profession) then return c.name, true end
@@ -195,6 +220,7 @@ end
 --- character's last login, and the guild roster (primary professions only). Skill only
 --- grows, so the highest is the latest.
 function Routes.Skill(route)
+    if route.class then return nil end
     local to = Routes.Recipient(route)
     local profession = tonumber(route.profession)
     local best
@@ -235,6 +261,7 @@ function Routes.Divert(item, verdict, price, settings, routes)
     local outgrown, route
     for _, r in ipairs(routes or {}) do
         local matches, past = Routes.Matches(r, item, settings and settings.tiers, settings and settings.priceOf)
+        if r.class and Routes.PriceKeep(verdict) then matches = false end
         if past then outgrown = outgrown or r end
         if matches and (not route or Routes.Before(r, route)) then route = r end
     end
@@ -260,10 +287,10 @@ end
 local function withKeys(list, scope)
     local out = {}
     for _, r in ipairs(list) do
-        if type(r) == "table" and r.to and r.profession then
+        if type(r) == "table" and r.to and (r.profession or r.class) then
             local copy = {}
             for k, v in pairs(r) do copy[k] = v end
-            copy.scope, copy.key = scope, Routes.Key(r.profession, r.to)
+            copy.scope, copy.key = scope, Routes.KeyOf(r)
             out[#out + 1] = copy
         end
     end
@@ -308,7 +335,7 @@ local function find(key)
     for _, scope in ipairs({ "character", "account" }) do
         local list = listFor(scope)
         for i, r in ipairs(list) do
-            if type(r) == "table" and Routes.Key(r.profession, r.to) == key then return list, i, r, scope end
+            if type(r) == "table" and Routes.KeyOf(r) == key then return list, i, r, scope end
         end
     end
     return nil
@@ -323,22 +350,28 @@ function Routes.Get(key)
     return copy
 end
 
---- Add a binding. opts: scope ("account" default / "character"), cap (copper; false = none).
+--- Add a binding. `what`: a crafting profession's skill line ID, or a class token ("MAGE") for
+--- a class binding. opts: scope ("account" default / "character"), cap (copper; false = none).
 --- Returns the binding, or nil and why.
-function Routes.Add(name, profession, opts)
+function Routes.Add(name, what, opts)
     opts = opts or {}
     name = Routes.Clean(name)
     if not name then return nil, "no name" end
     if name:lower() == tostring(ns.PlayerName()):lower() then return nil, "that's this character" end
-    profession = tonumber(profession)
-    if not Routes.ProfessionName(profession) then return nil, "not a crafting profession" end
-    local key = Routes.Key(profession, name)
+    local profession, class = tonumber(what), nil
+    if not profession then
+        class = type(what) == "string" and ns.Classes.Token(what) or nil
+        if not class then return nil, "not a crafting profession or a class" end
+    elseif not Routes.ProfessionName(profession) then
+        return nil, "not a crafting profession"
+    end
+    local route = { to = name, profession = profession, class = class,
+        cap = opts.cap == nil and Routes.DEFAULT_CAP or (opts.cap or nil), at = call(GetServerTime) or time() }
+    local key = Routes.KeyOf(route)
     if find(key) then return nil, "already bound" end
     local scope = opts.scope == "character" and "character" or "account"
     local list = listFor(scope)
     if #list >= Routes.MAX then return nil, "too many bindings" end
-    local route = { to = name, profession = profession, cap = opts.cap == nil and Routes.DEFAULT_CAP or (opts.cap or nil),
-        at = call(GetServerTime) or time() }
     list[#list + 1] = route
     ns.Log.Add("routes", "bound %s to %s (%s)", Routes.What(route), name, scope)
     return Routes.Get(key)
@@ -438,7 +471,7 @@ local function addCandidate(list, byName, c)
     end
     entry.sources[c.source] = true
     entry.online = entry.online or c.online == true
-    entry.class, entry.level = entry.class or c.class, entry.level or c.level
+    entry.class, entry.level = entry.class or ns.Classes.Token(c.class), entry.level or c.level
     for _, id in ipairs(c.professions or {}) do
         id = tonumber(id)
         if Routes.ProfessionName(id) and not entry.professionSet[id] then
@@ -475,7 +508,8 @@ local function guildCandidates(list, byName)
             local info = call(club.GetMemberInfo, clubId, memberId)
             if type(info) == "table" and info.name and not info.isSelf then
                 addCandidate(list, byName, { name = info.name, source = "guild", online = presenceOnline(info.presence),
-                    level = info.level, professions = { info.profession1ID, info.profession2ID } })
+                    level = info.level, class = ns.Classes.Token(info.classID),
+                    professions = { info.profession1ID, info.profession2ID } })
             end
         end
         return

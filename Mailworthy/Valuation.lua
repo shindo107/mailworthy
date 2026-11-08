@@ -372,7 +372,8 @@ end
 local evaluate
 
 --- item: { link, itemID, count, stacks, quality, classID, vendor (copper per unit; nil = not
----   loaded yet), bound, quest, inUse (locked by the game), locked (Mailworthy lock) }
+---   loaded yet), bound, quest, questFor (the title of an active quest that needs it), inUse
+---   (locked by the game), locked (Mailworthy lock) }
 --- price: nil when there's no price source at all (no Auctionator); else
 ---   { ah = copper per unit or nil, age = days or nil, de = copper per item or nil }
 ---   history = Prices.History rows (optional), exact = true / false / nil }
@@ -386,6 +387,8 @@ function Valuation.Evaluate(item, price, settings)
     if item.locked then return keep("locked") end
     if item.bound then return keep("soulbound") end
     if item.quest then return keep("quest item") end
+    -- An item an active quest's objective names (Quests.lua), quest item or not: never sold.
+    if item.questFor then return keep("a quest needs it", { quest = item.questFor }) end
     if item.inUse then return keep("in use") end
     if Valuation.IsTool(item) then return keep("profession tool") end
     if settings.keepProfessionMats then

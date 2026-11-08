@@ -28,7 +28,7 @@ end
 ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
-    tiers = true, tierCheck = true, guildTemplate = true, ledger = true,
+    tiers = true, tierCheck = true, guildTemplate = true, ledger = true, questNeeds = true,
 } }
 
 function ns.Features.Describe()
@@ -105,9 +105,9 @@ local HELP = {
     "/mw scan - what Mailworthy would mail and why (sends nothing)",
     "/mw ledger - what other players mailed you beyond what you sent back, and Export log (every mail sent"
         .. " and received)",
-    "/mw summary - on your bank alt: what to list, disenchant or vendor",
+    "/mw summary - on your bank alt (or without one): what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
-        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger> on|off"
+        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",
     "/mw help - this list",

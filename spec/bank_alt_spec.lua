@@ -134,6 +134,40 @@ describe("bank alt view", function()
         assert.is_nil(text:find("Mailed for", 1, true), "never mailed: no such line")
     end)
 
+    it("tooltip: a kept item says why (operator, 2026-11-08: Sharp Claw and Jade said nothing)", function()
+        WowStub.state.professions = { { index = 1, name = "Blacksmithing", rank = 60, maxRank = 150, skillLine = 164 } }
+        WowStub.setBag(0, 5, WowStub.item(5635, "Sharp Claw", { count = 4, sell = 45, class = 7, subclass = 6 }))
+        prices[WowStub.link(5635, "Sharp Claw")] = { ah = 900 }
+        WowStub.setBag(0, 6, WowStub.item(1529, "Jade", { quality = 2, count = 2, sell = 700, class = 7, subclass = 7 }))
+        prices[WowStub.link(1529, "Jade")] = { ah = 2150 }
+        ns.BankAlt.Redraw()
+        local text = hover(WowStub.link(5635, "Sharp Claw"), 5635)
+        assert.truthy(text:find("Mailworthy  |cffffffff[Keep]|r", 1, true), text)
+        assert.truthy(text:find("Stays in your bags: your Blacksmithing needs it (until skill 200).", 1, true), text)
+        text = hover(WowStub.link(1529, "Jade"), 1529)
+        assert.truthy(text:find("Stays in your bags: your Blacksmithing needs it (until skill 290).", 1, true), text)
+        assert.equal("", hover(WowStub.link(6948, "Hearthstone"), 6948), "soulbound: the game already says so")
+    end)
+
+    it("tooltip lines are pure: where the window mails it, or why it stays", function()
+        local other = ns.BankAlt.OtherLine
+        assert.same({ "Mail", "Goes to Bob Surname at the mailbox: Enchanting materials binding." },
+            { other({ result = { action = "mail", route = "friend", to = "Bob Surname", what = "Enchanting materials" } }) })
+        assert.same({ "Mail", "Goes to your bank alt at the mailbox: common item (no price data)." },
+            { other({ result = { action = "mail", route = "common", reason = "common item (no price data)" } }) })
+        assert.same({ "Keep", "Stays in your bags: Auction +5s: bank alt skipped." },
+            { other({ result = { action = "keep", route = "ah", gain = 500, held = "bank alt skipped" } }) })
+        assert.same({ "Keep", "Stays in your bags: no auction price yet." },
+            { other({ result = { action = "keep", reason = "no price" } }) })
+        for reason in pairs(ns.BankAlt.QUIET_KEEPS) do
+            assert.is_nil(other({ result = { action = "keep", reason = reason } }), reason)
+        end
+        assert.is_nil(other(nil))
+        -- No bank alt: nothing goes to one, so the tooltip never says it does (Codex review).
+        assert.same({ "Keep", "Stays in your bags: no bank alt (common item (no price data))." },
+            { other({ result = { action = "mail", route = "common", reason = "common item (no price data)" } }, true) })
+    end)
+
     it("without Auctionator: no tags, only why it was mailed", function()
         _G.Auctionator = nil
         MailworthyDB.mailed = { [2589] = { route = "common", at = WowStub.state.serverTime, from = "Tilda Quickfoot" } }
@@ -279,6 +313,30 @@ describe("vendor tags on a main after sending", function()
         assert.is_nil(ns.BankAlt.Mode())
     end)
 
+    it("while the Mailworthy window is open, the tooltip says what the window does with the item", function()
+        -- operator, 2026-11-08: Sharp Claw hovered at the mailbox, before sending, said nothing.
+        local postCall, lines, displayed = nil, {}, nil
+        _G.Enum = { TooltipDataType = { Item = 0 } }
+        _G.TooltipDataProcessor = { AddTooltipPostCall = function(_, fn) postCall = fn end }
+        _G.TooltipUtil = { GetDisplayedItem = function() return "name", displayed end }
+        ns.BankAlt.InstallTooltip()
+        rawset(GameTooltip, "AddLine", function(_, text) table.insert(lines, text) end)
+        local function hover(id, name)
+            lines, displayed = {}, WowStub.link(id, name)
+            postCall(GameTooltip, { id = id })
+            return table.concat(lines, "\n")
+        end
+        assert.equal("", hover(2770, "Copper Ore"), "window closed, no tags here: nothing")
+        _G.MailworthyMailButton:Click()
+        MailworthyDB.mailed = { [2770] = { route = "ah", at = WowStub.state.serverTime, from = "Tilda Quickfoot" } }
+        local text = hover(2770, "Copper Ore")
+        assert.truthy(text:find("[Auction]", 1, true), text)
+        assert.is_nil(text:find("Mailed for", 1, true), "'Mailed for' is the bank alt's line")
+        assert.truthy(hover(2589, "Linen Cloth"):find("[Vendor now]", 1, true))
+        rawset(GameTooltip, "AddLine", nil)
+        _G.Enum, _G.TooltipDataProcessor, _G.TooltipUtil = nil, nil, nil
+    end)
+
     it("the tooltip says to vendor it, without 'Mailed for' (that's for the bank alt)", function()
         local postCall, lines = nil, {}
         _G.Enum = { TooltipDataType = { Item = 0 } }
@@ -349,8 +407,10 @@ describe("bank alt on a second account (never sent, no pick from a main)", funct
     it("is not the bank alt until it says so; then the tags come on without 'tags everywhere'", function()
         combined:UpdateItems()
         assert.is_false(ns.BankAlt.IsBankAlt())
-        assert.is_nil(ns.BankAlt.Mode())
-        assert.is_nil(tagOf(combined.Items[1]))
+        -- No bank alt on this realm and faction: this character sells its own, so its tags show
+        -- (the bank alt is optional, operator 2026-11-08).
+        assert.equal("self", ns.BankAlt.Mode())
+        assert.equal("AH", tagOf(combined.Items[1]))
         ns.SettingsUI.Show()
         _G.MailworthySettingsHere:Click()
         assert.is_true(ns.BankAlt.IsBankAlt())

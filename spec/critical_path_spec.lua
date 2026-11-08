@@ -1,7 +1,8 @@
 -- CRITICAL PATH: the shipping gate. Every build must still mail, safely, the way a
 -- player does it: a mailbox visit with a realistic bag, the mouse and the controller,
--- with and without Auctionator, with a binding, with a guild template, and on SavedVariables an older build
--- left behind. CI runs this file on its own before the rest, and a tag can't publish
+-- with and without Auctionator, with a binding (a profession's or a class's), with a guild
+-- template, without a bank alt or with it skipped for the visit, and on SavedVariables an older
+-- build left behind. CI runs this file on its own before the rest, and a tag can't publish
 -- unless it passes.
 --
 -- These tests check outcomes, not tuning: what was previewed is exactly what was sent,
@@ -25,6 +26,7 @@ local HARD_KEEPS = {
     [2775] = "locked by the player",
     [2901] = "profession tool",
     [4306] = "in use (locked by the game)",
+    [1081] = "an active quest's objective (Crisp Spider Meat for Redridge Goulash)",
 }
 
 --- A level-20ish character's bags on a fresh realm: trade goods, a BoE green, junk,
@@ -51,6 +53,9 @@ local function fillBags()
     local inUse = item(4306, "Silk Cloth", { count = 10, sell = 38, class = 7, subclass = 5 })
     inUse.isLocked = true -- picked up / being traded: the game's own lock
     put(0, 11, inUse, 9000)
+    -- A plain trade good an active quest asks for (operator, 2026-11-08): worth listing, never mailed.
+    put(0, 12, item(1081, "Crisp Spider Meat", { count = 5, sell = 250, class = 7, subclass = 8 }), 9000)
+    S.quests = { { title = "Redridge Goulash", objectives = { { text = "Crisp Spider Meat: 5/5", type = "item" } } } }
     put(5, 1, item(2592, "Wool Cloth", { count = 20, sell = 33, class = 7, subclass = 5 }), 9000)
     for i = 1, 10 do -- bags 1 and 2: ten priced stacks, so the run needs a second mail
         local bag, slot = i <= 4 and 1 or 2, i <= 4 and i or i - 4
@@ -260,6 +265,24 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
     end)
 
+    it("a class binding: the mage friend gets the mage-only scroll, the bank alt the rest, nobody else", function()
+        -- operator, 2026-11-08: "this is a mage only item, id like to be able to friend mail these types of items too"
+        WowStub.setBag(0, 13, WowStub.item(211234, "Scroll: VOCE WELL", { sell = 15, class = 0 }))
+        prices[WowStub.link(211234, "Scroll: VOCE WELL")] = 100
+        WowStub.state.itemClasses[211234] = "Mage"
+        WowStub.state.itemClasses[6515] = "Paladin" -- another class's item: not the mage's
+        ns.Routes.Add(BOB, "MAGE")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[211234])
+        assert.equal(BANK_ALT, preview[6515])
+        assert.equal("Send to Roknua, Bob", _G.MailworthyMailSend:GetText())
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+    end)
+
     it("two bindings on one material: lowest skill first, and a recipient that changes after the preview holds Send", function()
         -- operator, 2026-11-07: Blacksmithing and Engineering both take metal and stone, "Lowest skill
         -- first". Codex review: a skill heard between the preview and Send must not move mail unseen.
@@ -299,6 +322,45 @@ describe("critical path: mailing", function()
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [NEW] = true })
+    end)
+
+    it("no bank alt: the window opens, its share stays in the bags, and only the binding's friend gets mail", function()
+        -- operator, 2026-11-08: "dont require a bank alt to use mailworthy"
+        MailworthyDB.bankAlts = {}
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, ENCHANTING)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_true(ns.MailWindow.Frame():IsShown(), "no bank alt: the window, not the settings")
+        local preview = previewed(ns)
+        assert.same({ [10940] = BOB, [6515] = BOB }, preview, "only the binding's (dust, and the green to disenchant)")
+        assert.equal("Send to Bob", _G.MailworthyMailSend:GetText())
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BOB] = true })
+    end)
+
+    it("Skip once for the bank alt: its share stays this visit, the binding still goes", function()
+        -- operator, 2026-11-08: "Players should be able to click skip once for their bank alt sends too"
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, ENCHANTING)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(BANK_ALT, previewed(ns)[2592])
+        _G.MailworthyMailSkipBankAlt:Click()
+        assert.equal("Undo skip", _G.MailworthyMailSkipBankAlt:GetText())
+        local preview = previewed(ns)
+        assert.same({ [10940] = BOB, [6515] = BOB }, preview)
+        assert.equal("Send to Bob", _G.MailworthyMailSend:GetText())
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BOB] = true })
+        ns.Fire("MAIL_CLOSED")
+        mailbox()
+        ns.MailWindow.Show("send")
+        assert.equal(BANK_ALT, previewed(ns)[2592], "the next visit mails the bank alt again")
     end)
 
     --- The guild master's template (Guild.lua) arrives over the guild channel: Enchanting to Bob.

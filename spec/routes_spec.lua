@@ -301,7 +301,7 @@ describe("bindings", function()
 
         it("one recipient: the To line as before; a friend alone is named first", function()
             local lines = ns.MailWindow.Recipients({ recipients = {} }, "Roknua Themicrulah", false)
-            assert.same({ { name = "Roknua Themicrulah", note = "your bank alt" } }, lines)
+            assert.same({ { name = "Roknua Themicrulah", note = "your bank alt", bank = true } }, lines)
             lines = ns.MailWindow.Recipients({ recipients = { BOB }, byRecipient = { [BOB] = { mails = 2,
                 what = { "Tailoring materials" }, crafter = true } } }, "Roknua Themicrulah", false)
             assert.same({ { name = BOB, note = "Tailoring materials (their crafter)" } }, lines)

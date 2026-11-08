@@ -33,10 +33,13 @@ describe("settings window", function()
     end)
 
     it("lists known characters as buttons; pressing one saves the bank alt", function()
+        -- A bank alt is optional (operator, 2026-11-08): the settings open first, Choose... picks one.
+        assert.equal("main", ns.SettingsUI.View(), "no bank alt yet: still the settings")
+        assert.equal("Choose...", _G.MailworthySettingsChange:GetText())
+        _G.MailworthySettingsChange:Click()
         assert.truthy(_G.MailworthySettingsChoice1:GetText():find("Roknua Themicrulah", 1, true))
         assert.is_false(_G.MailworthySettingsChoice2:IsShown())
         assert.is_false(_G.MailworthySettingsForget1:IsShown(), "known characters can't be forgotten")
-        assert.equal("pick", ns.SettingsUI.View(), "no bank alt yet: opens on the picker")
         _G.MailworthySettingsChoice1:Click()
         assert.equal("Roknua Themicrulah", ns.Config.BankAlt())
         assert.truthy(hint():find("Bank alt: Roknua Themicrulah", 1, true))
@@ -58,7 +61,7 @@ describe("settings window", function()
         assert.equal("main", ns.SettingsUI.View())
         assert.equal("|cff33ff99Roknua Themicrulah|r  |cffaaaaaawarrior 8|r",
             ns.SettingsUI.BankAltText("Roknua Themicrulah", false, ns.Config.Choices()))
-        assert.truthy(ns.SettingsUI.BankAltText(nil):find("None yet", 1, true))
+        assert.truthy(ns.SettingsUI.BankAltText(nil):find("None: what's worth selling stays in your bags", 1, true))
         assert.is_false(_G.MailworthySettingsHere:IsShown(), "the picker's buttons are hidden")
         assert.is_false(_G.MailworthySettingsName:IsShown())
     end)
@@ -167,6 +170,7 @@ describe("settings window", function()
         before_each(function() WowStub.state.gamepadUI = true end)
 
         it("binds the D-pad, Cross and Circle while it's open, with no Blizzard window focused", function()
+            _G.MailworthySettingsChange:Click() -- Choose...: the picker
             WowStub.state.activeFrame = nil
             tick()
             local b = WowStub.state.bindings
