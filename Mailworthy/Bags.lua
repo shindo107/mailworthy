@@ -72,11 +72,35 @@ function Bags.Group(slots)
     return items
 end
 
-function Bags.CurrentSettings()
-    return ns.Config.Values()
+-- The bank alt is optional (operator, 2026-11-08: "dont require a bank alt to use mailworthy"),
+-- and the player can skip it for one mailbox visit ("Skip once for their bank alt sends too"):
+-- then what would have gone to the bank alt stays in the bags, listed under Staying with the
+-- route it would have had, and only bindings mail.
+local bankAltSkipped = false
+
+function Bags.SkipBankAlt(on)
+    bankAltSkipped = on == true
+    ns.Log.Add("scan", "bank alt %s this visit", bankAltSkipped and "skipped" or "back")
+end
+function Bags.BankAltSkipped() return bankAltSkipped end
+
+--- Why the bank alt's share stays in the bags at this mailbox, or nil when it goes.
+function Bags.HoldReason()
+    if not ns.Config.BankAlt() then return "no bank alt" end
+    if bankAltSkipped then return "bank alt skipped" end
+    return nil
 end
 
---- Scan and value the bags. Returns { settings, priced, mail = {items}, keep = {items},
+--- The window's settings (and /mw scan's): the saved ones, and whether the bank alt's share is held.
+function Bags.CurrentSettings()
+    local s = ns.Config.Values()
+    s.hold = Bags.HoldReason()
+    return s
+end
+
+--- Scan and value the bags. `settings.hold` (Bags.HoldReason): the bank alt's share is kept, with
+--- result.held saying why and result.route what it would have been. Returns { settings, priced,
+--- mail = {items}, keep = {items},
 --- unmailable = {items} (soulbound / quest: never listed in the window), totals }.
 function Bags.Evaluate(settings)
     settings = settings or Bags.CurrentSettings()
@@ -94,6 +118,7 @@ function Bags.Evaluate(settings)
     local stacksTo = {}
     for _, item in ipairs(Bags.Group(Bags.Slots())) do
         item.locked = ns.Locks.IsItemLocked(item.itemID)
+        item.questFor = ns.Quests.For(item.link)
         item.classID, item.subclassID = ns.Prices.ClassID(item.link)
         item.vendor = item.noValue and 0 or ns.Prices.Vendor(item.link)
         item.price = priced and ns.Prices.Lookup(item.link) or nil
@@ -101,6 +126,10 @@ function Bags.Evaluate(settings)
         local diverted, capped, past = ns.Routes.Divert(item, item.result, item.price, settings, routes)
         if diverted then item.result = diverted elseif capped then item.result.capped = capped end
         if not diverted and past then item.result.pastFor = past end
+        -- No bank alt, or skipped this visit: its share stays (bindings still go).
+        if settings.hold and item.result.action == "mail" and not item.result.to then
+            item.result.action, item.result.held = "keep", settings.hold
+        end
         if item.result.action == "mail" then
             table.insert(result.mail, item)
             local t = result.totals
@@ -289,7 +318,8 @@ function Bags.Report(result)
     local s, t = result.settings, result.totals
     local lines = {
         string.format("Mailworthy %s scan at %s (sends nothing)", ns.VERSION, date("%Y-%m-%d %H:%M")),
-        "bank alt: " .. tostring(ns.Config.BankAlt() or "none set (/mw settings)"),
+        "bank alt: " .. tostring(ns.Config.BankAlt() or "none (its share stays in the bags; /mw settings)")
+            .. (bankAltSkipped and ", skipped this visit" or ""),
         "prices: " .. (result.priced and "Auctionator" or "none (no Auctionator: mailing common items)")
             .. ((result.priced and (s.serverDay or math.huge) < ns.Valuation.FRESH_REALM_DAYS)
                 and " (fresh realm: unpriced white trade goods are mailed)" or ""),
@@ -314,7 +344,10 @@ function Bags.Report(result)
     end
     for _, item in ipairs(result.keep) do
         local w = workings(item, s)
-        lines[#lines + 1] = string.format("KEEP %s: %s%s", itemName(item), item.result.reason, w ~= "" and (" - " .. w) or "")
+        local r = item.result
+        local why = r.held and string.format("%s (%s %s)", r.held, ROUTE[r.route] or "?", r.reason) or r.reason
+        if r.quest then why = why .. " (" .. r.quest .. ")" end
+        lines[#lines + 1] = string.format("KEEP %s: %s%s", itemName(item), why, w ~= "" and (" - " .. w) or "")
     end
     if #result.unmailable > 0 then
         local names = {}
@@ -334,3 +367,5 @@ function Bags.Scan()
     ns.Report.Show(Bags.Report(result), "Mailworthy scan (sends nothing)")
     return result
 end
+
+ns.On("MAIL_CLOSED", function() bankAltSkipped = false end)

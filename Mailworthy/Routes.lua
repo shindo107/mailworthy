@@ -38,7 +38,7 @@ Routes.ROUTE = "friend"     -- the verdict route of a diverted item
 -- Verdicts a binding never overrides (AGENTS safety: never a locked item, and
 -- nothing the game wouldn't let us attach).
 Routes.HARD_KEEPS = {
-    locked = true, soulbound = true, ["quest item"] = true, ["in use"] = true,
+    locked = true, soulbound = true, ["quest item"] = true, ["a quest needs it"] = true, ["in use"] = true,
     ["profession tool"] = true, ["item info not loaded yet"] = true,
 }
 

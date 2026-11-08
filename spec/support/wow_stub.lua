@@ -29,6 +29,7 @@ local function defaultState()
         bags = { [0] = {}, [1] = {}, [2] = {} },
         attached = {}, cursor = nil, used = {}, sent = {}, sentItems = {}, postage = 30, money = 0, cod = 0, moneyCalls = {},
         inbox = {}, invoices = {}, takes = {},
+        quests = {}, -- the quest log: { { title, header = true?, objectives = { { text, type } } } }
         mods = {}, bindings = {}, bindingOwners = {}, activeFrame = nil, now = 1000, gamepadUI = false,
         navButton = nil,
         -- bindings: guild = nil (not in one) or { clubId, name, rank (this character's 0-based rank index, default 3),
@@ -421,6 +422,16 @@ _G.SendMail = function(name, subject, body)
         cod = s().cod })
 end
 _G.C_Mail = { IsCommandPending = function() return false end }
+-- The quest log (QuestLogDocumentation.lua): numShownEntries, GetInfo -> { title, questID, isHeader },
+-- GetQuestObjectives(questID) -> { { text, type, ... } }.
+_G.C_QuestLog = {
+    GetNumQuestLogEntries = function() return #s().quests, #s().quests end,
+    GetInfo = function(i)
+        local q = s().quests[i]
+        return q and { title = q.title, questID = 1000 + i, isHeader = q.header == true } or nil
+    end,
+    GetQuestObjectives = function(id) local q = s().quests[id - 1000] return q and q.objectives or {} end,
+}
 _G.GetInboxNumItems = function() return #s().inbox, #s().inbox end
 -- inbox[i] = { sender, subject, money, cod, daysLeft, returned, canReply (default true), isGM,
 --   items = { { itemID, name, count, link } } }; takes are recorded in state.takes (the tests fire

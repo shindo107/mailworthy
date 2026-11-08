@@ -4,7 +4,7 @@
 --     gather), "In your
 --     bags" (tags, lock glow) and "More" (friends, guild, bank alt summary, mail ledger,
 --     minimap button);
---   pick view (Change..., and straight away while no bank alt is set): the known
+--   pick view (Change... / Choose...; a bank alt is optional since 2026-11-08): the known
 --     characters, "This character is my bank alt" (a main on another WoW account),
 --     an optional typed name, Back. Picking saves and returns to the main view.
 -- Keyboard/mouse: click. Controller: the D-pad moves Mailworthy's own highlight,
@@ -332,7 +332,7 @@ end
 
 --- Pure: the bank alt row: "Name  (class level)" or "(this character)", or none yet.
 function UI.BankAltText(bankAlt, here, choices)
-    if not bankAlt then return "|cffff8040None yet: Mailworthy mails nothing until you pick one.|r" end
+    if not bankAlt then return "|cffaaaaaaNone: what's worth selling stays in your bags.|r" end
     local detail = here and "this character" or nil
     for _, c in ipairs(choices or {}) do
         if c.name == bankAlt then
@@ -428,12 +428,12 @@ function UI.Refresh()
     ns.Nav.Revalidate()
 end
 
---- Opens on the settings, or on the picker while no bank alt is set (there's nobody to mail yet).
+--- Opens on the settings (a bank alt is optional: Choose... picks one).
 --- `opener`: the Mailworthy window whose button opened it (placed beside that), or nil (centred).
 function UI.Show(opener)
     if not frame then UI.Create() end
     W.PlaceBeside(frame, opener)
-    setView(ns.Config.BankAlt() and "main" or "pick")
+    setView("main")
     UI.Refresh()
     frame:Show()
     frame:Raise()

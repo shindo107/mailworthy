@@ -21,6 +21,7 @@ Disenchant.lua
 Tiers.lua
 TierData.lua
 TierCheck.lua
+Quests.lua
 Valuation.lua
 Config.lua
 Routes.lua

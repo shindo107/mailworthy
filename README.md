@@ -21,7 +21,16 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - **At a mailbox:** click **Mailworthy** under the mail window (controller: Send Mail
   tab with R1, then Triangle). The window shows who gets the mail, what goes and why,
   what stays and why, and the total gain. **Send** mails it all in one press, 12 stacks
-  per mail. Pressing an item locks it, so it stays.
+  per mail. Pressing an item locks it, so it stays. **Skip once** beside your bank alt keeps
+  its share in the bags for this visit (bindings still go). Hovering an item says what the
+  window does with it, or why it stays.
+- **No bank alt needed:** without one, the window still opens and mails your bindings;
+  what's worth selling stays in your bags (listed under Staying, e.g. "Auction +5s: no bank
+  alt") and your bags carry the AH / B / DE / V tags. Pick one any time with **Choose...** in
+  the settings.
+- **Quests come first:** an item an active quest asks for (Crisp Spider Meat for Redridge
+  Goulash, not only "quest items") stays in your bags, is never tagged for the vendor, and
+  its tooltip names the quest.
 - **Lock items** you never want mailed: Alt+click (mouse), L3 in your bags (controller),
   or press the item in the Mailworthy window. Locked items glow blue while the Mailworthy
   window is open at the mailbox (a setting keeps the glow on everywhere), and hovering one
@@ -29,8 +38,9 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   wherever the item moves.
 - **On your bank alt:** bag slots carry **AH / B / DE / V** tags (list it, bank it for a
   later phase, disenchant it, vendor it now) recomputed with that character's own prices;
-  tooltips show today's verdict and why the item was mailed; the Mailworthy button (or
-  `/mw summary`) sums it up.
+  tooltips show today's verdict and why the item was mailed, or why it stays (a profession
+  that still needs it, a quest, no price yet); the Mailworthy button (or `/mw summary`) sums
+  it up.
 - **Bank alt on a second WoW account** (played on another monitor): mail crosses accounts,
   saved settings don't. On your main, press **Change...** in `/mw` and type the alt's name under
   "Or type a name" (press **Use name** twice: Mailworthy hasn't seen that character). On the alt's account
@@ -205,6 +215,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Skill ranks: `GetProfessionInfo` 3rd return for this character (First Aid and Cooking included), `C_Club.GetMemberInfo` `profession1Rank` / `profession2Rank` for guild members (in Forever's `ClubDocumentation.lua` and Communities roster sort) | `/mw report` "kept for First Aid 85; First Aid 85 is past Linen Cloth (mailed)"; a binding line says "skill N" with a guild member's rank, or a Mailworthy peer's "skills: ..." | open (2026-11-06) |
 | Scan freshness: `Auctionator.API.v1.GetAuctionAgeByItemID(caller, itemID)` (read in Auctionator's source: days since seen, nil past 21 days; else the `item:ID` link form) over 12 everyday trade goods; the scan day sent as `F2\|<server day>` after each hello | a character that hasn't scanned for a week, in a guild with a Mailworthy user who just scanned: `/mw report` "price stamp: <name> scanned 0 day(s) ago", a **!** on the Mailworthy button and the chat line at the mailbox | open (2026-11-06) |
 | Tier check: Forever's Professions window is the retail one, fed by `C_TradeSkillUI` (in Forever's source: `GetBaseProfessionInfo` / `GetChildProfessionInfo` `professionID` / `skillLevel`, `GetRecipeInfo` `learned` / `relativeDifficulty` 0 orange .. 3 grey, `GetRecipeSchematic` `reagentSlotSchematics[].reagents[].itemID` / `outputItemID`, `GetFilteredRecipeIDs`, `IsTradeSkillLinked` / `IsTradeSkillGuild` / `IsTradeSkillGuildMember` / `IsNPCCrafting`; events `TRADE_SKILL_SHOW`, `TRADE_SKILL_LIST_UPDATE`, `TRADE_SKILL_DATA_SOURCE_CHANGED`). Not in Forever's Lua, tried first: `GetAllRecipeIDs` (retail has it; else the filtered list, so a search or "skill-up only" filter hides recipes). The Classic globals (`GetTradeSkillInfo`, `GetCraftInfo`, `CRAFT_SHOW`, ...) aren't in Forever's source; they are a fallback only. The skill line comes from `GetProfessionInfo` (matched by ID, else by name) | open each crafting profession: `/mw report` "tier check: <name> <profession> <rank> read ... (N learned recipes, C_TradeSkillUI)", N close to the window's learned recipe count; then any "still used" lines, checked against the window's colours | open (2026-11-06) |
+| Items an active quest needs: `C_QuestLog.GetNumQuestLogEntries` / `GetInfo` (`title`, `questID`, `isHeader`) / `GetQuestObjectives` (`text`, `type` "item") from Forever's `QuestLogDocumentation.lua`; the Vanilla quest log's `GetNumQuestLogEntries` / `GetQuestLogTitle` / `GetNumQuestLeaderBoards` / `GetQuestLogLeaderBoard` as the fallback; the objective text as "Name: 3/5" (or "3/5 Name"), matched to the bag item's name; event `QUEST_LOG_UPDATE`. A quest under a collapsed header may not be counted | with Redridge Goulash in the log, Crisp Spider Meat: Staying "Redridge Goulash needs it", `/mw scan` "KEEP [Crisp Spider Meat] ...: a quest needs it (Redridge Goulash)", no V tag; turn the quest in and it's valued again | open (operator, 2026-11-08) |
 | Lock glow only while the Mailworthy window is open (its `OnShow` / `OnHide`, `IsVisible` under the mail frame), "always" setting; a new lock flashes 3 s anywhere; a tooltip line on a glowing item (`TooltipDataProcessor.AddTooltipPostCall`, item type, `data.id`) | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: still nothing; open the Mailworthy window: glow, and hovering a glowing item shows "Locked in Mailworthy: ..."; close the window or the mailbox: gone | open (operator, 2026-11-07; before: any open mailbox, 2026-10-21) |
 
 ## Picking up the work

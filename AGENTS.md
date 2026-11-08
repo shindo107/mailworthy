@@ -14,6 +14,9 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   author is a guild master or officer in their own roster (any member may pass a copy on), and
   only to a player in that roster (operator, 2026-11-07). Never attach money.
   Never mail a locked item.
+- Never mail an item an active quest's objective names, quest item or not (operator,
+  2026-11-08). Without a bank alt (optional), or with it skipped for the visit, its share
+  stays in the bags; only bindings mail.
 - A binding never overrides a hard keep (locked, soulbound, quest, in use, tool); at or
   above its price cap the normal rule applies and the item goes to the bank alt.
 - Re-check each slot right before attaching it; skip anything that changed.

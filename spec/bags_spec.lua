@@ -18,6 +18,7 @@ describe("bag scan", function()
         -- launch day 20: past the fresh-realm window, so "no price" keeps (the window has its own test)
         WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 20 * 86400
         ns.Fire("PLAYER_LOGIN")
+        ns.Config.SetBankAlt("Roknua Themicrulah") -- without one, its share stays (its own test below)
         prices = {}
         _G.Auctionator = { API = { v1 = {
             GetAuctionPriceByItemLink = function(caller, l)
@@ -288,5 +289,68 @@ describe("bag scan", function()
         assert.equal("kept for Blacksmithing; sell what I gather: on (no gathering profession here)",
             text({ keepProfessionMats = true, sellGathered = true, professions = { 164 } }))
         assert.equal("mailed", text({ keepProfessionMats = false, sellGathered = true, professions = { 164, 186 } }))
+    end)
+end)
+
+describe("bag scan without a bank alt, or with it skipped this visit", function()
+    -- operator, 2026-11-08: "dont require a bank alt to use mailworthy", "Players should be able to
+    -- click skip once for their bank alt sends too". Its share stays in the bags; bindings still go.
+    local ns, prices
+    local BOB = "Bob Surname"
+
+    before_each(function()
+        ns = loadAddon()
+        WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 20 * 86400
+        ns.Fire("PLAYER_LOGIN")
+        prices = {}
+        _G.Auctionator = { API = { v1 = {
+            GetAuctionPriceByItemLink = function(_, l) return prices[l] end,
+            GetAuctionAgeByItemLink = function() return 0 end,
+        } } }
+        WowStub.setBag(0, 1, WowStub.item(2770, "Copper Ore", { count = 20, sell = 5, class = 7, subclass = 7 }))
+        prices[WowStub.link(2770, "Copper Ore")] = 174
+        WowStub.setBag(0, 2, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, 333)
+    end)
+    after_each(function() _G.Auctionator = nil end)
+
+    local function find(list, itemID)
+        for _, it in ipairs(list) do if it.itemID == itemID then return it end end
+    end
+
+    it("no bank alt: the auction share stays with its route and gain; the binding still mails", function()
+        assert.equal("no bank alt", ns.Bags.HoldReason())
+        local result = ns.Bags.Evaluate()
+        assert.equal(1, #result.mail)
+        assert.equal(BOB, result.mail[1].result.to)
+        local ore = find(result.keep, 2770)
+        assert.equal("no bank alt", ore.result.held)
+        assert.equal("ah", ore.result.route)
+        assert.equal("Auction +" .. ns.Valuation.Money(ore.result.gain) .. ": no bank alt", ns.MailWindow.StayReason(ore.result))
+        assert.same({ BOB }, result.totals.recipients)
+        assert.equal(0, result.totals.gain, "held items add nothing to the gain line")
+        local report = ns.Bags.Report(result)
+        assert.truthy(report:find("bank alt: none (its share stays in the bags", 1, true), report)
+        assert.truthy(report:find("KEEP [Copper Ore] x20: no bank alt (AH auction house)", 1, true), report)
+    end)
+
+    it("the bank alt view's own scan never holds: its tags say what the market says", function()
+        local result = ns.Bags.Evaluate(ns.BankAlt.Settings())
+        assert.truthy(find(result.mail, 2770))
+    end)
+
+    it("skip once: held for this mailbox visit only", function()
+        ns.Config.SetBankAlt("Roknua Themicrulah")
+        assert.is_nil(ns.Bags.HoldReason())
+        assert.truthy(find(ns.Bags.Evaluate().mail, 2770))
+        ns.Bags.SkipBankAlt(true)
+        local result = ns.Bags.Evaluate()
+        assert.equal("bank alt skipped", find(result.keep, 2770).result.held)
+        assert.equal(BOB, result.mail[1].result.to)
+        assert.truthy(ns.Bags.Report(result):find("Roknua Themicrulah, skipped this visit", 1, true))
+        ns.Fire("MAIL_CLOSED")
+        assert.is_false(ns.Bags.BankAltSkipped())
+        assert.truthy(find(ns.Bags.Evaluate().mail, 2770))
     end)
 end)

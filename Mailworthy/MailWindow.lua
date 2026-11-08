@@ -29,7 +29,7 @@ local money = function(c) return ns.Valuation.Money(c) end
 local renderedInbox
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
 local guildButton
-local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine, owedLine, owedButton
+local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine, owedLine, owedButton, skipAltButton
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
@@ -75,6 +75,11 @@ end
 
 --- Pure: a player-facing reason for an item that stays.
 function UI.StayReason(r)
+    if r.held then -- the bank alt's share, held (none set, or skipped this visit): Bags.HoldReason
+        local chip = UI.CHIPS[r.route] or UI.CHIPS.common
+        return string.format("%s%s: %s", chip[1], r.gain and (" +" .. money(r.gain)) or "", r.held)
+    end
+    if r.quest then return r.quest .. " needs it" end
     if r.reason == "not worth it" then
         if (r.gain or 0) <= 0 then return "sells better at a vendor" end
         return string.format("only %s more than a vendor (needs %s)", money(r.gain), money(r.threshold))
@@ -95,8 +100,9 @@ end
 local function firstName(name) return tostring(name):match("^(%S+)") or tostring(name) end
 
 --- Pure: the Send button's text: "Send to Roknua", "Send to Roknua, Bob", "Send to Roknua +2".
---- `recipients` lists the scan's recipients ("" = the bank alt).
-function UI.SendText(recipients, bankAlt, isBankAlt)
+--- `recipients` lists the scan's recipients ("" = the bank alt); `skipped`: the bank alt is skipped.
+function UI.SendText(recipients, bankAlt, isBankAlt, skipped)
+    if skipped then bankAlt = nil end
     local names = {}
     for _, to in ipairs(recipients or {}) do
         if to == "" then
@@ -112,20 +118,23 @@ end
 
 local function mailsText(n) return string.format("%d mail%s", n, n == 1 and "" or "s") end
 
---- Pure: who this scan mails to, one line each, the bank alt first: { { name, note }, ... }.
+--- Pure: who this scan mails to, one line each, the bank alt first: { { name, note, bank }, ... }.
 --- `totals` from Bags.Evaluate (recipients, byRecipient). With nothing to mail: the bank alt
 --- alone, as before. With more than one recipient each note says what they get and how many
 --- mails (operator, 2026-11-06: "when sending to multiple people ... the receiver is made clear").
-function UI.Recipients(totals, bankAlt, isBankAlt)
+--- `skipped`: the bank alt is skipped this visit; its line stays first, so Undo skip sits beside it.
+function UI.Recipients(totals, bankAlt, isBankAlt, skipped)
     local recipients = totals and totals.recipients or {}
     local several = #recipients > 1
     local lines = {}
     local function bankLine(each)
-        local note = isBankAlt and "this is your bank alt" or (bankAlt and "your bank alt" or "")
+        local note = isBankAlt and "this is your bank alt" or (bankAlt and "your bank alt" or "optional: Settings")
+        if skipped and bankAlt and not isBankAlt then note = "your bank alt · skipped this time" end
         if several and each and bankAlt then note = note .. " · " .. mailsText(each.mails) end
-        lines[#lines + 1] = { name = bankAlt or "|cffff8040no bank alt set: press Settings|r", note = note }
+        lines[#lines + 1] = { name = bankAlt or "|cffaaaaaaNo bank alt: what's worth selling stays|r", note = note,
+            bank = true }
     end
-    if #recipients == 0 then bankLine() end
+    if #recipients == 0 or (skipped and bankAlt) then bankLine() end
     for _, to in ipairs(recipients) do
         local each = totals.byRecipient and totals.byRecipient[to] or { mails = 0, what = {} }
         if to == "" then
@@ -233,6 +242,13 @@ local function createRouteRows()
         UI.Refresh()
     end, "MailworthyMailGuildRules")
     guildButton:Hide()
+    -- Skip once for the bank alt too (operator, 2026-11-08): its share stays this visit, bindings go.
+    skipAltButton = W.Button(frame, "Skip once", 84, function()
+        if ns.Mailer.Busy() then return end
+        ns.Bags.SkipBankAlt(not ns.Bags.BankAltSkipped())
+        UI.Refresh()
+    end, "MailworthyMailSkipBankAlt")
+    skipAltButton:Hide()
     for i = 1, UI.ROUTE_ROWS do
         local row = {}
         row.text = W.Label(frame, "GameFontHighlightSmall")
@@ -544,9 +560,15 @@ function UI.Refresh(keepScan)
     shownAlt = bankAlt
     local isBankAlt = ns.Config.IsBankAltHere()
     local t = result.totals
-    local recipients = UI.Recipients(t, bankAlt, isBankAlt)
+    local skipped = ns.Bags.BankAltSkipped()
+    local recipients = UI.Recipients(t, bankAlt, isBankAlt, skipped)
     toName:SetText("|cffffd100To:|r " .. recipients[1].name)
     toNote:SetText(recipients[1].note)
+    local canSkip = recipients[1].bank and bankAlt ~= nil and not isBankAlt and not ns.Mailer.Busy()
+    skipAltButton:SetText(skipped and "Undo skip" or "Skip once")
+    if canSkip then skipAltButton:Show() else skipAltButton:Hide() end
+    at(skipAltButton, -20, -44, "TOPRIGHT")
+    at(toNote, canSkip and -112 or -26, -52, "TOPRIGHT")
     local more = 0
     for i, line in ipairs(toLines) do
         local r = recipients[i + 1]
@@ -612,7 +634,7 @@ function UI.Refresh(keepScan)
     -- While sending (and after), the mailer's progress or problem takes the fees line.
     local status = ns.Mailer.Status()
     if status then totalNote:SetText(status) end
-    sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt))
+    sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt, skipped))
     renderedInbox = UI.OnInbox()
     if renderedInbox and not ns.Mailer.Busy() then
         -- Mail goes out from the Send Mail tab only, and we never switch tabs ourselves

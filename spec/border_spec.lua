@@ -263,7 +263,9 @@ describe("why a locked item glows: the tooltip line", function()
         assert.matches("Alt%+click", got[1][1])
         assert.matches("L3", got[1][1])
         assert.same(ns.Border.COLOR, { got[1][2], got[1][3], got[1][4] })
-        assert.equal(0, #hover(2589), "an unlocked item: nothing")
+        for _, line in ipairs(hover(2589)) do
+            assert.is_not.equal(ns.Border.TOOLTIP, line[1], "an unlocked item: no glow line")
+        end
     end)
 
     it("says nothing where the item doesn't glow, and follows the flash and the setting", function()

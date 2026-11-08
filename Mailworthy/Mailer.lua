@@ -104,7 +104,7 @@ end
 
 --- Why sending can't start right now, or nil when it can. Every mail needs a recipient
 --- that isn't this character: the bank alt for the bank alt's mails, the bound player
---- for a binding's.
+--- for a binding's. Without a bank alt (optional since 2026-11-08) only bindings' mails go.
 function Mailer.Blocker(bankAlt, mails)
     if state.busy then return "already sending" end
     local me = tostring(ns.PlayerName()):lower()
@@ -116,7 +116,8 @@ function Mailer.Blocker(bankAlt, mails)
         end
     end
     if anyToAlt then
-        if not bankAlt then return "no bank alt set: press Settings" end
+        -- A mail for the bank alt with none set (Bags holds that share, so only a stale plan).
+        if not bankAlt and mails and #mails > 0 then return "no bank alt set: press Settings" end
         if tostring(bankAlt):lower() == me then return "this character is the bank alt" end
     end
     if InCombatLockdown() then return "not in combat" end

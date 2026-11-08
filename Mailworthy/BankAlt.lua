@@ -9,9 +9,14 @@
 --   * a summary window: stacks to list, items to disenchant, items now better
 --     at a vendor (and how many of those were mailed for the auction house).
 --
--- Shown on the bank alt (the character this realm + faction mails to), or on
--- every character with the "tags everywhere" setting. Postage doesn't count
--- there: nothing is being mailed.
+-- Shown on the bank alt (the character this realm + faction mails to), on a character
+-- with no bank alt (it sells its own: the bank alt is optional, operator 2026-11-08), or
+-- on every character with the "tags everywhere" setting. Postage doesn't count there:
+-- nothing is being mailed.
+--
+-- The tooltip also says why an item stays (operator, 2026-11-08: Sharp Claw and Jade showed
+-- nothing, read as "missing data": they were kept for a profession, and a kept item had no
+-- line), and, while the Mailworthy window is open, what the window does with it.
 --
 -- On a main, after Send has mailed everything (operator, 2026-10-14): V tags
 -- only, on what the Mailworthy window kept because a vendor pays more, for the
@@ -59,10 +64,12 @@ end
 
 local vendorMode = false -- this session, on this character, after a send
 
---- "bankalt" (AH / DE / V), "everywhere" (the setting), "vendor" (a main after Send: V only), or nil.
+--- "bankalt" (AH / DE / V), "everywhere" (the setting), "self" (no bank alt on this realm and
+--- faction: this character sells its own), "vendor" (a main after Send: V only), or nil.
 function BankAlt.Mode()
     if BankAlt.IsBankAlt() then return "bankalt" end
     if ns.Config.Flag("tagsEverywhere") then return "everywhere" end
+    if not ns.Config.BankAlt() then return "self" end
     if vendorMode then return "vendor" end
     return nil
 end
@@ -116,7 +123,8 @@ function BankAlt.Refresh()
     cache.result = ns.Bags.Evaluate(BankAlt.Settings())
     for _, list in ipairs({ cache.result.mail, cache.result.keep }) do
         for _, item in ipairs(list) do
-            item.verdict = BankAlt.Verdict(item)
+            item.advice = BankAlt.Verdict(item) -- the tooltip's, in every mode
+            item.verdict = item.advice -- the bag tag's: after a send on a main, V only
             if BankAlt.Mode() == "vendor" and item.verdict ~= "v" then item.verdict = nil end
             cache.byLink[item.link] = item
             cache.byItemID[item.itemID] = cache.byItemID[item.itemID] or item
@@ -185,15 +193,40 @@ local function ageText(age)
     return string.format(" (scanned %d day%s ago)", age, age == 1 and "" or "s")
 end
 
+-- Kept for a reason the tooltip doesn't repeat: the game's own lines (soulbound, quest item), the
+-- lock glow's line (Border), or nothing to say yet.
+BankAlt.QUIET_KEEPS = { soulbound = true, ["quest item"] = true, locked = true, ["in use"] = true,
+    ["item info not loaded yet"] = true }
+
+--- Pure: the label and the line for an item with no verdict tag: where the Mailworthy window
+--- mails it, or why it stays in the bags. nil when there's nothing to add.
+function BankAlt.OtherLine(item)
+    local r = item and item.result
+    if type(r) ~= "table" then return nil end
+    if r.action == "mail" then
+        if r.to then
+            return "Mail", string.format("Goes to %s at the mailbox: %s.", tostring(r.to),
+                r.what and (tostring(r.what) .. " binding") or "a binding")
+        end
+        return "Mail", "Goes to your bank alt at the mailbox: " .. tostring(r.reason) .. "."
+    end
+    if r.action ~= "keep" or BankAlt.QUIET_KEEPS[r.reason] then return nil end
+    return "Keep", "Stays in your bags: " .. ns.MailWindow.StayReason(r) .. "."
+end
+
 --- Pure: the tooltip lines for one item: { { text, r, g, b }, ... }.
 --- `item` is the valued bag item (or nil when it isn't in the bags), `record` the
 --- MailworthyDB.mailed entry (or nil).
 function BankAlt.TooltipLines(item, record, settings)
     local lines = {}
-    local verdict = item and item.verdict
+    local verdict = item and (item.advice or item.verdict)
     local tag = verdict and BankAlt.TAGS[verdict]
-    if not tag and not record then return lines end
-    lines[1] = { "Mailworthy" .. (tag and ("  |cffffffff[" .. tag.label .. "]|r") or ""), 1, 0.82, 0 }
+    local otherLabel, otherText
+    if not tag then otherLabel, otherText = BankAlt.OtherLine(item) end
+    local label = tag and tag.label or otherLabel
+    if not label and not record then return lines end
+    lines[1] = { "Mailworthy" .. (label and ("  |cffffffff[" .. label .. "]|r") or ""), 1, 0.82, 0 }
+    if otherText then lines[#lines + 1] = { otherText, 1, 1, 1 } end
     if tag then
         local r, p = item.result, item.price or {}
         local unit = r.ahUnit or p.ah
@@ -231,16 +264,36 @@ function BankAlt.TooltipLines(item, record, settings)
     return lines
 end
 
+--- While the Mailworthy window shows, the item as the window has it (its settings: postage and
+--- bindings), so the tooltip says what the window does; nil otherwise.
+local function windowItem(link, itemID)
+    local window = ns.MailWindow.Frame()
+    local result = window and window:IsVisible() and ns.MailWindow.Result()
+    if not result then return nil end
+    local byID
+    for _, list in ipairs({ result.mail, result.keep }) do
+        for _, it in ipairs(list) do
+            if link and it.link == link then return it, result end
+            if itemID and it.itemID == itemID then byID = byID or it end
+        end
+    end
+    return byID, byID and result or nil
+end
+
 local function onTooltip(tooltip, data)
-    if not ns.Features.On("tooltipLines") or not BankAlt.Active() then return end
+    if not ns.Features.On("tooltipLines") then return end
     if tooltip ~= rawget(_G, "GameTooltip") then return end
     local link = select(2, call(rawget(_G, "TooltipUtil") and TooltipUtil.GetDisplayedItem, tooltip))
     local itemID = type(data) == "table" and tonumber(data.id) or nil
-    local c = current()
-    local item = (link and c.byLink[link]) or (itemID and c.byItemID[itemID]) or nil
-    itemID = itemID or (item and item.itemID)
+    local shown, shownResult = windowItem(link, itemID)
+    if not shown and not BankAlt.Active() then return end
+    local c = shown and { result = shownResult } or current()
+    local item = shown and { result = shown.result, price = shown.price, advice = BankAlt.Verdict(shown) }
+        or (link and c.byLink[link]) or (itemID and c.byItemID[itemID]) or nil
+    itemID = itemID or (shown and shown.itemID) or (item and item.itemID)
     -- On a main after sending, only the vendor verdict: "Mailed for" belongs on the bank alt.
-    local record = BankAlt.Mode() ~= "vendor" and itemID and type(MailworthyDB.mailed) == "table"
+    local mode = BankAlt.Mode()
+    local record = mode and mode ~= "vendor" and itemID and type(MailworthyDB.mailed) == "table"
         and MailworthyDB.mailed[itemID] or nil
     if type(record) ~= "table" then record = nil end
     local lines = BankAlt.TooltipLines(item, record, c.result and c.result.settings or BankAlt.Settings())
@@ -315,7 +368,7 @@ function BankAlt.CreateWindow()
     frame:SetPoint("CENTER")
     local title = W.Label(frame, "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 22, -18)
-    title:SetText("Mailworthy: on your bank alt")
+    title:SetText("Mailworthy: what to sell")
     header = W.Label(frame, "GameFontNormal")
     header:SetPoint("TOPLEFT", 24, -50)
     rows = {}

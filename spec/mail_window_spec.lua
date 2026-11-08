@@ -50,6 +50,38 @@ describe("mail window", function()
         assert.equal("Send to Roknua", text("MailworthyMailSend"))
     end)
 
+    it("Skip once beside the bank alt: its items move to Staying, Send has nothing for it, Undo puts them back", function()
+        -- operator, 2026-11-08: "Players should be able to click skip once for their bank alt sends too"
+        _G.MailworthyMailButton:Click()
+        local skip = _G.MailworthyMailSkipBankAlt
+        assert.is_true(skip:IsShown())
+        assert.equal("Skip once", text("MailworthyMailSkipBankAlt"))
+        skip:Click()
+        local result = ns.MailWindow.Result()
+        assert.equal(0, #result.mail)
+        assert.equal("bank alt skipped", result.keep[1].result.held, "the auction item tops Staying")
+        assert.equal("|cffffd100To:|r Roknua Themicrulah", ns.MailWindow.Texts().to[1])
+        assert.equal("Undo skip", text("MailworthyMailSkipBankAlt"))
+        assert.equal("Send", text("MailworthyMailSend"), "nothing goes to the bank alt: not named on Send")
+        skip:Click()
+        assert.equal(1, #ns.MailWindow.Result().mail)
+        assert.equal("Skip once", text("MailworthyMailSkipBankAlt"))
+    end)
+
+    it("the recipient lines: the skipped bank alt stays first, so Undo skip sits beside it", function()
+        local R = ns.MailWindow.Recipients
+        local friendOnly = { recipients = { "Bob Surname" }, byRecipient = { ["Bob Surname"] = { mails = 1, what = {} } } }
+        local lines = R(friendOnly, "Roknua Themicrulah", false, true)
+        assert.equal(2, #lines)
+        assert.same({ name = "Roknua Themicrulah", note = "your bank alt · skipped this time", bank = true }, lines[1])
+        assert.equal("Bob Surname", lines[2].name)
+        lines = R(friendOnly, "Roknua Themicrulah", false, false)
+        assert.equal("Bob Surname", lines[1].name, "not skipped and nothing for it: the friend alone")
+        lines = R({ recipients = {} }, nil, false, false)
+        assert.truthy(lines[1].name:find("No bank alt", 1, true))
+        assert.equal("optional: Settings", lines[1].note)
+    end)
+
     it("formats item names and reasons for people", function()
         assert.equal("|cffffffffCopper Ore|r |cffaaaaaax20|r", ns.MailWindow.ItemText(WowStub.link(2770, "Copper Ore"), 20))
         assert.equal("sells better at a vendor", ns.MailWindow.StayReason({ reason = "not worth it", gain = -10 }))

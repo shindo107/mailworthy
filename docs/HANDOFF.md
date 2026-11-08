@@ -66,6 +66,7 @@ must never break the game.
 | `Prices.lua` | Auctionator adapter (`Lookup`: AH price per unit, age in days, exact, disenchant; nil without Auctionator), disenchant value from Siz DisenchantValue (`DisenchantValueOf`: `DisenchantValueAPI.GetValue(link)`, else Auctionator's call; `deSource`), vendor price (`GetItemInfo` 11th return), class ID, `DisenchantAddon()` / `DisenchantAddonInstalled()` (Siz DisenchantValue by its API table, Disenchantry by `DisenchantryDB`) |
 | `Disenchant.lua` | era disenchant tables ported from Disenchantry 1.1.5 (MIT; original-era rows only, Forever's ilvl 21-30 weapon essence quirk) and the pure expected value (chance x average quantity x material price, nil when a material has no price); `Value(itemFacts)` prices materials through `Prices.MaterialPrice` |
 | `Valuation.lua` | **pure** decision rule: settings (defaults + saved, disenchant follows the disenchant addon, `keepProfessionMats` on), profession materials (`PROFESSION_MATS` by skill line ID x trade-goods subclass, `NeededBy`, `CraftingProfessions`; `settings.professions` filled by `Bags.Evaluate` from `Characters.Professions()`), deposit, thresholds, keep reasons, no-Auctionator rule, `Money` formatting |
+| `Quests.lua` | items an active quest asks for (`Quests.For(link)` -> quest title): quest log objectives of type "item" (`C_QuestLog`, Vanilla calls as fallback), matched by item name; cache dropped on `QUEST_LOG_UPDATE`; switch `questNeeds`. `Valuation` keeps them ("a quest needs it", a hard keep in `Routes.HARD_KEEPS`) |
 | `Bags.lua` | scan bags 0-5 (`LastBag()` = `NUM_TOTAL_EQUIPPED_BAG_SLOTS`: backpack, bags 1-4, reagent bag; `IsBag()` shared with Locks) -> slots -> items (grouped per link + bound + in-use), locks, prices, verdicts, totals; `/mw scan` report in the copy box (sends nothing) |
 | `Config.lua` | saved settings (`MailworthyDB.settings` only what the player touched, `bankAlts[realm|faction]` set by a pick or by the bank alt itself via `SetBankAltHere`, `names` history); flags `minimapHidden`, `tagsEverywhere`, `glowEverywhere`; choices, auto-complete, steppers |
 | `Widgets.lua` | window / button / label / legend helpers shared by all windows |
@@ -267,6 +268,23 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   The mailbox window's binding rows show the recipient's skill ("(guild, skill
   120)"), so a material past it going to the bank alt explains itself. Button labels fit
   their border (`Widgets.Fit` after every SetText: small font, then "...").
+- Feedback of 2026-11-08 (operator): (1) "missing sharp tooth data" / "more items missing, all
+  of these gems": Sharp Claw and Jade were in the data (`TierData.lua`, Blacksmithing keeps them
+  while levelling); the tooltip only spoke for AH / B / DE / V verdicts, so a kept item was
+  silent, and on a main before sending it showed nothing at all. Now `BankAlt.OtherLine` says
+  why an item stays (`MailWindow.StayReason`) or, while the Mailworthy window shows, where the
+  window mails it (`windowItem`: the window's own result). The operator suggested pulling item
+  data from the Blizzard API (Raid Ledger's keys); not needed for this, no API call added.
+  (2) "if the player has an active quest for an item (not always quest items) it shouldn't
+  recommend vendoring or auctioning": `Quests.lua`, a hard keep. (3) "skip once for their bank
+  alt sends too": a Skip once / Undo skip button beside the bank alt's "To:" line
+  (`Bags.SkipBankAlt`, cleared at `MAIL_CLOSED`). (4) "dont require a bank alt to use
+  mailworthy": the Mailworthy button opens the window without one, the settings open on the
+  main view (Choose... picks one), and the bank alt's share stays (`Bags.HoldReason`: the item
+  is kept with `result.held` and its route, "Auction +5s: no bank alt" under Staying; bindings
+  still mail; `Mailer.Blocker` refuses only a mail actually for a missing bank alt). Without a
+  bank alt the bag tags show on that character (`BankAlt.Mode` "self"). Critical path cases:
+  no bank alt, Skip once, and a quest item in every bag.
 - Popups beside their opener (operator, same day: the new popups "overlap the existing menus
   and you cant read the new popup easily without closing the old one"): `Widgets.PlaceBeside`
   puts settings / friends / the bank alt summary to the right of the Mailworthy window that

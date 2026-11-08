@@ -127,6 +127,7 @@ describe("disenchant tables", function()
 
         it("end to end: with Disenchantry installed a green sword goes for disenchanting on the tables' value", function()
             ns.Fire("PLAYER_LOGIN")
+            ns.Config.SetBankAlt("Roknua Themicrulah") -- without one, its share stays (Bags.HoldReason)
             _G.DisenchantryDB = {}
             auctionator({ [STRANGE_DUST] = 100, [GREATER_MAGIC] = 1000, [SMALL_GLIMMERING] = 2000 })
             local result = ns.Bags.Evaluate()
