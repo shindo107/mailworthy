@@ -355,6 +355,91 @@ function Comms.Peer(name)
     return name and store()[name:lower()] or nil
 end
 
+-- The Mailworthy mark (operator, 2026-11-08: "a mailworthy icon or some sort of indicator on the
+-- mailworthy ui when a player's name is mentioned showing if they have mailworthy as well"): the
+-- addon's icon right after a name, as a texture escape in our own font strings (no frame, no
+-- texture on anything of Blizzard's, no tooltip). Each window that shows one says what it means in
+-- its footer (MARK_KEY, Widgets.Footer), so nothing depends on hovering. Switch: peerMark.
+Comms.MARK = "|TInterface\\AddOns\\Mailworthy\\Textures\\Icon:0|t"
+Comms.MARK_KEY = Comms.MARK .. " runs Mailworthy"
+
+--- Whether `name` is known to run Mailworthy: this character, one of the account's characters
+--- on this realm + faction (Mailworthy recorded them), a player whose Mailworthy said hello, or a
+--- character that player's hello listed as theirs. Peers go after PEER_DAYS (Prune).
+function Comms.Runs(name)
+    name = ns.Routes.Clean(name)
+    if not name then return false end
+    local lower = name:lower()
+    if lower == tostring(ns.PlayerName()):lower() then return true end
+    for _, entry in ipairs(ns.Characters.Mailable()) do
+        if tostring(entry.name):lower() == lower then return true end
+    end
+    local peers = store()
+    if type(peers[lower]) == "table" then return true end
+    for _, peer in pairs(peers) do
+        local characters = type(peer) == "table" and peer.characters
+        for _, c in ipairs(type(characters) == "table" and characters or {}) do
+            if type(c) == "table" and tostring(c.name):lower() == lower then return true end
+        end
+    end
+    return false
+end
+
+-- Windows that show marks redraw when the names behind them change (a new peer, a peer's
+-- characters or professions changed), once per burst of messages: never on every addon packet (Codex review).
+Comms.MARK_DELAY = 1 -- seconds
+local markListeners, markPending = {}, false
+
+--- Call `fn` (no arguments) after the set of names known to run Mailworthy changed.
+function Comms.OnMarksChanged(fn)
+    if type(fn) == "function" then markListeners[#markListeners + 1] = fn end
+end
+
+local function notifyMarks()
+    markPending = false
+    for _, fn in ipairs(markListeners) do
+        local ok, err = pcall(fn)
+        if not ok then ns.Log.Add("error", "mark redraw: %s", tostring(err)) end
+    end
+end
+
+-- Pure: what a stored peer puts on screen, as text: the names it marks (the sender and the
+-- characters its hello listed) with their professions, which decide where a binding delivers
+-- (Routes.Crafter: "delivered to <their crafter>"; Codex review). Skill ranks are left out.
+local function markNames(peer)
+    if type(peer) ~= "table" then return "" end
+    local function entry(name, professions)
+        local ids = {}
+        for i, id in ipairs(type(professions) == "table" and professions or {}) do ids[i] = tostring(id) end
+        table.sort(ids)
+        return tostring(name):lower() .. "=" .. table.concat(ids, ",")
+    end
+    local names = { entry(peer.name, peer.professions) }
+    for _, c in ipairs(type(peer.characters) == "table" and peer.characters or {}) do
+        if type(c) == "table" then names[#names + 1] = entry(c.name, c.professions) end
+    end
+    table.sort(names)
+    return table.concat(names, ";")
+end
+
+local function marksChanged(old, new)
+    if markNames(old) == markNames(new) or markPending then return end
+    markPending = true
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(Comms.MARK_DELAY, notifyMarks)
+    else
+        notifyMarks()
+    end
+end
+
+--- `text` (default: the name) with the Mailworthy mark after it when `name` runs Mailworthy, and
+--- whether it was marked (the window then shows MARK_KEY in its footer).
+function Comms.Mark(name, text)
+    text = text or tostring(name)
+    if not ns.Features.On("peerMark") or not Comms.Runs(name) then return text, false end
+    return text .. " " .. Comms.MARK, true
+end
+
 --- Record a hello from `sender` (a name, possibly with a realm suffix) on `channel`.
 function Comms.Hear(sender, text, channel)
     local msg = Comms.Decode(text)
@@ -408,6 +493,7 @@ function Comms.Hear(sender, text, channel)
             end
             peer = { name = name, professions = ids, characters = characters, version = msg.version }
             store()[name:lower()] = peer
+            marksChanged(old, peer)
         end
         peer.skills, peer.at = skills, serverTime()
         ns.Log.Add("comms", "skills from %s: %s", name, Comms.SkillText(msg.skills))
@@ -420,6 +506,7 @@ function Comms.Hear(sender, text, channel)
     local peer = { name = name, professions = msg.professions, characters = characters, version = msg.version, at = serverTime(),
         skills = type(old) == "table" and old.skills or nil }
     store()[name:lower()] = peer
+    marksChanged(old, peer)
     ns.Log.Add("comms", "hello from %s: professions %s, %d other character(s)", name,
         #peer.professions > 0 and table.concat(peer.professions, ",") or "none", #characters)
     return peer
