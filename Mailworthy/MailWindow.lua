@@ -33,6 +33,7 @@ local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, stal
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
+local shownAlt -- the bank alt the list on screen was drawn for (UI.Send compares against it)
 local pages = { mail = 1, stay = 1 }
 
 UI.CHIPS = {
@@ -540,6 +541,7 @@ function UI.Refresh(keepScan)
     local pad = ns.MailButton.GamepadUI()
     title:SetText("Mailworthy  " .. (pad and ns.Gamepad.Glyph(ns.Gamepad.FACE_TOP) or ""))
     local bankAlt = ns.Config.BankAlt()
+    shownAlt = bankAlt
     local isBankAlt = ns.Config.IsBankAltHere()
     local t = result.totals
     local recipients = UI.Recipients(t, bankAlt, isBankAlt)
@@ -629,24 +631,31 @@ function UI.Refresh(keepScan)
     ns.Nav.Revalidate()
 end
 
---- Pure: the items of a fresh scan (`fresh`, its mail list) going somewhere the list on screen
---- (`shown`) didn't say: an item the preview sent elsewhere, or a new one (bags changed) to a
---- player the preview didn't name. The bank alt is always shown ("To: ..."). A binding's recipient
---- can move between the preview and Send without the bags changing: a crafter's skill passes a
---- material, or two bindings swap on "lowest skill first" (Codex review, 2026-11-07).
-function UI.Changed(shown, fresh, bankAlt)
-    local was, named = {}, { [tostring(bankAlt)] = true }
+--- Pure: the items of a fresh scan (`fresh`, its mail list, for bank alt `freshAlt`) going
+--- somewhere the list on screen (`shown`, drawn for `previewAlt`) didn't say: an item the preview
+--- sent elsewhere, or a new one (bags changed) to a player the preview didn't name; the bank alt
+--- the list named is always shown ("To: ..."). Items are told apart by link (one item ID can be
+--- several items: a green's random suffix), and one item may go to several shown recipients.
+--- A binding's recipient can move between the preview and Send without the bags changing (a
+--- crafter's skill passes a material, two bindings swap on "lowest skill first"), and so can the
+--- bank alt (picked in Settings beside the list) (Codex review, 2026-11-07).
+function UI.Changed(shown, fresh, previewAlt, freshAlt)
+    if freshAlt == nil then freshAlt = previewAlt end
+    local function key(it) return it.link or it.itemID end
+    local was, named = {}, { [tostring(previewAlt)] = true }
     for _, it in ipairs(shown or {}) do
-        local to = tostring(it.result and it.result.to or bankAlt)
-        if was[it.itemID] == nil then was[it.itemID] = to end
+        local to = tostring(it.result and it.result.to or previewAlt)
+        local k = key(it)
+        was[k] = was[k] or {}
+        was[k][to] = true
         named[to] = true
     end
     local changed = {}
     for _, it in ipairs(fresh or {}) do
-        local to = tostring(it.result and it.result.to or bankAlt)
-        local before = was[it.itemID]
-        if (before ~= nil and before ~= to) or (before == nil and not named[to]) then
-            changed[#changed + 1] = { item = it, was = before, to = to }
+        local to = tostring(it.result and it.result.to or freshAlt)
+        local before = was[key(it)]
+        if (before and not before[to]) or (not before and not named[to]) then
+            changed[#changed + 1] = { item = it, was = before and next(before) or nil, to = to }
         end
     end
     return changed
@@ -655,11 +664,11 @@ end
 function UI.Send()
     if not result then return end
     ns.lastCommand = "Mailworthy Send"
-    local shown = result.mail
+    local shown, alt = result.mail, shownAlt
     UI.Refresh() -- the freshest scan, so the mail list is what's in the bags now
     -- AGENTS Safety: mail goes only to the recipients the player saw. If the fresh scan sends
     -- anything elsewhere, nothing goes: the list now shows where, and a second press sends it.
-    local changed = UI.Changed(shown, result.mail, ns.Config.BankAlt())
+    local changed = UI.Changed(shown, result.mail, alt, ns.Config.BankAlt())
     if #changed > 0 then
         local c = changed[1]
         local name = tostring(c.item.link or ""):match("%[(.-)%]") or ("item " .. tostring(c.item.itemID))

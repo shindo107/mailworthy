@@ -70,6 +70,14 @@ describe("widgets and labels", function()
         assert.equal("Jold", c[1].to)
         assert.equal(1, #changed({ mail(1, "Smith") }, { mail(1) }, "Bank"), "a friend's item now to the bank alt")
         assert.equal(1, #changed({ mail(1, "Smith") }, { mail(9, "Ann") }, "Bank"), "a new item to someone unseen")
+        -- Codex re-review: the bank alt changed in Settings beside the list; one item ID, two items
+        assert.equal(1, #changed({ mail(1) }, { mail(1) }, "Old Bank", "New Bank"), "the bank alt changed after the preview")
+        assert.equal(1, #changed({ mail(1, "Smith") }, { mail(9) }, "Old Bank", "New Bank"), "a new item to the new bank alt")
+        local function green(link, to) return { itemID = 15210, link = link, result = { to = to } } end
+        local list = { green("[Raider Shortsword of the Tiger]"), green("[Raider Shortsword of the Monkey]", "Bob") }
+        assert.same({}, changed(list, list, "Bank"), "two suffixes of one item ID, two recipients: unchanged")
+        assert.equal(1, #changed(list, { green("[Raider Shortsword of the Tiger]", "Bob"),
+            green("[Raider Shortsword of the Monkey]", "Bob") }, "Bank"))
     end)
 
     it("the settings' Guild button says where the guild rules stand", function()

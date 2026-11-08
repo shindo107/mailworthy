@@ -285,6 +285,22 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [ENGINEER] = true })
     end)
 
+    it("a bank alt picked after the preview holds Send until the list shows it (Codex review)", function()
+        local NEW = "Newbank Alt"
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        ns.Config.SetBankAlt(NEW) -- Settings beside the mail window; the list still names the old one
+        _G.MailworthyMailSend:Click()
+        assert.is_false(ns.Mailer.Busy(), "nothing goes to a bank alt the list didn't name")
+        WowStub.runTimers()
+        assert.equal(0, #WowStub.state.sent)
+        local preview = previewed(ns)
+        for id in pairs(preview) do preview[id] = preview[id] == BANK_ALT and NEW or preview[id] end
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [NEW] = true })
+    end)
+
     --- The guild master's template (Guild.lua) arrives over the guild channel: Enchanting to Bob.
     local function guildTemplate()
         local gm = "Guild Master"
