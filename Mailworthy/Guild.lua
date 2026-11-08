@@ -102,12 +102,16 @@ function Guild.RankOf(name)
     return nil
 end
 
-local function guildKey()
-    local guild = Guild.Mine()
+--- The key a guild's template and contributions are kept under: "realm|faction|guild" for
+--- `guild` (default: this character's guild), or nil outside a guild.
+function Guild.Key(guild)
+    if type(guild) ~= "string" or guild == "" then guild = Guild.Mine() end
     if not guild then return nil end
     local _, realm, faction = ns.Characters.Current()
     return tostring(realm) .. "|" .. tostring(faction) .. "|" .. guild
 end
+
+local function guildKey() return Guild.Key() end
 
 local function store(field)
     MailworthyDB[field] = type(MailworthyDB[field]) == "table" and MailworthyDB[field] or {}
@@ -176,11 +180,14 @@ function Guild.Rules(personal)
     for _, r in ipairs(personal or {}) do bound[tonumber(r.profession) or -1] = true end
     local me = lower(ns.PlayerName())
     local out = {}
-    for _, r in ipairs(Guild.Template().rules or {}) do
+    local t, key = Guild.Template(), guildKey()
+    for _, r in ipairs(t.rules or {}) do
         local id = tonumber(r.profession)
         if id and not own[id] and not bound[id] and r.to and lower(r.to) ~= me then
+            -- rev and guildKey travel with the binding to the mail log and the guild contributions
+            -- (Contributions.lua): what this rule mails is counted for the guild under that revision.
             out[#out + 1] = { to = r.to, profession = id, cap = r.cap, scope = "guild",
-                key = "guild|" .. ns.Routes.Key(id, r.to), from = Guild.Template().from }
+                key = "guild|" .. ns.Routes.Key(id, r.to), from = t.from, rev = tonumber(t.rev), guildKey = key }
         end
     end
     return out

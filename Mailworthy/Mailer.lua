@@ -295,13 +295,24 @@ ns.On("MAIL_SEND_SUCCESS", function()
     state.stacks = state.stacks + #mail.attached
     mail.sent = true
     record(mail)
+    -- A guild template rule's mail (Contributions.lua): its rule, revision and stack units, or nil.
+    local okTag, guild = pcall(ns.Contributions.Tag, mail)
+    if not okTag then
+        ns.Log.Add("mailer", "contributions error: %s", tostring(guild))
+        guild = nil
+    end
     if ns.Ledger then -- the mail log and the balance with a friend (Ledger.lua): exactly what was attached
         local items = {}
         for _, stack in ipairs(mail.attached) do
             items[#items + 1] = { itemID = stack.itemID, link = stack.link, count = stack.count }
         end
-        local okLog, err = pcall(ns.Ledger.RecordSent, { to = mail.to, subject = mail.subject, items = items }, "Mailworthy")
+        local okLog, err = pcall(ns.Ledger.RecordSent, { to = mail.to, subject = mail.subject, items = items,
+            guild = guild }, "Mailworthy")
         if not okLog then ns.Log.Add("mailer", "ledger error: %s", tostring(err)) end
+    end
+    if guild then -- the guild contributions count it (not mail to this account's own characters)
+        local okCount, err = pcall(ns.Contributions.Count, mail.to, guild)
+        if not okCount then ns.Log.Add("mailer", "contributions error: %s", tostring(err)) end
     end
     ns.Log.Add("mailer", "MAIL_SEND_SUCCESS for mail %d", index)
     notify()

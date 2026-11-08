@@ -301,6 +301,10 @@ function Routes.Divert(item, verdict, price, settings, routes)
             .. tostring(to)) or (Routes.What(route) .. " go to " .. tostring(to)),
         vendor = (item.vendor or 0) * n, postage = (settings and settings.postage or 30) * (item.stacks or 1),
         ahUnit = unit,
+        -- A guild template rule's mail (Guild.Rules): the mail log tags it and the guild contributions
+        -- count it (Contributions.lua); personal and class bindings carry none.
+        guild = route.scope == "guild" and { key = route.guildKey, profession = tonumber(route.profession),
+            rev = tonumber(route.rev) } or nil,
     }
 end
 
