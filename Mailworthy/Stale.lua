@@ -53,7 +53,8 @@ function Stale.Day(t) return math.floor((t or serverTime()) / 86400) end
 function Stale.On() return ns.Features.On("staleNudge") end
 
 --- Days since Auctionator last saw the freshest watched trade good: 0 = today;
---- math.huge when none was seen in 21 days (or ever); nil without Auctionator.
+--- math.huge when none was seen in 21 days (or ever); nil without Auctionator (TradeSkillMaster's
+--- public API has no price age, so a TSM-only player gets no nudge).
 function Stale.OwnAge()
     local api = ns.Prices.Auctionator()
     if not api then return nil end

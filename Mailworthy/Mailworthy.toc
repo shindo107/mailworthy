@@ -5,7 +5,7 @@
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1743661
 ## IconTexture: Interface\AddOns\Mailworthy\Textures\Icon
-## OptionalDeps: Auctionator, DisenchantValue, Disenchantry
+## OptionalDeps: Auctionator, TradeSkillMaster, DisenchantValue, Disenchantry
 ## SavedVariables: MailworthyDB
 ## SavedVariablesPerCharacter: MailworthyCharDB
 
