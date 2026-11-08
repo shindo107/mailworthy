@@ -106,7 +106,7 @@ function UI.StayReason(r)
     if r.reason == "no price" then return r.failed and "the price lookup failed" or "no auction price yet" end
     if r.reason == "locked" then return "locked (press to unlock)" end
     if r.reason == "junk (no price data)" then return "junk: sell it at a vendor" end
-    if r.reason == "uncommon or better (no price data)" then return "uncommon: needs Auctionator prices" end
+    if r.reason == "uncommon or better (no price data)" then return "uncommon: needs auction prices" end
     if r.untilSkill then return r.reason .. " (until skill " .. r.untilSkill .. ")" end
     if r.window then
         return string.format("%s (%s still %s)", r.reason, tostring(r.window.recipe),

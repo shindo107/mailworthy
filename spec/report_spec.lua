@@ -43,7 +43,7 @@ describe("report", function()
         finally(function() _G.TSM_API, _G.Auctionator = nil, nil end)
         local function tsm() _G.TSM_API = { GetCustomPriceValue = function() end } end
         local function atr() _G.Auctionator = { API = { v1 = { GetAuctionPriceByItemLink = function() end } } } end
-        assert.equal("Prices: none (install Auctionator or TSM; only white items are mailed)", ns.SettingsUI.PricesText())
+        assert.equal("Prices: none (install Auctionator or TSM; white items and staple trade goods only)", ns.SettingsUI.PricesText())
         tsm()
         ns.HandleSlash("report")
         has(ns.Report.Text(), "prices: TradeSkillMaster")

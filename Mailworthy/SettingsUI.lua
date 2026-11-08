@@ -428,7 +428,7 @@ end
 --- The main view's "Prices:" line: the auction source in use (Auctionator wins over
 --- TradeSkillMaster), or what installing one changes.
 function UI.PricesText()
-    return "Prices: " .. (ns.Prices.SourceText() or "none (install Auctionator or TSM; only white items are mailed)")
+    return "Prices: " .. (ns.Prices.SourceText() or "none (install Auctionator or TSM; white items and staple trade goods only)")
 end
 
 function UI.Refresh()

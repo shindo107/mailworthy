@@ -74,8 +74,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   or take it out of every corner to turn Mailworthy off there). Another
   character's bags and the bank get no tags (the bank's locked items still glow).
   `/mw feature baganatorTags off` (or `bagnonTags`, `arkInventoryTags`, `betterBagsTags`) turns one off.
-- **Send a profession's materials to a friend** (`/mw friends`, or the settings' "Send
-  materials to friends" button): pick a guild member, party member or one of your own
+- **Send a profession's materials to a friend** (`/mw friends`, or the settings'
+  **Friends...** button): pick a guild member, party member or one of your own
   characters (online players first; their professions are shown and suggested), then the
   profession. From then on that profession's primary materials (dust, essences and shards for
   an enchanter, plus green and blue weapons and armor for them to disenchant; cloth for a

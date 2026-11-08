@@ -438,7 +438,7 @@ function BankAlt.RefreshWindow()
     if not frame then return end
     local c = current()
     local summary = BankAlt.Summary(c.result)
-    header:SetText(c.result.priced and "With today's prices" or "No Auctionator prices here: install it and run a scan")
+    header:SetText(c.result.priced and "With today's prices" or "No auction prices here: install Auctionator or TSM")
     for key, row in pairs(rows) do
         local text, value = ROW_TEXT[key](summary[key])
         row.text:SetText(text)
