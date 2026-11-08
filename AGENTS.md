@@ -24,6 +24,8 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   (common) items; with Auctionator, an item without a price stays in the bags,
   with one exception (operator, 2026-10-20): during launch days 0-13 an unpriced
   white **trade good** is mailed like a common item (never when the price call failed).
+  A profession binding mails its materials to the bound player whatever their price
+  (operator, 2026-11-08: "keep as is"); a class binding follows the price rules above.
 
 ## Never write into Blizzard's controller UI (STRICT)
 

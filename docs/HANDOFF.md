@@ -296,6 +296,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   beside the profession ones (`Routes.KeyOf` "class:MAGE|name", `What` "Mage items"; taken only
   when this character's class can't use the item; same cap, hard keeps, Skip once; not in guild
   templates). The friends window offers the picked player's class first when it is known.
+  Class bindings keep the price rules (`Routes.PriceKeep`: no price, no Auctionator for a
+  non-white item, a stale price); profession bindings still mail their materials whatever
+  their price, as before (operator, same day: "keep as is"; written into AGENTS.md Safety).
 - Popups beside their opener (operator, same day: the new popups "overlap the existing menus
   and you cant read the new popup easily without closing the old one"): `Widgets.PlaceBeside`
   puts settings / friends / the bank alt summary to the right of the Mailworthy window that
