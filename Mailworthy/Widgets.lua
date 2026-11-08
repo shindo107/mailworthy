@@ -144,3 +144,13 @@ function Widgets.Legend(extra)
         ns.Gamepad.Glyph(ns.Gamepad.FACE_RIGHT))
     return extra and (text .. "    " .. extra) or text
 end
+
+--- A window's footer: the Mailworthy mark's key while a marked name shows (Comms.Mark: what the
+--- icon means, readable without hovering) and the controller legend with a controller, joined by
+--- `sep` (default: spaces; the mailbox window stacks them).
+function Widgets.Footer(pad, marked, sep)
+    local parts = {}
+    if marked then parts[#parts + 1] = ns.Comms.MARK_KEY end
+    if pad then parts[#parts + 1] = Widgets.Legend() end
+    return table.concat(parts, sep or "    ")
+end
