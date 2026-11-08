@@ -93,7 +93,7 @@ must never break the game.
 | `LedgerUI.lua` | the ledger window (`/mw ledger`, Settings > Mail ledger..., Friends > Mail ledger..., the Mailworthy window's pay-back line): rows "Bob: 10s more than you've sent back" + what they sent + Mark paid (two presses), Export log... (the copy box) |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), three views (`UI.View`): list (the guild template line first, when there is one or this character can publish: "Guild rules: on / off / Use guild rules" one press, Edit... / Create...; guild rules as rows without buttons) (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step; `UI.Target()` "guild": guild members only, the rule goes to the draft) and guild (guild master / officers: the draft's rules with cap and Remove, Add a rule..., Publish to guild); opens on add while there are no bindings and no guild line; a binding returns to the list |
 
-Tests: `spec/` (busted on LuaJIT, 550 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
+Tests: `spec/` (busted on LuaJIT, 576 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
 `spec/support/wow_stub.lua` (bags, mail send tab, postage, timers with delays,
 override bindings, focused frame, item buttons that **error on any field write**; with
 `WowStub.state.layout` it solves SetPoint / SetSize anchors so `spec/dpad_reach_spec.lua` walks
