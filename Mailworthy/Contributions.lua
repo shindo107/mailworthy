@@ -40,7 +40,7 @@ Contributions.GIVERS_MAX = 50
 Contributions.UNIX_MAX = 4102444800    -- Raid Ledger's unix-seconds ceiling (2100-01-01)
 Contributions.COUNT_MAX = 2147483647   -- Postgres int4
 Contributions.DAY_MAX = 47482          -- floor(UNIX_MAX / 86400)
-Contributions.ROSTER_TTL = 60          -- seconds a roster read is reused
+Contributions.ROSTER_GAP = 10          -- seconds between roster reads on GUILD_ROSTER_UPDATE (one more follows)
 
 local function call(fn, ...)
     if type(fn) ~= "function" then return nil end
@@ -76,6 +76,12 @@ end
 --- Pure: the UTC day number of a server time.
 function Contributions.Day(at) return math.floor((tonumber(at) or 0) / 86400) end
 
+--- Pure: `day` is one of the last DAYS UTC days up to `today` (a later one, from a clock that ran
+--- ahead, would push a real day out of the export's 35; Codex review).
+function Contributions.InWindow(day, today)
+    return day > today - Contributions.DAYS and day <= today and day <= Contributions.DAY_MAX
+end
+
 -- Counting -------------------------------------------------------------------------------------
 
 function Contributions.Store()
@@ -92,7 +98,7 @@ function Contributions.Clean(c, today)
     local days, sum = {}, 0
     for day, units in pairs(tableOr(c.days)) do
         day, units = whole(day), whole(units)
-        if day and units and units > 0 and day > today - Contributions.DAYS and day <= Contributions.DAY_MAX then
+        if day and units and units > 0 and Contributions.InWindow(day, today) then
             days[day] = units
             sum = sum + units
         end
@@ -189,17 +195,38 @@ local function readRoster()
     return n > 0 and names or nil
 end
 
---- The lower-case names on `guild`'s roster, or nil when it can't be read: read while this character is
---- in that guild (at most every ROSTER_TTL seconds; `force` reads now), else the last read of it this
---- session (at logout the roster may be gone already).
-function Contributions.Roster(guild, force)
+--- The lower-case names on `guild`'s roster, or nil when it can't be read: read now while this
+--- character is in that guild, else the last read of it this session (at logout the roster may be gone
+--- already; GUILD_ROSTER_UPDATE keeps that read at most ROSTER_GAP seconds behind).
+function Contributions.Roster(guild)
     if type(guild) ~= "string" then return nil end
-    local t = call(GetTime) or 0
-    if ns.Guild.Mine() == guild and (force or roster.guild ~= guild or t - roster.at >= Contributions.ROSTER_TTL) then
+    if ns.Guild.Mine() == guild then
         local names = readRoster()
-        if names then roster.guild, roster.names, roster.at = guild, names, t end
+        if names then roster.guild, roster.names, roster.at = guild, names, call(GetTime) or 0 end
     end
     return roster.guild == guild and roster.names or nil
+end
+
+-- GUILD_ROSTER_UPDATE: read the roster again, at most every ROSTER_GAP seconds; an update inside the gap
+-- gets one read when it ends, so a member who left drops out (Codex review).
+local trailing = false
+local function onRosterUpdate()
+    local guild = ns.Guild.Mine()
+    if not guild then return end
+    local wait = roster.at + Contributions.ROSTER_GAP - (call(GetTime) or 0)
+    if wait <= 0 then return Contributions.Roster(guild) end
+    if trailing then return end
+    trailing = true
+    local timer = rawget(_G, "C_Timer")
+    if type(timer) ~= "table" or type(timer.After) ~= "function" then
+        trailing = false
+        return Contributions.Roster(guild)
+    end
+    timer.After(wait, function()
+        trailing = false
+        local g = ns.Guild.Mine()
+        if g then pcall(Contributions.Roster, g) end
+    end)
 end
 
 -- The export --------------------------------------------------------------------------------------
@@ -252,7 +279,7 @@ function Contributions.Build(input)
             local days, sum = {}, 0
             for day, units in pairs(tableOr(c.days)) do
                 day, units = whole(day), whole(units)
-                if day and units and units > 0 and day > today - Contributions.DAYS and day <= Contributions.DAY_MAX then
+                if day and units and units > 0 and Contributions.InWindow(day, today) then
                     days[#days + 1] = { day = day, items = units }
                 end
             end
@@ -308,6 +335,7 @@ function Contributions.ReportLines()
     else
         lines[#lines + 1] = "guild export: nothing (no guild, or nothing known)"
     end
+    if Contributions.lastError then lines[#lines + 1] = "guild export error: " .. Contributions.lastError end
     return lines
 end
 
@@ -317,12 +345,10 @@ MailworthyAPI.v1 = type(MailworthyAPI.v1) == "table" and MailworthyAPI.v1 or {}
 function MailworthyAPI.v1.GetGuildExport(guildName)
     local ok, result = pcall(Contributions.Export, guildName)
     if ok and type(result) == "table" then return result end
-    if not ok then pcall(ns.Log.Add, "contributions", "export error: %s", tostring(result)) end
+    -- Kept in memory for /mw report, never logged: the API writes nothing to SavedVariables (Codex review).
+    if not ok then Contributions.lastError = tostring(result) end
     return nil
 end
 
 ns.On("PLAYER_LOGIN", function() Contributions.Migrate() end)
-ns.On("GUILD_ROSTER_UPDATE", function()
-    local guild = ns.Guild.Mine()
-    if guild then Contributions.Roster(guild) end
-end)
+ns.On("GUILD_ROSTER_UPDATE", onRosterUpdate)

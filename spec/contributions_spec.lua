@@ -324,7 +324,6 @@ describe("guild contributions", function()
             peers[CARA:lower()] = { name = CARA, at = NOW - 61 * 86400 } -- older than 60 days
             peers[BOB:lower()] = { name = BOB, at = NOW - 5 }
             seedPeers(1005, function(i) return NOW - 100 - i end)
-            ns.Contributions.Roster(GUILD, true)
             local e = MailworthyAPI.v1.GetGuildExport()
             assertContract(e)
             assert.equal(1000, #e.peers)
@@ -366,6 +365,32 @@ describe("guild contributions", function()
             assert.equal(34, #days) -- 35 days in the window, one of them zero
             assert.same({ day = TODAY - 34, items = 1 }, days[1])
             assert.same({ day = TODAY, items = 1 }, days[34])
+        end)
+
+        it("a day bucket after today (a clock that ran ahead) never pushes a real day out", function()
+            local days = {}
+            for d = 0, 34 do days[TODAY - d] = 1 end
+            days[TODAY + 1] = 5
+            MailworthyDB.guildGiven = { [KEY] = { [ME:lower()] = { name = ME, total = 40, since = NOW, days = days } } }
+            local g = MailworthyAPI.v1.GetGuildExport().givers[1]
+            assert.equal(35, #g.days)
+            assert.same({ day = TODAY - 34, items = 1 }, g.days[1])
+            assert.same({ day = TODAY, items = 1 }, g.days[35])
+            ns.Contributions.Migrate(NOW)
+            assert.is_nil(MailworthyDB.guildGiven[KEY][ME:lower()].days[TODAY + 1])
+            assert.equal(40, MailworthyDB.guildGiven[KEY][ME:lower()].total)
+        end)
+
+        it("a member who leaves drops out of peers at the next roster update", function()
+            ns.Comms.Peers()[BOB:lower()] = { name = BOB, at = NOW - 5 }
+            ns.Comms.Peers()[CARA:lower()] = { name = CARA, at = NOW - 6 }
+            assert.equal(2, #MailworthyAPI.v1.GetGuildExport().peers)
+            table.remove(WowStub.state.guild.members, 2) -- Bob leaves
+            WowStub.state.now = WowStub.state.now + 1
+            ns.Fire("GUILD_ROSTER_UPDATE") -- inside the gap: one read when it ends
+            WowStub.runTimers(ns.Contributions.ROSTER_GAP)
+            WowStub.state.guild = nil -- logging out: only that read is left
+            assert.same({ { name = CARA, lastSeenAt = NOW - 6 } }, MailworthyAPI.v1.GetGuildExport(GUILD).peers)
         end)
 
         it("all-time is never below the days' sum, and names longer than 48 are dropped, never shortened", function()
@@ -415,11 +440,14 @@ describe("guild contributions", function()
             _G.MailworthyDB = db
             assert.is_nil(MailworthyAPI.v1.GetGuildExport({}))
             local key = ns.Guild.Key
+            local before = {}
+            for i, line in ipairs(MailworthyDB.log) do before[i] = line end
             ns.Guild.Key = function() error("boom") end
             assert.is_nil(MailworthyAPI.v1.GetGuildExport())
             ns.Guild.Key = key
-            assert.truthy(table.concat(ns.Log.Lines(), "\n"):find("export error", 1, true), "an error is logged")
-            MailworthyDB.log = {} -- the one error line this case caused on purpose
+            assert.same(before, MailworthyDB.log, "the API wrote to the saved log")
+            MailworthyDB.peers = {} -- the junk peer above is Comms' own report's business
+            assert.truthy(ns.Report.Build():find("guild export error: ", 1, true), "/mw report shows the error")
         end)
     end)
 end)
