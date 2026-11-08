@@ -47,6 +47,15 @@ Routes.HARD_KEEPS = {
     ["profession tool"] = true, ["item info not loaded yet"] = true,
 }
 
+-- Verdicts a class binding doesn't override either: AGENTS safety keeps an unpriced item (with
+-- Auctionator) and anything but white items (without it) in the bags (Codex review, 2026-11-08).
+function Routes.PriceKeep(verdict)
+    if not (verdict and verdict.action == "keep") then return false end
+    local reason = tostring(verdict.reason)
+    return reason == "no price" or reason == "uncommon or better (no price data)"
+        or reason == "junk (no price data)" or reason:find("^price too old") ~= nil
+end
+
 local skipped = {} -- route key -> true for this mailbox visit
 
 local function call(fn, ...)
@@ -252,6 +261,7 @@ function Routes.Divert(item, verdict, price, settings, routes)
     local outgrown, route
     for _, r in ipairs(routes or {}) do
         local matches, past = Routes.Matches(r, item, settings and settings.tiers, settings and settings.priceOf)
+        if r.class and Routes.PriceKeep(verdict) then matches = false end
         if past then outgrown = outgrown or r end
         if matches and (not route or Routes.Before(r, route)) then route = r end
     end

@@ -24,7 +24,7 @@ Classes.BY_ID = { [1] = "WARRIOR", [2] = "PALADIN", [3] = "HUNTER", [4] = "ROGUE
     [7] = "SHAMAN", [8] = "MAGE", [9] = "WARLOCK", [11] = "DRUID" }
 Classes.ORDER = { "DRUID", "HUNTER", "MAGE", "PALADIN", "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" }
 
-local cache = {} -- itemID -> set of tokens, or false (no class line)
+local cache = {} -- itemID -> set of tokens (only a class line found is kept: see Classes.Of)
 
 local function call(fn, ...)
     if type(fn) ~= "function" then return nil end
@@ -86,7 +86,8 @@ local function lineText(line)
 end
 
 --- The classes that may use an item ({ MAGE = true }), false when anyone can, nil when the
---- game hasn't loaded its tooltip yet.
+--- game hasn't loaded its tooltip yet. Only a found class line is cached: tooltip data can
+--- arrive in parts (a name line first), so "anyone" is asked again next scan (Codex review).
 function Classes.Of(itemID)
     itemID = tonumber(itemID)
     if not itemID then return nil end
@@ -100,7 +101,7 @@ function Classes.Of(itemID)
         local set = Classes.Parse(lineText(line), format)
         if set then found = set break end
     end
-    cache[itemID] = found
+    if found then cache[itemID] = found end
     return found
 end
 

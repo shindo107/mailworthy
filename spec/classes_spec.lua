@@ -87,6 +87,30 @@ describe("class-only items", function()
         assert.equal("locked", find(ns.Bags.Evaluate().keep, SCROLL).result.reason)
     end)
 
+    it("never over the price rules: unpriced with Auctionator, or a green without it, stays (Codex review)", function()
+        ns.Routes.Add(BOB, "MAGE")
+        prices[WowStub.link(SCROLL, "Scroll: VOCE WELL")] = nil
+        assert.equal("no price", find(ns.Bags.Evaluate().keep, SCROLL).result.reason)
+        _G.Auctionator = nil
+        WowStub.setBag(0, 1, WowStub.item(SCROLL, "Scroll: VOCE WELL", { quality = 2, sell = 15, class = 0 }))
+        assert.equal("uncommon or better (no price data)", find(ns.Bags.Evaluate().keep, SCROLL).result.reason)
+        WowStub.setBag(0, 1, WowStub.item(SCROLL, "Scroll: VOCE WELL", { sell = 15, class = 0 }))
+        assert.equal(BOB, find(ns.Bags.Evaluate().mail, SCROLL).result.to, "a white one goes, as without a binding")
+    end)
+
+    it("a tooltip that loads in parts: no class line yet is asked again, not cached (Codex review)", function()
+        local real, full = _G.C_TooltipInfo, false
+        _G.C_TooltipInfo = { GetItemByID = function()
+            local lines = { { leftText = "Scroll: VOCE WELL" } }
+            if full then lines[2] = { leftText = "Classes: Mage" } end
+            return { lines = lines }
+        end }
+        assert.is_false(ns.Classes.Of(4243))
+        full = true
+        assert.same({ MAGE = true }, ns.Classes.Of(4243))
+        _G.C_TooltipInfo = real
+    end)
+
     it("refuses a class that isn't one", function()
         assert.same({ nil, "not a crafting profession or a class" }, { ns.Routes.Add(BOB, "DEATHKNIGHT") })
     end)
