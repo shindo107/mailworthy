@@ -508,7 +508,8 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   never changes it: items received at their value plus gold received, minus items and gold
   sent. Not counted: this account's characters (known characters and the bank alt), system
   mail (`canReply` false, GM, AH invoices), COD (a sale). A returned mail taken back undoes the
-  "sent". A Mailworthy peer's characters (from their hello) count as one player.
+  "sent". Two Mailworthy peers count as one player only when each one's own hello lists the
+  other (a hello is anyone's word; named after the alphabetically first).
 - **Only your own side shows** (operator): the ledger window lists players you received more
   from than you sent back, with what they sent, and **Mark paid** (two presses: a trade or gold
   in person; logged); a chat line when you take a counted mail; the Mailworthy window's line at
@@ -520,15 +521,17 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   go to the recipient's Mailworthy: `V2|<mail's sender>|<recipient>|<server time>|<itemID>:
   <count>:<copper>;...`, WHISPER only, and only to a player just heard from (any Mailworthy
   message: they're online; else `Comms.Ask` prompts hellos, and the values wait up to 30 days in
-  `outbox`), to the recipient or another character their hello lists. The receiver keeps them in
-  `expect` (31 days) when the recipient is one of its own characters and the mail's sender is
-  the whisperer or one of their listed characters, and uses the oldest match (item and count)
-  when the item is taken, **at most 3x its own price** (a made-up value can't run up a debt).
+  `outbox`), to the recipient's own character, never another one their hello claims. The receiver
+  keeps them in `expect` (31 days) when the recipient is one of its own characters and the
+  mail's sender is the whisperer, and uses the oldest match (item, count and the character
+  taking it) when the item is taken, **at most 3x its own price** (a made-up value can't run up
+  a debt).
   Otherwise its own price when taken. No price: listed by count, not in gold.
 - **The more up-to-date scan wins** (operator, 2026-11-07: "we should trust the more up to date
   value at time of send"): each value carries its Auctionator scan's age in days
   (`<itemID>:<count>:<copper>:<age>`; v0.25.0 sent none and still reads the new form). On
-  receipt, the receiver's own price as it stood the day the mail went (`Ledger.PriceThen`: its
+  receipt, the receiver's own price as it stood the day the mail went (days counted as
+  Auctionator counts them, `Ledger.ScanDay`: floor((local time - SCAN_DAY_0) / 86400); `PriceThen`: its
   last scan when that was already in, else that day in Auctionator's history, its lowest price
   seen) is compared with the sender's: the fresher scan at the time of send wins; a tie, an
   unknown age or no price of ours that day keeps the sender's (still capped at 3x ours). The
@@ -536,13 +539,18 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
 - **Answer back** (operator, same day, so both players see the same value): when the receiver
   settles on a value other than the sender's (its scan was fresher, or the cap), it queues
   `R2|<recipient>|<mail's sender>|<the mail's time>|<itemID>:<count>:<copper>;...` for the
-  sender, held in `outbox` like the values (WHISPER only, sent once the sender or a character
-  their hello lists is heard from, 30 days at most). The sender finds that mail in its log
-  (sender, recipient, time), takes the value (`agreed`, the old one kept as `mine`) and moves
+  sender, held in `outbox` like the values (WHISPER only, sent once the mail's sender character is
+  heard from, 30 days at most). The sender finds that mail in its log (sender, recipient, time;
+  a second mail to the same player in the same second is stamped a second later, so the time
+  names one mail), takes the value (`agreed`, the old one kept as `mine`) and moves
   its balance by the difference; an answer under a third or over 3x its own value is ignored,
   and an item takes one answer. Until the answer arrives, the sender shows its own value.
   Still unmatched: a mail whose values never reached the receiver before it was taken (the
   receiver then used its own price and has nothing to answer to).
+- **Trust** (Codex review, 2026-11-07): a hello's "my other characters" list is never evidence for
+  reading or settling a mail. Values go to, and answers come from, the exact character the mail
+  names; a stranger listing Bob as their alt gets none of Bob's values, can't answer for him and
+  doesn't take his balance.
 - **Never seen by the players** (operator: "as long as these messages back and forth are all
   obscured by the player"): values and answers are addon messages, which no chat window shows,
   and whispers, so only the two players' clients get them. A whisper to an offline player would

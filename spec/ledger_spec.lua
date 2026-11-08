@@ -409,14 +409,78 @@ describe("mail ledger", function()
         assert.is_true(ns.LedgerUI.Frame():IsShown())
     end)
 
-    it("a peer's characters count as one player", function()
-        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({ { skillLine = 197 } },
-            { { name = "Bobs Tailor", professions = { { skillLine = 197 } } } }), "GUILD", BOB)
+    local function hello(from, others)
+        local list = {}
+        for _, name in ipairs(others) do list[#list + 1] = { name = name, professions = { { skillLine = 197 } } } end
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({ { skillLine = 197 } }, list), "GUILD", from)
+    end
+
+    it("a peer's characters count as one player when each one's hello lists the other", function()
+        hello(BOB, { "Bobs Tailor" })
+        hello("Bobs Tailor", { BOB })
         inboxMail(LINEN, 20, { sender = "Bobs Tailor" })
         take(LINEN.id)
         assert.equal(1000, (ns.Ledger.Net(BOB)))
         sendByHand(BOB, LINEN, 20)
         assert.equal(0, (ns.Ledger.Net("Bobs Tailor")))
+    end)
+
+    it("a stranger claiming to be Bob's alt gets nothing of Bob's: not his balance, values or answers (Codex review)", function()
+        hello(BOB, {})
+        hello("Mallory Thief", { BOB }) -- "Bob is my alt"
+        inboxMail(LINEN, 20)
+        take(LINEN.id)
+        assert.equal(BOB, ns.Ledger.Debts()[1].name, "Bob's balance stays Bob's")
+        WowStub.state.now = WowStub.state.now + 120
+        sendByHand(BOB, ORE, 20) -- values wait for Bob
+        local before = #WowStub.state.addonMessages
+        hello("Mallory Thief", { BOB })
+        for i = before + 1, #WowStub.state.addonMessages do
+            assert.is_nil(WowStub.state.addonMessages[i].message:find("^V2"), "Bob's values went to Mallory")
+        end
+        local at = ns.Ledger.Store().log[#ns.Ledger.Store().log].at
+        local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", at, { { itemID = ORE.id, count = 20, value = 3600 } })
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", "Mallory Thief")
+        assert.equal(1200, ns.Ledger.Store().log[#ns.Ledger.Store().log].items[1].value, "Mallory answered for Bob")
+        local v = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", WowStub.state.serverTime, { { itemID = LINEN.id, count = 20,
+            value = 3000 } })
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", v[1], "WHISPER", "Mallory Thief")
+        assert.is_nil(ns.Ledger.Store().expect["bob surname"], "Mallory spoke for Bob's mail")
+    end)
+
+    it("mail taken by this character never uses values meant for another of its characters (Codex review)", function()
+        MailworthyDB.characters["Alt Person|Classic Beta PvP|Alliance"] = { name = "Alt Person", realm = "Classic Beta PvP",
+            faction = "Alliance" }
+        local at = WowStub.state.serverTime
+        ns.Ledger.Store().expect["bob surname"] = {
+            { at = at - 60, to = "Alt Person", itemID = LINEN.id, count = 20, value = 1400 },
+            { at = at, to = "Rettana Quilwrit", itemID = LINEN.id, count = 20, value = 1100 } }
+        inboxMail(LINEN, 20)
+        take(LINEN.id)
+        assert.equal(1100, (ns.Ledger.Net(BOB)), "this character's own mail's value")
+        assert.equal(1, #ns.Ledger.Store().expect["bob surname"])
+        assert.equal("Alt Person", ns.Ledger.Store().expect["bob surname"][1].to, "the alt's value still waits for it")
+    end)
+
+    it("two mails to one player in the same second get different times, so answers find the right one (Codex review)", function()
+        sendByHand(BOB, ORE, 20)
+        sendByHand(BOB, ORE, 10)
+        local log = ns.Ledger.Store().log
+        assert.equal(log[1].at + 1, log[2].at)
+        local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", log[1].at, { { itemID = ORE.id, count = 20, value = 900 } })
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+        assert.equal(900, log[1].items[1].value)
+        assert.equal(600, log[2].items[1].value)
+    end)
+
+    it("scan days are Auctionator's: a mail sent before its day boundary and taken after is a day old (Codex review)", function()
+        _G.Auctionator.Constants = { SCAN_DAY_0 = 0 }
+        local _time = _G.time
+        _G.time = function(t) if t then return _time(t) end return WowStub.state.serverTime end
+        local boundary = math.floor(WowStub.state.serverTime / 86400) * 86400
+        assert.equal(1, ns.Ledger.ScanDay(boundary + 60) - ns.Ledger.ScanDay(boundary - 3600), "an hour before, a minute after")
+        assert.equal(0, ns.Ledger.ScanDay(boundary + 7200) - ns.Ledger.ScanDay(boundary + 60))
+        _G.time = _time
     end)
 
     it("the report says how much is logged, never who or how much", function()

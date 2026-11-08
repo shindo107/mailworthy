@@ -87,3 +87,8 @@ publishes a tag only after all of CI passes.
   them by full path in messages.
 - Before every push: `eval "$(luarocks --lua-version=5.1 path)"`, then
   `busted --lua=luajit` and `luacheck .`.
+- **Codex review before every PR** (operator, 2026-11-07): before opening a PR, have Codex
+  review the branch's diff against `origin/main` (Claude Code: the `codex:codex-rescue`
+  subagent, review only, no edits), check each finding against the code, fix the real ones
+  with a spec each, and list in the PR description what Codex found and what was fixed or why
+  not. Commits pushed to an open PR that change behaviour get the same review.
