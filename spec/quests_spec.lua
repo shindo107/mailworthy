@@ -114,6 +114,49 @@ describe("quests", function()
         assert.truthy(text:find("Stays in your bags: Redridge Goulash needs it.", 1, true), text)
     end)
 
+    it("a quest accepted mid-run: the slot is re-checked before attaching and skipped (Codex review)", function()
+        local quests = WowStub.state.quests
+        WowStub.state.quests = {}
+        ns.Fire("QUEST_LOG_UPDATE")
+        local stack = { bag = 0, slot = 1, count = 5, itemID = MEAT, link = WowStub.link(MEAT, "Crisp Spider Meat") }
+        assert.is_true(ns.Mailer.StillThere(stack))
+        WowStub.state.quests = quests
+        ns.Fire("QUEST_LOG_UPDATE")
+        assert.same({ false, "an active quest needs it" }, { ns.Mailer.StillThere(stack) })
+    end)
+
+    it("a quest abandoned after the preview: Send holds, the list shows the item going (Codex review)", function()
+        MailFrame:Show()
+        SendMailFrame:Show()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(find(ns.MailWindow.Result().mail, MEAT), "under Staying")
+        WowStub.state.quests = {}
+        ns.Quests.Invalidate() -- the log changed; the window hasn't redrawn yet
+        _G.MailworthyMailSend:Click()
+        assert.is_false(ns.Mailer.Busy(), "an item the list showed staying never goes unseen")
+        WowStub.runTimers()
+        assert.equal(0, #WowStub.state.sent)
+        assert.truthy(table.concat(WowStub.printed, "\n"):find(
+            "Not sent: Crisp Spider Meat now goes to Roknua instead of staying in your bags", 1, true))
+        assert.truthy(find(ns.MailWindow.Result().mail, MEAT), "the list now shows it going")
+    end)
+
+    it("a quest accepted with the item already in the bags redraws the window and the tags (Codex review)", function()
+        local quests = WowStub.state.quests
+        WowStub.state.quests = {}
+        ns.Fire("QUEST_LOG_UPDATE")
+        MailFrame:Show()
+        SendMailFrame:Show()
+        _G.MailworthyMailButton:Click()
+        assert.truthy(find(ns.MailWindow.Result().mail, MEAT))
+        ns.Fire("QUEST_LOG_UPDATE")
+        assert.truthy(find(ns.MailWindow.Result().mail, MEAT), "nothing changed: no redraw needed")
+        WowStub.state.quests = quests
+        ns.Fire("QUEST_LOG_UPDATE")
+        assert.is_nil(find(ns.MailWindow.Result().mail, MEAT), "the window redrew on its own")
+        assert.equal("a quest needs it", find(ns.BankAlt.Refresh().keep, MEAT).result.reason)
+    end)
+
     it("the questNeeds switch turns it off", function()
         MailworthyDB.features = { questNeeds = false }
         assert.truthy(find(ns.Bags.Evaluate().mail, MEAT))

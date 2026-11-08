@@ -76,6 +76,10 @@ describe("widgets and labels", function()
         local function green(link, to) return { itemID = 15210, link = link, result = { to = to } } end
         local list = { green("[Raider Shortsword of the Tiger]"), green("[Raider Shortsword of the Monkey]", "Bob") }
         assert.same({}, changed(list, list, "Bank"), "two suffixes of one item ID, two recipients: unchanged")
+        -- Codex review, 2026-11-08: an item the list showed under Staying, now in the mail.
+        local c2 = changed({}, { mail(1081) }, "Bank", "Bank", { mail(1081) })
+        assert.equal(1, #c2)
+        assert.equal("Staying", c2[1].was)
         assert.equal(1, #changed(list, { green("[Raider Shortsword of the Tiger]", "Bob"),
             green("[Raider Shortsword of the Monkey]", "Bob") }, "Bank"))
     end)

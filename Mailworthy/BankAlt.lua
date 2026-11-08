@@ -199,8 +199,9 @@ BankAlt.QUIET_KEEPS = { soulbound = true, ["quest item"] = true, locked = true, 
     ["item info not loaded yet"] = true }
 
 --- Pure: the label and the line for an item with no verdict tag: where the Mailworthy window
---- mails it, or why it stays in the bags. nil when there's nothing to add.
-function BankAlt.OtherLine(item)
+--- mails it, or why it stays in the bags. nil when there's nothing to add. `noBankAlt`: none is
+--- set, so nothing goes to one (Bags.HoldReason; Codex review).
+function BankAlt.OtherLine(item, noBankAlt)
     local r = item and item.result
     if type(r) ~= "table" then return nil end
     if r.action == "mail" then
@@ -208,6 +209,7 @@ function BankAlt.OtherLine(item)
             return "Mail", string.format("Goes to %s at the mailbox: %s.", tostring(r.to),
                 r.what and (tostring(r.what) .. " binding") or "a binding")
         end
+        if noBankAlt then return "Keep", "Stays in your bags: no bank alt (" .. tostring(r.reason) .. ")." end
         return "Mail", "Goes to your bank alt at the mailbox: " .. tostring(r.reason) .. "."
     end
     if r.action ~= "keep" or BankAlt.QUIET_KEEPS[r.reason] then return nil end
@@ -222,7 +224,7 @@ function BankAlt.TooltipLines(item, record, settings)
     local verdict = item and (item.advice or item.verdict)
     local tag = verdict and BankAlt.TAGS[verdict]
     local otherLabel, otherText
-    if not tag then otherLabel, otherText = BankAlt.OtherLine(item) end
+    if not tag then otherLabel, otherText = BankAlt.OtherLine(item, not ns.Config.BankAlt()) end
     local label = tag and tag.label or otherLabel
     if not label and not record then return lines end
     lines[1] = { "Mailworthy" .. (label and ("  |cffffffff[" .. label .. "]|r") or ""), 1, 0.82, 0 }

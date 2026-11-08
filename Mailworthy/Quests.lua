@@ -101,5 +101,27 @@ end
 
 function Quests.Invalidate() needs = nil end
 
-ns.On("QUEST_LOG_UPDATE", function() Quests.Invalidate() end)
+--- Pure: do two indexes name the same items for the same quests?
+function Quests.Same(a, b)
+    for k, v in pairs(a or {}) do if (b or {})[k] ~= v then return false end end
+    for k in pairs(b or {}) do if (a or {})[k] == nil then return false end end
+    return true
+end
+
+--- QUEST_LOG_UPDATE fires often: read the log again, and only when what it asks for changed,
+--- redraw what depends on it (the bag tags and tooltips, the Mailworthy window), so a quest
+--- accepted or turned in with the item already in the bags shows at once (Codex review).
+function Quests.Update()
+    local before = needs
+    local ok, quests = pcall(Quests.Read)
+    needs = Quests.Index(ok and quests or {})
+    if before == nil or Quests.Same(before, needs) then return false end
+    if ns.BankAlt then ns.BankAlt.Redraw() end
+    if ns.MailWindow and not ns.Mailer.Busy() then ns.MailWindow.RefreshIfShown() end
+    return true
+end
+
+ns.On("QUEST_LOG_UPDATE", function()
+    if ns.Features.On("questNeeds") then Quests.Update() end
+end)
 ns.On("PLAYER_LOGIN", function() Quests.Invalidate() end)

@@ -661,9 +661,13 @@ end
 --- A binding's recipient can move between the preview and Send without the bags changing (a
 --- crafter's skill passes a material, two bindings swap on "lowest skill first"), and so can the
 --- bank alt (picked in Settings beside the list) (Codex review, 2026-11-07).
-function UI.Changed(shown, fresh, previewAlt, freshAlt)
+--- `stayed` (the list's Staying items): one of those now in the mail is a change too (a quest
+--- abandoned after the preview; Codex review, 2026-11-08), whoever it goes to.
+function UI.Changed(shown, fresh, previewAlt, freshAlt, stayed)
     if freshAlt == nil then freshAlt = previewAlt end
     local function key(it) return it.link or it.itemID end
+    local kept = {}
+    for _, it in ipairs(stayed or {}) do kept[key(it)] = true end
     local was, named = {}, { [tostring(previewAlt)] = true }
     for _, it in ipairs(shown or {}) do
         local to = tostring(it.result and it.result.to or previewAlt)
@@ -676,7 +680,9 @@ function UI.Changed(shown, fresh, previewAlt, freshAlt)
     for _, it in ipairs(fresh or {}) do
         local to = tostring(it.result and it.result.to or freshAlt)
         local before = was[key(it)]
-        if (before and not before[to]) or (not before and not named[to]) then
+        if kept[key(it)] and not before then
+            changed[#changed + 1] = { item = it, was = "Staying", to = to }
+        elseif (before and not before[to]) or (not before and not named[to]) then
             changed[#changed + 1] = { item = it, was = before and next(before) or nil, to = to }
         end
     end
@@ -686,16 +692,17 @@ end
 function UI.Send()
     if not result then return end
     ns.lastCommand = "Mailworthy Send"
-    local shown, alt = result.mail, shownAlt
+    local shown, alt, stayed = result.mail, shownAlt, result.keep
     UI.Refresh() -- the freshest scan, so the mail list is what's in the bags now
     -- AGENTS Safety: mail goes only to the recipients the player saw. If the fresh scan sends
     -- anything elsewhere, nothing goes: the list now shows where, and a second press sends it.
-    local changed = UI.Changed(shown, result.mail, alt, ns.Config.BankAlt())
+    local changed = UI.Changed(shown, result.mail, alt, ns.Config.BankAlt(), stayed)
     if #changed > 0 then
         local c = changed[1]
         local name = tostring(c.item.link or ""):match("%[(.-)%]") or ("item " .. tostring(c.item.itemID))
         local text = string.format("Not sent: %s now goes to %s%s. Check the list, then press Send again.", name,
-            firstName(c.to), c.was and (" instead of " .. firstName(c.was)) or "")
+            firstName(c.to), c.was == "Staying" and " instead of staying in your bags"
+                or c.was and (" instead of " .. firstName(c.was)) or "")
         ns.Log.Add("mailer", "send held: %d item(s) changed recipient since the preview (%s to %s, was %s)", #changed,
             name, c.to, tostring(c.was))
         ns.Print(text)
