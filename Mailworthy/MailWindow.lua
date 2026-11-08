@@ -227,7 +227,7 @@ local function createRouteRows()
     friendsButton = W.Button(frame, "Friends...", 90, function() ns.RoutesUI.Show(frame) end, "MailworthyMailFriends")
     guildButton = W.Button(frame, "Guild rules: on", 130, function()
         if ns.Guild.SetUse(false) then
-            ns.Print("Guild rules off: your materials no longer follow the guild template. Turn them back on in Friends.")
+            ns.Print("Guild rules off: your materials no longer follow the guild template. Turn them back on with /mw guild.")
         end
         UI.Refresh()
     end, "MailworthyMailGuildRules")
@@ -255,6 +255,15 @@ local function createRouteRows()
     end
 end
 
+--- Pure: a binding row's grey tags: "(guild, skill 120)", "(skill 120)", "(guild)" or "". The skill
+--- shows why a material past it stays (2026-11-07: "i'm not sure hiphop is on linen anymore").
+function UI.RouteTags(guild, skill)
+    local tags = {}
+    if guild then tags[#tags + 1] = "guild" end
+    if skill then tags[#tags + 1] = "skill " .. tostring(skill) end
+    return #tags > 0 and (" |cff888888(" .. table.concat(tags, ", ") .. ")|r") or ""
+end
+
 --- Fill the binding rows; returns how many rows show (0: the block is hidden).
 local function fillRoutes()
     local list = ns.Routes.List()
@@ -272,7 +281,7 @@ local function fillRoutes()
             local skipped = ns.Routes.Skipped(r.key)
             row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. firstName(to) .. "|r"
                 .. (crafter and (" |cff888888(" .. firstName(r.to) .. "'s crafter)|r") or "")
-                .. (r.scope == "guild" and " |cff888888(guild)|r" or "")
+                .. UI.RouteTags(r.scope == "guild", ns.Routes.Skill(r))
                 .. (skipped and " |cff888888skipped this time|r" or ""))
             row.skip:SetText(skipped and "Undo skip" or "Skip once")
             row.skip:Show()

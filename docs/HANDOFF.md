@@ -256,6 +256,12 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   (`Valuation.CanDisenchant`, `Routes.GEAR_QUALITIES`; epics stay on the normal rule) for a
   binding on Enchanting 333. Soulbound gear is a hard keep; the binding's per-unit cap compares
   the piece's AH price, so a green the AH pays well for still goes to the bank alt.
+- Bindings and guild rules take primary materials only (operator, 2026-11-07, after Linen
+  Cloth went to a guild engineer: "only focus on the primary materials ... they can ask or
+  acquire some minor pieces"): `Routes.Matches` checks the profession's own subclasses, not
+  `Tiers.KEEP`. The mailbox window's binding rows show the recipient's skill ("(guild, skill
+  120)"), so a material past it going to the bank alt explains itself. Button labels fit
+  their border (`Widgets.Fit` after every SetText: small font, then "...").
 - Popups beside their opener (operator, same day: the new popups "overlap the existing menus
   and you cant read the new popup easily without closing the old one"): `Widgets.PlaceBeside`
   puts settings / friends / the bank alt summary to the right of the Mailworthy window that
@@ -381,8 +387,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   their own with a chat line), **GM and officers** publish (rank index 0 and 1, checked in the
   receiver's own roster), **personal wins** (own bindings first; a rule for a profession this
   character has is left out; Skip once at the mailbox). Rules are profession bindings (herbs =
-  Alchemy), one per profession; "Guild rules: on" in Friends and on the mailbox window's Bindings
-  heading turns them all off. Copies from anyone (operator, same day: "whoever is online gets the
+  Alchemy), one per profession; "Guild rules: on" in the Guild window (`/mw guild`, the settings'
+  Guild button, `RoutesUI.ShowGuild`; 2026-11-07, out of Friends) and on the mailbox window's
+  Bindings heading turns them all off. The author may name themself (`Routes.Me`, first in the
+  rule's player list): the guild's other members mail them; their own client never does. Copies from anyone (operator, same day: "whoever is online gets the
   copy, and it can be copied from them by any member"): each copy names its author, whose rank
   the receiver checks; rules for non-members are dropped; one holder answers each ask; a copy in
   an author's name that they never published is corrected by their Mailworthy (PLAN "Guild

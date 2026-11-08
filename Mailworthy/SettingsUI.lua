@@ -2,7 +2,8 @@
 --   main view: the bank alt on one row with Change..., then "What gets mailed"
 --     (minimum gain, listing length, disenchant, profession materials, sell what I
 --     gather), "In your
---     bags" (tags, lock glow) and "More" (friends, bank alt summary, minimap button);
+--     bags" (tags, lock glow) and "More" (friends, guild, bank alt summary, mail ledger,
+--     minimap button);
 --   pick view (Change..., and straight away while no bank alt is set): the known
 --     characters, "This character is my bank alt" (a main on another WoW account),
 --     an optional typed name, Back. Picking saves and returns to the main view.
@@ -21,12 +22,12 @@ local UI = {}
 ns.SettingsUI = UI
 
 UI.MAX_CHOICES = 6
-local WIDTH, MAIN_HEIGHT, ROW = 420, 496, 26
+local WIDTH, MAIN_HEIGHT, ROW = 420, 522, 26
 
 local frame, nameBox, nameHint, current, emptyHint, legend, pricesLine, changeButton
 local choiceRows = {}
 local amountLabel, pctLabel, disenchantButton, minimapButton, tagsButton, glowButton, matsButton, hereButton, friendsButton
-local gatherButton
+local gatherButton, guildButton
 local durationButtons = {}
 local mainWidgets, pickWidgets = {}, {}
 local typedLabel, useNameButton, backButton
@@ -281,19 +282,23 @@ local function createBagsAndMore()
     add(mainWidgets, W.Button(frame, "Bank alt summary...", 182, function()
         if ns.BankAlt then ns.BankAlt.ShowWindow(frame) end
     end, "MailworthySettingsSummary")):SetPoint("TOPLEFT", 214, -378)
+    -- 2026-11-07: "I want a new button for guild inside the mailworthy settings"
+    guildButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.RoutesUI.ShowGuild(frame) end,
+        "MailworthySettingsGuild"))
+    guildButton:SetPoint("TOPLEFT", 24, -404)
+    add(mainWidgets, W.Button(frame, "Mail ledger...", 182, function() ns.LedgerUI.Show(frame) end,
+        "MailworthySettingsLedger")):SetPoint("TOPLEFT", 214, -404)
     minimapButton = toggle(182, "Minimap", function()
         ns.Config.Set("minimapHidden", ns.Config.MinimapShown())
         if ns.MinimapButton then ns.MinimapButton.Refresh() end
     end)
-    minimapButton:SetPoint("TOPLEFT", 24, -404)
-    add(mainWidgets, W.Button(frame, "Mail ledger...", 182, function() ns.LedgerUI.Show(frame) end,
-        "MailworthySettingsLedger")):SetPoint("TOPLEFT", 214, -404)
+    minimapButton:SetPoint("TOPLEFT", 24, -430)
     pricesLine = add(mainWidgets, W.Label(frame, "GameFontDisableSmall"))
-    pricesLine:SetPoint("TOPLEFT", 28, -446)
+    pricesLine:SetPoint("TOPLEFT", 28, -472)
     pricesLine:SetWidth(270)
     pricesLine:SetJustifyH("LEFT")
     add(mainWidgets, W.Button(frame, "Done", 100, function() frame:Hide() end, "MailworthySettingsDone"))
-        :SetPoint("TOPRIGHT", -24, -440)
+        :SetPoint("TOPRIGHT", -24, -466)
 end
 
 function UI.Create()
@@ -366,6 +371,13 @@ local function hideChoices()
     end
 end
 
+--- Pure: the Guild button: "Guild..." / "Guild (rules on)..." / "Guild (new template)...".
+function UI.GuildButtonText(inGuild, template)
+    if not inGuild or not template then return "Guild..." end
+    if template.use == nil then return "Guild (new template)..." end
+    return template.use and "Guild (rules on)..." or "Guild (rules off)..."
+end
+
 local function fillMain(bankAlt, here, choices)
     current:SetText(UI.BankAltText(bankAlt, here, choices))
     changeButton:SetText(bankAlt and "Change..." or "Choose...")
@@ -388,9 +400,10 @@ local function fillMain(bankAlt, here, choices)
         #gathering > 0 and table.concat(gathering, ", ") or "no gathering profession here"))
     tagsButton:SetText("Bag tags: " .. (ns.Config.Flag("tagsEverywhere") and "every character" or "bank alt only"))
     glowButton:SetText("Lock glow: " .. (ns.Config.Flag("glowEverywhere") and "always" or "in Mailworthy"))
-    local bindings = ns.Routes.Count()
+    local bindings = #ns.Routes.Personal()
     friendsButton:SetText(bindings == 0 and "Friends..."
         or string.format("Friends (%d binding%s)...", bindings, bindings == 1 and "" or "s"))
+    guildButton:SetText(UI.GuildButtonText(ns.Guild.On() and ns.Guild.Mine() ~= nil, ns.Guild.On() and ns.Guild.Template()))
     minimapButton:SetText("Minimap button: " .. (ns.Config.MinimapShown() and "shown" or "hidden"))
     pricesLine:SetText("Prices: " .. (ns.Prices.Auctionator() and "Auctionator"
         or "none (install Auctionator; only white items are mailed)"))

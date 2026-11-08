@@ -1,19 +1,20 @@
 -- The friends window (/mw friends, the settings' Friends button, the Mailworthy
 -- window's Friends button; media/ux-pass-prototype.png), one view at a time:
---   list: the guild template line (when the guild has one, or this character may
---     make one: who shared it, "Guild rules: on / off" in one press, Edit...), then
---     the bindings in force, each with its price cap stepper, scope (all my
+--   list: the player's own bindings, each with its price cap stepper, scope (all my
 --     characters / this character), where the mail goes (the friend, or the
 --     character of theirs that has the profession, as their own Mailworthy
---     reported) and Remove; the guild's rules show as rows without buttons; then
---     "Add a binding...";
+--     reported) and Remove; then "Add a binding...";
 --   add, step 1: pick a player (party, guild, own characters, Mailworthy users;
 --     online first; their professions shown); step 2: pick the profession (theirs
 --     suggested). Binding saves and returns to the list; Back goes one step back.
---     For a guild rule, step 1 lists guild members only and the rule goes to the
---     draft, back in the guild view;
---   guild (guild master and officers, Guild.lua): the template's rules being edited,
---     each with its cap stepper and Remove; "Add a rule...", "Publish to guild", Back.
+--     For a guild rule, step 1 lists this character and the guild's members only and
+--     the rule goes to the draft, back in the guild view;
+--   guild (/mw guild, the settings' Guild button; 2026-11-07: "I want a new button for
+--     guild inside the mailworthy settings, seems weird its in the friends tab"): who
+--     shared the guild's template, "Guild rules: on / off" in one press, and its rules
+--     (why one is left out here); for the guild master and officers (Guild.lua) the
+--     rules being edited, each with its cap stepper and Remove, "Add a rule...",
+--     "Publish to guild".
 -- With no bindings and no guild template it opens straight on step 1. Every control is a
 -- button, so the controller drives it (PadKey "settings" set, Nav); nothing needs typing.
 local _, ns = ...
@@ -25,16 +26,17 @@ UI.BINDING_ROWS, UI.CANDIDATE_ROWS, UI.PROFESSION_ROWS = 4, 6, 8
 local WIDTH = 560
 local BIND_ROW, LIST_ROW = 50, 26
 local BIND_TOP = -92
-local GUILD_LINE = -66   -- the guild template line in the list view
-local GUILD_SHIFT = 30   -- how far it pushes the bindings down
-local DRAFT_TOP = -112   -- the first rule row in the guild view
+local GUILD_LINE = -66   -- the guild template line in the guild view
+local GUILD_HELP = -96   -- what the rules do, under it
+local GUILD_TOP = -138   -- the first rule row in the guild view
 local LIST_TOP = -72
+UI.TITLE = { friends = "Send materials to friends", guild = "Guild materials" }
 
 local W = ns.Widgets
 
-local frame, sub, bindHead, stepLabel, chosenLabel, emptyBindings, bindPage, candPage, refreshButton
+local frame, title, sub, bindHead, stepLabel, chosenLabel, emptyBindings, bindPage, candPage, refreshButton
 local addButton, backButton, doneButton, ledgerButton, hint, legend
-local guildLabel, guildToggle, guildEdit, publishButton
+local guildLabel, guildToggle, publishButton
 local bindingRows, candidateRows, professionRows = {}, {}, {}
 local pages = { bind = 1, cand = 1 }
 local candidates, picked = {}, nil
@@ -44,7 +46,7 @@ local target = "me" -- what the add view makes: "me" (a binding) or "guild" (a t
 function UI.Frame() return frame end
 function UI.Picked() return picked end
 --- "list" (the bindings), "add" (step 1: a player; step 2, once picked: the profession) or
---- "guild" (the guild template's rules, for the guild master and officers).
+--- "guild" (the guild template: on / off, its rules; the editor for the guild master and officers).
 function UI.View() return view end
 --- What the add view makes: "me" (a binding) or "guild" (a guild template rule).
 function UI.Target() return target end
@@ -80,7 +82,8 @@ end
 --- rules" before the player chose), or nil toggle when there is no template.
 function UI.GuildText(template, canPublish)
     if not template then
-        return canPublish and "No guild template yet: make one for your guild's materials." or nil, nil
+        return canPublish and "No guild template yet: add a rule for each profession, then Publish to guild."
+            or "No guild template yet: your guild master or an officer makes it here.", nil
     end
     local n = #(template.rules or {})
     local text = string.format("Guild template from %s: %d rule%s", tostring(template.from), n, n == 1 and "" or "s")
@@ -157,7 +160,7 @@ end
 
 local function createGuild()
     guildLabel = W.Label(frame, "GameFontHighlight")
-    guildLabel:SetWidth(WIDTH - 56 - 250)
+    guildLabel:SetWidth(WIDTH - 56 - 160)
     guildLabel:SetJustifyH("LEFT")
     guildToggle = W.Button(frame, "", 140, function()
         local was = ns.Guild.InUse()
@@ -165,15 +168,11 @@ local function createGuild()
             setHint(was and "Guild rules off: your materials no longer follow the guild template."
                 or "Guild rules on: the guild's rules apply after your own bindings and professions.")
             ns.MailWindow.RefreshIfShown()
+            local settings = ns.SettingsUI.Frame()
+            if settings and settings:IsShown() then ns.SettingsUI.Refresh() end
         end
         UI.Refresh()
     end, "MailworthyFriendsGuildRules")
-    guildEdit = W.Button(frame, "Edit...", 90, function()
-        view, picked = "guild", nil
-        pages.bind = 1
-        setHint("")
-        UI.Refresh()
-    end, "MailworthyFriendsGuildEdit")
     publishButton = W.Button(frame, "Publish to guild", 150, function()
         local ok, err = ns.Guild.Publish()
         if not ok then
@@ -213,8 +212,8 @@ local function createAdd()
         candidateRows[i] = b
     end
     for i = 1, UI.PROFESSION_ROWS do
-        local b = W.Button(frame, "", 250, function() UI.Bind(i) end, "MailworthyFriendsProfession" .. i)
-        b:SetPoint("TOPLEFT", 24 + ((i - 1) % 2) * 262, LIST_TOP - 24 - math.floor((i - 1) / 2) * LIST_ROW)
+        local b = W.Button(frame, "", WIDTH - 48, function() UI.Bind(i) end, "MailworthyFriendsProfession" .. i)
+        b:SetPoint("TOPLEFT", 24, LIST_TOP - 24 - (i - 1) * LIST_ROW)
         b:Hide()
         professionRows[i] = b
     end
@@ -236,9 +235,9 @@ function UI.Create()
     frame = W.Window("MailworthyFriendsFrame", WIDTH, 400)
     frame:SetFrameStrata("FULLSCREEN_DIALOG")
     frame:SetPoint("CENTER")
-    local title = W.Label(frame, "GameFontNormalLarge")
+    title = W.Label(frame, "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -18)
-    title:SetText("Send materials to friends")
+    title:SetText(UI.TITLE.friends)
     sub = W.Label(frame, "GameFontHighlightSmall")
     sub:SetPoint("TOPLEFT", 28, -44)
     sub:SetWidth(WIDTH - 56)
@@ -261,11 +260,11 @@ function UI.Create()
 end
 
 --- Re-read who can be bound (the roster is asked for and other Mailworthys are asked to say
---- hello). For a guild rule: guild members only.
+--- hello). For a guild rule: this character (its author), then guild members only.
 local function gather(reason)
     candidates = ns.Routes.Candidates()
     if target == "guild" then
-        local members = {}
+        local members = { ns.Routes.Me() }
         for _, c in ipairs(candidates) do
             if c.sources.guild then members[#members + 1] = c end
         end
@@ -301,13 +300,18 @@ local function fillRows(list, top, kindOf, emptyText)
         if r then
             placeRow(row, top - shown * BIND_ROW)
             if row.kind == "draft" then
-                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r")
+                local me = tostring(r.to):lower() == tostring(ns.PlayerName()):lower()
+                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r" .. (me and " |cffaaaaaa(you)|r" or ""))
+            elseif row.kind == "guild" then
+                local why = ns.Guild.Why(r, ns.Routes.Personal(), ns.Characters.Professions(), ns.PlayerName())
+                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r"
+                    .. (why and (" |cffaaaaaa(not here: " .. why .. ")|r") or ""))
             else
                 local to, crafter = ns.Routes.Recipient(r)
                 row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r"
                     .. (crafter and (" |cffaaaaaa(delivered to " .. to .. ")|r") or "") .. UI.OwedText(r.to))
             end
-            row.cap:SetText(UI.CapText(r) .. (row.kind == "guild" and "  |cffaaaaaa(guild template)|r" or ""))
+            row.cap:SetText(UI.CapText(r))
             row.scope:SetText(ns.Routes.SCOPES[r.scope] or tostring(r.scope))
             show({ row.text, row.cap }, true)
             show({ row.remove, row.capDown, row.capUp }, row.kind ~= "guild")
@@ -332,13 +336,27 @@ local function fillRows(list, top, kindOf, emptyText)
     return top - shown * BIND_ROW - (shown == 0 and 30 or 0)
 end
 
---- The list view's guild line; returns how far it pushes the bindings down.
-local function fillGuildLine()
-    local template, canPublish = ns.Guild.On() and ns.Guild.Template() or nil, ns.Guild.On() and ns.Guild.CanPublish()
-    local text, toggle = UI.GuildText(template, canPublish)
-    if not text then
-        show({ guildLabel, guildToggle, guildEdit }, false)
-        return 0
+--- Pure: what the guild view says under the template line.
+function UI.GuildHelp(canPublish)
+    if canPublish then
+        return "Members who turn the guild rules on mail each profession's own materials to the player named "
+            .. "(you too). Their own bindings and professions come first."
+    end
+    return "With the guild rules on, each profession's own materials go to the player named. "
+        .. "Your own bindings and professions come first."
+end
+
+--- The guild view's head: the template line with its one-press toggle, then what the rules do.
+local function fillGuildHead(canPublish)
+    local name = ns.Guild.Mine()
+    stepLabel:SetText("|cffffd100Guild template|r" .. (name and (" for " .. name) or ""))
+    local text, toggle
+    if not ns.Guild.On() then
+        text = "The guild template is switched off (/mw feature guildTemplate on)."
+    elseif not name then
+        text = "Not in a guild (or the game hasn't said which yet)."
+    else
+        text, toggle = UI.GuildText(ns.Guild.Template(), canPublish)
     end
     guildLabel:SetText(text)
     at(guildLabel, 28, GUILD_LINE - 4)
@@ -350,14 +368,9 @@ local function fillGuildLine()
     else
         guildToggle:Hide()
     end
-    if canPublish then
-        guildEdit:SetText(template and "Edit..." or "Create...")
-        at(guildEdit, toggle and -170 or -24, GUILD_LINE, "TOPRIGHT")
-        guildEdit:Show()
-    else
-        guildEdit:Hide()
-    end
-    return GUILD_SHIFT
+    chosenLabel:SetText(name and ns.Guild.On() and UI.GuildHelp(canPublish) or "")
+    at(chosenLabel, 28, GUILD_HELP)
+    chosenLabel:Show()
 end
 
 local function fillCandidates()
@@ -418,14 +431,14 @@ local function fillProfessions()
         setHint("Over the cap (" .. ns.Valuation.Money(ns.Routes.CAP_STEPS[1]) .. " each to start) a material goes to "
             .. "your bank alt instead.")
     end
-    return LIST_TOP - 24 - math.ceil(shown / 2) * LIST_ROW
+    return LIST_TOP - 24 - shown * LIST_ROW
 end
 
 --- Show the widgets of the current view, place the footer under the last row, size the window.
 function UI.Refresh()
     if not frame then return end
-    if view == "guild" and not ns.Guild.CanPublish() then view = "list" end
     local list, guild, add = view == "list", view == "guild", view == "add"
+    title:SetText((guild or (add and target == "guild")) and UI.TITLE.guild or UI.TITLE.friends)
     show({ sub }, list)
     show({ stepLabel }, not list)
     show({ bindHead }, false)
@@ -434,7 +447,7 @@ function UI.Refresh()
         for _, b in ipairs(professionRows) do b:Hide() end
         show({ candPage, refreshButton, chosenLabel }, false)
     end
-    if not list then show({ guildLabel, guildToggle, guildEdit }, false) end
+    if not guild then show({ guildLabel, guildToggle }, false) end
     if not guild then publishButton:Hide() end
     if not list then ledgerButton:Hide() end
     if add then
@@ -443,10 +456,10 @@ function UI.Refresh()
     end
     local y
     if list then
-        local top = BIND_TOP - fillGuildLine()
+        local top = BIND_TOP
         at(bindHead, 20, top + 22)
         bindHead:Show()
-        y = fillRows(ns.Routes.List(), top, function(r) return r.scope == "guild" and "guild" or "route" end,
+        y = fillRows(ns.Routes.Personal(), top, function() return "route" end,
             "None yet: press Add a binding to pick a player, then the profession whose materials they get.")
         addButton:SetText("Add a binding...")
         addButton:Show()
@@ -458,21 +471,26 @@ function UI.Refresh()
         ledgerButton:Show()
         at(doneButton, -24, y - 10, "TOPRIGHT")
     elseif guild then
-        stepLabel:SetText("|cffffd100Guild template|r for " .. tostring((ns.Guild.Mine())))
-        chosenLabel:SetText("Members who turn the guild rules on mail each profession's materials to the player named. "
-            .. "Their own bindings and professions come first.")
-        at(chosenLabel, 28, LIST_TOP - 2)
-        chosenLabel:Show()
-        y = fillRows(ns.Guild.Draft() or {}, DRAFT_TOP, function() return "draft" end,
-            "No rules yet: press Add a rule to pick a guild member, then the profession whose materials they get.")
-        addButton:SetText("Add a rule...")
-        addButton:Show()
-        publishButton:SetText(ns.Guild.DraftChanged() and "Publish to guild" or "Send again")
-        at(addButton, 24, y - 10)
-        at(publishButton, 174, y - 10)
-        publishButton:Show()
-        backButton:Show()
-        at(backButton, -134, y - 10, "TOPRIGHT")
+        local canPublish = ns.Guild.On() and ns.Guild.CanPublish()
+        fillGuildHead(canPublish)
+        local template = ns.Guild.On() and ns.Guild.Template() or nil
+        if canPublish then
+            y = fillRows(ns.Guild.Draft() or {}, GUILD_TOP, function() return "draft" end,
+                "No rules yet: press Add a rule to pick yourself or a guild member, then the profession whose "
+                .. "materials they get.")
+            addButton:SetText("Add a rule...")
+            addButton:Show()
+            publishButton:SetText(ns.Guild.DraftChanged() and "Publish to guild" or "Send again")
+            at(addButton, 24, y - 10)
+            at(publishButton, 174, y - 10)
+            publishButton:Show()
+        else
+            y = fillRows(template and template.rules or {}, GUILD_TOP, function() return "guild" end,
+                template and "This template has no rules." or "")
+            addButton:Hide()
+            publishButton:Hide()
+        end
+        backButton:Hide()
         at(doneButton, -24, y - 10, "TOPRIGHT")
         y = y - 30
         at(hint, 28, y - 14)
@@ -542,16 +560,30 @@ function UI.Show(opener)
     if not frame then UI.Create() end
     W.PlaceBeside(frame, opener)
     picked, target = nil, "me"
-    local guildLine = ns.Guild.On() and (ns.Guild.Template() or ns.Guild.CanPublish())
-    view = (ns.Routes.Count() == 0 and not guildLine) and "add" or "list"
+    view = #ns.Routes.Personal() == 0 and "add" or "list"
     pages.bind, pages.cand = 1, 1
     setHint("")
     UI.Reload("shown")
-    if ns.Guild.On() and not ns.Guild.Template() then ns.Guild.Ask("friends window") end
     UI.Refresh()
     frame:Show()
     frame:Raise()
     ns.Log.Add("ui", "friends window shown")
+end
+
+--- The guild view (/mw guild, the settings' Guild button): the template, on / off, and for the
+--- guild master and officers its editor. `opener` as for UI.Show.
+function UI.ShowGuild(opener)
+    if not frame then UI.Create() end
+    W.PlaceBeside(frame, opener)
+    picked, target, view = nil, "guild", "guild"
+    pages.bind, pages.cand = 1, 1
+    setHint("")
+    ns.Routes.RequestRoster()
+    if ns.Guild.On() and not ns.Guild.Template() then ns.Guild.Ask("guild window") end
+    UI.Refresh()
+    frame:Show()
+    frame:Raise()
+    ns.Log.Add("ui", "guild window shown")
 end
 
 function UI.Toggle()

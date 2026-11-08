@@ -12,9 +12,9 @@
 --   newest revision. A copy naming an author who never published it is corrected by that
 --   author's Mailworthy when it hears it: it sends the real one with a newer revision.
 -- * Opt-in once: a member's Mailworthy says a template arrived and does nothing until the
---   player turns the guild rules on (friends window). Later updates then apply on their
---   own, with a chat line naming every rule. One press turns the guild rules off again
---   (friends window, and the mailbox window's Bindings heading).
+--   player turns the guild rules on (the Guild window: /mw guild, the settings' Guild button).
+--   Later updates then apply on their own, with a chat line naming every rule. One press
+--   turns the guild rules off again (the Guild window, and the mailbox window's Bindings heading).
 -- * Personal wins: the player's own bindings come first (a rule for a profession they
 --   bound themselves is left out), and a rule for a profession this character has is left
 --   out (a tailor keeps their cloth), as is a rule naming this character. Skip once works
@@ -357,10 +357,10 @@ function Guild.Offer(sender, author, rev, rules)
     ns.Log.Add("guild", "template by %s (from %s) taken: %s", author, sender, Guild.RulesText(kept))
     local copy = via and (" (copy from " .. via .. ")") or ""
     if use == true then
-        ns.Print(string.format("Guild rules updated by %s%s: %s. Turn them off any time in Friends.", author, copy,
+        ns.Print(string.format("Guild rules updated by %s%s: %s. Turn them off any time with /mw guild.", author, copy,
             Guild.RulesText(kept)))
     elseif use == nil then
-        ns.Print(string.format("%s shared a guild template%s (%s). Open Friends (/mw friends) to use it.", author, copy,
+        ns.Print(string.format("%s shared a guild template%s (%s). Open Guild in Mailworthy settings (/mw guild) to use it.", author, copy,
             Guild.RulesText(kept)))
     end
     refreshWindows()

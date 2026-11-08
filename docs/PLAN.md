@@ -299,10 +299,12 @@ materials amongst the guild." And: "the template should have a 1 click disable a
   again with a newer revision, which replaces every copy (a publisher with no record at all,
   saved data lost, takes its own copy back instead).
 - **Opt-in once:** a new template prints one chat line and shows "Guild template from <name>:
-  N rules (new)" with **Use guild rules** in Friends; nothing is mailed before that press.
+  N rules (new)" with **Use guild rules** in the Guild window (`/mw guild`, the settings' Guild
+  button; operator 2026-11-07: "seems weird its in the friends tab"); nothing is mailed before
+  that press.
   Updates then apply on their own, each with a chat line naming the rules. Kept per account
   per realm + faction + guild (`MailworthyDB.guildTemplates`).
-- **One-press off:** "Guild rules: on" in Friends and on the Bindings heading of the Mailworthy
+- **One-press off:** "Guild rules: on" in the Guild window and on the Bindings heading of the Mailworthy
   window (shown while a guild rule applies).
 - **Personal wins:** `Routes.List` = this character's bindings, the account's, then the guild's
   (`Guild.Rules`) minus rules for a profession bound personally, a profession this character
@@ -349,6 +351,11 @@ them) then I just keep going to the AH. Same methodology for all crafting materi
   binding that still needs it takes it); another of this character's professions that still
   needs it keeps it. Kept items say "until skill N"; the workings say "your First Aid (80) is
   past it".
+- **Bindings take primary materials only** (operator, 2026-11-07: "only focus on the primary
+  materials rather than every possible material the professions can use. they can ask or
+  acquire some minor pieces"): `Routes.Matches` takes a trade good of the profession's own
+  subclasses (plus Enchanting's gear), never a `Tiers.KEEP` side item (an engineer's Linen
+  Cloth). That stays on the normal rule. Own professions still keep their side items.
 - **Bindings:** `Routes.Matches(route, item, tiers)` is false for a material the recipient's
   `route.skill` is past, so the next binding that needs it, or the normal rule (the bank alt),
   gets it; the workings say "not to Bob: their First Aid (80) is past it". `Routes.Skill(route)`

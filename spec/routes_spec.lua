@@ -52,6 +52,27 @@ describe("bindings", function()
             assert.is_false(ns.Routes.Matches({ to = BOB, profession = 186 }, { classID = 7, subclassID = 7 }), "Mining binds nothing")
         end)
 
+        it("takes primary materials only: Linen Cloth goes to the tailor's rule, never the engineer's", function()
+            -- 2026-11-07: Linen Cloth (Engineering uses it on the side) went to the guild's engineer;
+            -- the operator: "only focus on the primary materials ... they can ask or acquire some minor pieces"
+            local linen = { itemID = 2589, classID = 7, subclassID = 5, quality = 1, count = 22, stacks = 2, vendor = 1 }
+            local ENGINEERING = 202
+            assert.is_false(ns.Routes.Matches({ to = BOB, profession = ENGINEERING }, linen), "Linen is a side material")
+            assert.is_true(ns.Routes.Matches({ to = BOB, profession = ENGINEERING }, { itemID = 2770, classID = 7, subclassID = 7 }),
+                "Copper Ore: metal and stone")
+            assert.is_true(ns.Routes.Matches({ to = BOB, profession = TAILORING }, linen))
+            local D = ns.Valuation.DEFAULTS
+            local engineer = { to = "Jold Ark", profession = ENGINEERING, key = "e", cap = 50000 }
+            local tailor = { to = "Hiphoptobop", profession = TAILORING, key = "t", cap = 50000 }
+            assert.equal("Hiphoptobop", ns.Routes.Divert(linen, { action = "mail" }, nil, D, { engineer, tailor }).to,
+                "the engineer's rule comes first in the list and still doesn't take it")
+            assert.is_nil(ns.Routes.Divert(linen, { action = "mail" }, nil, D, { engineer }), "the normal rule decides")
+            local past = { to = "Hiphoptobop", profession = TAILORING, key = "t", cap = 50000, skill = 125 }
+            local v, _, outgrown = ns.Routes.Divert(linen, { action = "mail" }, nil, D, { engineer, past })
+            assert.is_nil(v, "a tailor past Linen (115) doesn't get it either: the bank alt does")
+            assert.equal(past, outgrown)
+        end)
+
         it("an Enchanting binding also takes green and blue weapons and armor to disenchant", function()
             local route = { to = BOB, profession = ENCHANTING }
             assert.is_true(ns.Routes.Matches(route, { classID = 4, subclassID = 2, quality = 2 }), "green armor")

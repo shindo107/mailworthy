@@ -75,11 +75,62 @@ function Widgets.PlaceBeside(f, opener)
     return side or "center"
 end
 
+Widgets.PAD = 16 -- the button art's edges: text stays inside them
+
+local FONTS = {
+    { normal = "GameFontNormal", highlight = "GameFontHighlight", disabled = "GameFontDisable" },
+    { normal = "GameFontNormalSmall", highlight = "GameFontHighlightSmall", disabled = "GameFontDisableSmall" },
+}
+
+local function setFonts(b, set)
+    for _, part in ipairs({ { "SetNormalFontObject", set.normal }, { "SetHighlightFontObject", set.highlight },
+        { "SetDisabledFontObject", set.disabled } }) do
+        local font = rawget(_G, part[2])
+        if font and type(b[part[1]]) == "function" then pcall(b[part[1]], b, font) end
+    end
+end
+
+local function textWidth(fs)
+    local measure = fs.GetUnboundedStringWidth or fs.GetStringWidth
+    local ok, w = pcall(measure, fs)
+    return ok and tonumber(w) or nil
+end
+
+--- Pure: which font a label of `normalWidth` takes on a button of `width`: 1 (normal) when it
+--- fits, else 2 (small); the second return is true when even the small one doesn't (the
+--- label is then cut with "..." at the button's edge). `smallWidth` is its width in the small font.
+function Widgets.FitFont(width, normalWidth, smallWidth)
+    local room = width - Widgets.PAD
+    if not normalWidth or normalWidth <= room then return 1, false end
+    return 2, (smallWidth or normalWidth) > room
+end
+
+--- Keep a button's label inside its border (2026-11-07: "button text commonly runs over the
+--- button borders"): the normal font when it fits, the small one when it doesn't, and past that
+--- the label stops at the edge. Runs after every SetText on our own buttons.
+function Widgets.Fit(b)
+    local fs = type(b.GetFontString) == "function" and b:GetFontString() or nil
+    local width = type(b.GetWidth) == "function" and tonumber((b:GetWidth())) or nil
+    if not fs or not width or width <= 0 then return end
+    setFonts(b, FONTS[1])
+    if type(fs.SetWidth) == "function" then pcall(fs.SetWidth, fs, 0) end
+    local normal = textWidth(fs)
+    local font = Widgets.FitFont(width, normal)
+    if font == 1 then return end
+    setFonts(b, FONTS[2])
+    local _, cut = Widgets.FitFont(width, normal, textWidth(fs))
+    if cut and type(fs.SetWidth) == "function" then pcall(fs.SetWidth, fs, width - Widgets.PAD) end
+end
+
 function Widgets.Button(parent, text, width, onClick, name)
     local b = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
     b:SetSize(width, 22)
     b:SetText(text)
     b:SetScript("OnClick", onClick)
+    if type(hooksecurefunc) == "function" then
+        pcall(hooksecurefunc, b, "SetText", function(self) Widgets.Fit(self) end)
+    end
+    Widgets.Fit(b)
     return b
 end
 
