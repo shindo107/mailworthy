@@ -60,8 +60,9 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   keeps its own price scans, and the "Mailed for" tooltip line stays on the sending account.
 - **No math needed:** prices are Auctionator's last scan, held down by the 3-day median
   when the last scan is a spike (one empty market can't flip a verdict), half the deposit counts (the game refunds it on a sale), a flooded
-  market is valued at its floor, and the rule knows the realm's launch day: in launch week
-  unpriced white trade goods are mailed, before the first raids enchanting materials, herbs
+  market is valued at its floor, an item with no auction price yet goes to the bank alt to wait
+  for one (grey junk stays for the vendor), recipes go to the friend bound to their
+  profession, and the rule knows the realm's launch day: before the first raids enchanting materials, herbs
   and elementals are tagged **B** (bank them, they sell higher later), and later the
   minimum gain grows with the gold supply. Details: `docs/PLAN.md` "Decision rule".
 - **After sending:** your main's bags tag what's left for the vendor with **V** (grey
@@ -93,6 +94,10 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   follows the name when that player runs Mailworthy too (their Mailworthy said hello, one of
   their characters it listed, or one of your own characters); the window's bottom line says
   what the icon means. `/mw feature peerMark off` hides it.
+- **Tags in Auctionator too:** with Auctionator installed, the same AH / B / DE / V tags the
+  bags show appear on the item icons of Auctionator's Selling tab (its bag list and the item
+  being posted), on the characters whose bags show them. `/mw feature auctionatorTags off`
+  hides them.
 - **Class-only items to a friend of that class:** a scroll or piece of gear whose tooltip says
   "Classes: Mage" can go to your mage friend. In `/mw friends`, pick the player; when their
   class is known (party, guild, your own characters), "Mage items" is the first choice. It
@@ -235,6 +240,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Tags and lock glow in ArkInventory (its `Core/ArkInventoryAPI.lua`, author's repo, Sept 2026): `hooksecurefunc(ArkInventory.API, "ItemFrameUpdated", fn(frame, loc, bag, slot))`, `API.LocationIsOffline(loc)`, `API.getBlizzardBagIdFromWindowId(loc, bag)` (bag and bank locations only: it prints a warning for others), `API.ItemFrameItemTableGet(frame).h` (link), `Const.Location.Bag` / `Bank`, the window `ARKINV_Frame1` for the legend | ArkInventory on: tags on the bag window, the legend under it, the glow; another character's bags: no tags; no ArkInventory warnings in chat. `/mw report` "bag addon: ArkInventory ..., hooked" | open (2026-11-08) |
 | Tags and lock glow in BetterBags (its Forever build `BetterBags_Camelot.toc`, Interface 16001; source read 2026-11-08): `LibStub("AceAddon-3.0"):GetAddon("BetterBags")`, `:GetModule("Events"):RegisterMessage("item/Updated" / "item/Clearing", fn(ctx, item, decoration))` as its own Masque integration uses them; the item's `currentData` (`bagid`, `slotid`, `itemInfo.itemID`, `isItemEmpty`), `isFreeSlot`, `kind` (2 = guild bank) read only; the decoration (ContainerFrameItemButtonTemplate) drawn on; `addon.Bags.Backpack.frame` for the legend | BetterBags on: tags on its bag icons, the legend under the backpack, the glow with the window open; sort, move and sell items: no tag left on a free-slot button; `/mw report` "bag addon: BetterBags ..., hooked" | open (2026-11-08) |
 | Disenchant prices for green items | Auctionator with a green item in bags | open |
+| Tags on Auctionator's Selling tab (`AuctionatorTags.lua`): `hooksecurefunc` on `AuctionatorGroupsViewItemMixin.SetItemInfo`, the item info's `itemLink` / `itemCount` / `locations` (ItemLocation `GetBagAndSlot`) or `location` (the posting panel's icon); the buttons built from the mixin after login (on first AH open) and pooled (`CreateFramePool`, `SetItemInfo` again on every refresh) | Auctionator 340 source (the version measured on Forever): `Source/Groups/View.lua`, `ViewItem.lua` / `.xml`, `Source/Tabs/Selling/Mixins/BagItemSelected.lua` | open (2026-11-08): on the bank alt, the Selling tab's icons show the bags' tags, after scrolling and after selling or moving a stack; `/mw report` "auctionator tags: hooked; N Auctionator button(s) seen, M tagged now" |
 | Mail ledger (`Ledger.lua`): `hooksecurefunc` post-hooks on `SendMail`, `TakeInboxItem`, `TakeInboxMoney` and `AutoLootMailItem` (Blizzard's Open All and shift-click call them; read in Forever's `MailFrame.lua`); the Send Mail tab read with `GetSendMailItem` / `GetSendMailItemLink` / `GetSendMailMoney` / `GetSendMailCOD` at `MAIL_SEND_INFO_UPDATE` / `SEND_MAIL_MONEY_CHANGED` / `SEND_MAIL_COD_CHANGED` and in the hook (not in Forever's generated API docs: legacy globals, guarded); `GetInboxHeaderInfo` returns 10 `wasReturned`, 12 `canReply`, 13 `isGM` (as `MailFrame.lua` reads them); `GetInboxItem` / `GetInboxItemLink`; `MAIL_SUCCESS(itemID)` confirms a take and `MAIL_FAILED(itemID)` refuses one (MailInfoDocumentation; unanswered takes count when the mailbox closes); value whispers `SendAddonMessage(prefix, text, "WHISPER", name)` | mail a friend by hand and take a mail from them: `/mw ledger` Export log shows both lines with item names and values, the chat line appears on taking it, `/mw report` "ledger: on, N log entries ... 0 take(s) unconfirmed"; with both on Mailworthy, the receiver's export says "sender's value" | open (2026-11-07) |
 | SavedVariables survive `/reload` and relog | self-test marker, v0.4.0 settings | **work** (login, character switch, `/reload`) |
 | One-press sending from the Mailworthy window (no money, no COD) | v0.4.0 | **works** (operator, 2026-10-14) |

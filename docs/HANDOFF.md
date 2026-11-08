@@ -74,6 +74,7 @@ must never break the game.
 | `Mailer.lua` | sending: plan 12 stacks per mail, re-check each slot, attach, zero money/COD, `SendMail`, chain on `MAIL_SEND_SUCCESS`; stops on failure / close / combat / 10 s; a run id kills a stopped run's timers; records `MailworthyDB.mailed` (30 days) |
 | `MailWindow.lua` | the window at the mailbox (`media/ux-pass-prototype.png`): To, binding rows (only while there are bindings: Skip once / Remove, Friends...), Mailing rows (chip + gain), Staying rows (reason), total (its second line: fees, or the mailer's status), Send / Settings (no Close: X, Escape, Circle); `UI.Layout` sizes the window to the rows shown; rows toggle item locks; pages of 8 / 5. Opened on the Inbox, there is no Send button (a note says to open the Send Mail tab; v0.16.1's secure "click" button on `MailFrameTab2` never showed in game and was removed, operator 2026-11-06: "otherwise just don't show it"), and `MailworthyTabWatcher` moves the window to Send Mail when the player goes there (Mailworthy's code never switches tabs). Several recipients: `UI.Recipients(totals)` puts one line per recipient under "To:" (what, how many mails; `Bags` totals `byRecipient`) and the Mailing list is grouped by recipient. **Return to sender** (`MailworthyMailReturn`, `UI.ToggleReturns`, beside Settings, lit while on; the controller legend moved under the buttons). On the bank alt: "This is your bank alt" on the To line, its share held, a **Summary...** button (`MailworthyMailSummary`) where Skip once sits |
 | `BankAlt.lua` | bank alt view: verdicts with no postage (`Verdict`: ah / de / v), tags on bag buttons (a `Border` decorator; by bag slot, else by link / item ID for views with no slot; `TagShown`, `LegendText` shared with the bag addons), tooltip lines via `TooltipDataProcessor`, summary window (`/mw summary`, the Mailworthy window's Summary... on the bank alt; the mail button only with `bankAltMail` off); switches `bankAltTags`, `tooltipLines`; setting `tagsEverywhere` |
+| `AuctionatorTags.lua` | the bag tags on Auctionator's Selling tab (2026-11-08): a `hooksecurefunc` post-hook on `AuctionatorGroupsViewItemMixin.SetItemInfo` at login (Auctionator 340 builds the tab on first AH open, copying the mixin into its pooled buttons; the posting panel's icon calls the global mixin), the item's stacks (`info.locations` / `info.location`, `GetBagAndSlot`) the first stack still holding that item (`Pick`: the bags may change before Auctionator redraws), drawn by `Border.RefreshButton` like a bag button (BankAlt's tag and the lock glow, their weak tables; its link passed for a link fallback); redrawn with every `Border.RefreshAll` (`Border.AddRefresher`: bags, prices, locks, the lock flash's end); shown where the bag tags are (`BankAlt.Active`); `/mw report` counts `BankAlt.TagShown` on visible buttons. Switch `auctionatorTags`; `/mw report` "auctionator tags: ..." |
 | `SettingsUI.lua` | settings window, two views (`UI.View`): main (bank alt row with Change..., "What gets mailed": steppers, 2/8/24h, disenchant, profession materials; "In your bags": tags, glow; "More": friends, summary, minimap; the prices source) and pick (opened by Change..., or Choose... while no bank alt is set; the settings always open on main, a bank alt is optional since v0.28.0: known characters, "This character is my bank alt" for a second account, optional typed name with "not seen" second press, Back); a pick returns to main; controller via `PadKey` set `settings` (works away from the mailbox) |
 | `MinimapButton.lua` | LedgerLink's minimap button (click: settings; drag: move); feature `minimapButton` |
 | `Report.lua` | `/mw report` (one copyable report: build, controller, switches, bank alt, settings, locks, last send, bindings, peers, blocked actions, log), the copy box `/mw scan` uses, and the AH sale-mail reader (house cut). Replaced the discovery self-test in Phase 5 |
@@ -90,7 +91,7 @@ must never break the game.
 | `LedgerUI.lua` | the ledger window (`/mw ledger`, Settings > Mail ledger..., Friends > Mail ledger..., the Mailworthy window's pay-back line): rows "Bob: 10s more than you've sent back" + what they sent + Mark paid (two presses), Export log... (the copy box) |
 | `RoutesUI.lua` | the friends window (`/mw friends`, settings button, Mailworthy window button), three views (`UI.View`): list (the guild template line first, when there is one or this character can publish: "Guild rules: on / off / Use guild rules" one press, Edit... / Create...; guild rules as rows without buttons) (binding rows: cap stepper with `UI.CapText` "5g each or more: to my bank alt", scope, Remove; names the crafter the mail goes to; Add a binding...) and add (step 1 a player, online first; step 2 the profession, theirs suggested; Back one step; `UI.Target()` "guild": guild members only, the rule goes to the draft) and guild (guild master / officers: the draft's rules with cap and Remove, Add a rule..., Publish to guild); opens on add while there are no bindings and no guild line; a binding returns to the list |
 
-Tests: `spec/` (busted on LuaJIT, 497 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
+Tests: `spec/` (busted on LuaJIT, 528 specs; `critical_path_spec.lua` is the shipping gate, AGENTS.md "Critical path") with a WoW stub in
 `spec/support/wow_stub.lua` (bags, mail send tab, postage, timers with delays,
 override bindings, focused frame, item buttons that **error on any field write**; with
 `WowStub.state.layout` it solves SetPoint / SetSize anchors so `spec/dpad_reach_spec.lua` walks
@@ -215,7 +216,8 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   3-day median of Auctionator's history when that is lower (2026-11-07: the median alone
   over-valued a falling market; its database, not the stable API: guarded); launch day from
   `GetServerTime()` against Nov 4, 2026 (`Valuation.LAUNCH_EPOCH`), or the realm's first
-  sight when earlier; days 0-13 mail unpriced white trade goods; a glut (10x our count
+  sight when earlier; days 0-13 mailed unpriced white trade goods (replaced 2026-11-08: every
+  unpriced item goes to the bank alt, see below); a glut (10x our count
   listed, -25%) is valued at the floor; **Bank** verdict (B tag) for late-demand trade
   goods before day 35 and gluts until day 60; the minimum gain grows 1/180 a day after
   day 35, capped at 2x. No new settings.
@@ -333,6 +335,15 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   addon icon after the name (`Comms.Mark`), from the peers Comms already keeps, no new message.
   Own characters count (Mailworthy recorded them there), so the bank alt is marked too. No tooltip:
   each window's footer explains the icon while one shows. Switch `peerMark`.
+- Tags in Auctionator (operator, 2026-11-08: "can the item badges we show on the bag also be shown in
+  the Auctionator ah menus too?"): `AuctionatorTags.lua`. Read in Auctionator 340's source (its GitHub
+  repo is private now; a player's Forever install was read): the Selling tab's bag list and the posting
+  panel's icon are the only places it lists bag items (the Cancelling tab lists auctions, not bags), all
+  `AuctionatorGroupsViewItemTemplate` buttons. Chosen: one post-hook on the mixin's `SetItemInfo`
+  (Auctionator has no public API or callback for its buttons), the same tags in the same top-left spot
+  and on the same characters as the bags (no new setting), no legend in Auctionator's frame (the bags'
+  legend shows under the bags, which the AH opens; Mailworthy's tooltip lines show on Auctionator's
+  icons already). A favourite that isn't in the bags gets no tag.
 - Popups beside their opener (operator, same day: the new popups "overlap the existing menus
   and you cant read the new popup easily without closing the old one"): `Widgets.PlaceBeside`
   puts settings / friends / the bank alt summary to the right of the Mailworthy window that
@@ -348,13 +359,38 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
 - TradeSkillMaster as a price source (CurseForge user Warki7, 2026-11-08: "possible to use this with
   TradeSkillMaster?"): `Prices.Source()`; Auctionator wins when both are installed (no new setting:
   its scans carry the age, exactness and history decision rule v2 uses; TSM's public API gives none).
-  TSM counts as "with Auctionator" in AGENTS.md Safety: an item it has no price for stays, a failed
+  TSM counts as "with Auctionator" in AGENTS.md Safety: an item it has no price for stays (to the
+  bank alt since 2026-11-08), a failed
   call (a raise, or a source `IsCustomPriceValid` rejects) never counts as "no price yet", and the
   launch-week white trade goods exception applies the same way. Unit price = the lower of
   `DBMinBuyout` and `DBMarket` (this realm's AuctionDB; never region data). With TSM alone there is
   no price age, so no "price too old" keep and no stale nudge. Critical path: TSM alone, TSM with a
   failing call, and both installed (TSM never asked). Not changed: `BankAlt.lua` / `MailWindow.lua`
   texts that say "Auctionator" for the no-source case (other sessions were editing them).
+- No auction price yet = to the bank alt (operator, 2026-11-08, a screenshot of "Plans: Iridescent
+  Hammer" tagged "[Keep] Stays in your bags: no auction price yet": "going to the bank alt on no data
+  is better than holding on the main"). `Valuation.Unpriced`: with a price source and no auction
+  price, route `noprice` (chip "No price", `/mw scan` "NO PRICE", no gain); a price past the age limit
+  counts as none ("auction price too old (N days)"); grey junk and a failed call stay; unpriced gear
+  too (`UNPRICED_GEAR`). Operator's answers the same day: no price source = "Whites + staples +
+  recipes", "Yes, gear goes too", "Stale prices go too" (the stale nudge now says old-priced items go
+  to the bank alt). Class bindings never take an item without a current auction price, whatever
+  its route (`Routes.Divert`; a disenchant value alone isn't one: Codex review). A failed price
+  call reaches no binding either (Codex review; materials included), and mails nothing on a
+  disenchant value either (second Codex pass). The total line counts them ("+9s more than
+  vendoring, 2 with no price yet", `MailWindow.TotalText`); the bank alt's own tooltip says why its
+  share stays (`OtherLine` with `Bags.HoldReason`); the stale nudge says old-priced items "count as
+  unpriced". Staple trade goods (`Valuation.STAPLES`, ~110 Classic IDs, one table) are
+  "always mail" as a common item when unpriced (Bank on top), and without any price source whatever
+  their quality. Recipes: `Valuation.RecipeProfession` (class 9, `Enum.ItemRecipeSubclass`) makes a
+  recipe part of its profession's binding (`Routes.Matches`; reason "Blacksmithing recipe goes to
+  Bob"; mailed with the materials, same subject); the cap applies to a priced recipe, a stale
+  price included (Codex review: a 9g plan 9 days old doesn't reach the friend under a 5g cap). Replaces the
+  launch-days 0-13 white trade goods exception (`FreshRealmDefault`, `FRESH_REALM_DAYS` removed).
+  AGENTS.md Safety rewritten; critical path: unpriced to the bank alt (hard keeps and junk stay, no
+  bank alt = stays), recipes to the binding / the bank alt / over the cap, class binding never takes
+  an unpriced item, staples without a price source; the old "unpriced stays" assertions changed on
+  purpose, each with a comment saying what it was.
 - Optional deps: `.pkgmeta` `optional-dependencies` auctionator, tradeskill-master (2026-11-08), siz-disenchantvalue and (since
   2026-10-26, the project being back) disenchantry: a slug that disappears fails the CurseForge
   upload with error 1018 (v0.8.0 and v0.9.0 did on disenchantry in October 2026), so if a tag's
@@ -606,3 +642,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    character's bags: no tags; open the bank: locked items glow, no tags. `/mw feature bagnonTags off`
    + `/reload`: nothing drawn. `/mw report` "bag addon: <name> v..., switch ...=on, hooked, N
    button(s) seen, 0 error(s), legend shown under its bags"; the log has no "bagaddons ... error".
+17. In-game check of the tags in Auctionator (2026-11-08), mouse and controller: on the bank alt (or a
+   character with no bank alt) at the auction house, Auctionator's Selling tab shows the same AH / B / DE /
+   V tags as the bags on its bag list, still right after scrolling the list, collapsing a group, and after
+   posting or moving a stack; the item picked for posting shows its tag too. `/mw report` "auctionator
+   tags: hooked; N Auctionator button(s) seen, M tagged now, ... 0 error(s)". `/mw feature
+   auctionatorTags off` + `/reload`: no tags there, and the report says "off".

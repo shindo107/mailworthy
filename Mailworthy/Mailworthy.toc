@@ -44,4 +44,5 @@ MinimapButton.lua
 MailWindow.lua
 BankAlt.lua
 BagAddons.lua
+AuctionatorTags.lua
 Report.lua

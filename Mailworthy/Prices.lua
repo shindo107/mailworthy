@@ -61,7 +61,8 @@ Prices.SOURCE_NAME = { Auctionator = "Auctionator", TSM = "TradeSkillMaster" }
 
 --- The auction price source in use: "Auctionator" (wins when both are installed), "TSM", or nil.
 --- Any source counts as "with Auctionator" in the AGENTS.md Safety rules: an item it has no
---- price for stays in the bags; with none, only unlocked, tradeable white items are mailed.
+--- price for goes to the bank alt (2026-11-08); with none, only unlocked, tradeable white items
+--- and the staple trade goods are mailed.
 function Prices.Source()
     if Prices.Auctionator() then return "Auctionator" end
     if Prices.TSM() then return "TSM" end

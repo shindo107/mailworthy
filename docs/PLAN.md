@@ -178,8 +178,36 @@ trend (3-day median against the previous week). A **glut** (10x our count listed
 the price down 25% or more) is valued at the floor of the market (median of the daily
 minimums) with the deposit counted lost.
 
-**Fresh realm (research 4.2):** with Auctionator installed but no price for an item
-yet, a white trade good (class 7) is mailed as a common item during launch days 0-13.
+**No auction price yet (operator, 2026-11-08):** "going to the bank alt on no data is
+better than holding on the main". With Auctionator (or TSM) installed but no auction price
+for an item, it is mailed to the bank alt to wait there for one (route `noprice`, chip "No
+price", reason "no auction price yet"; no gain is shown, none is made up). A price past the
+age limit counts as none: the item goes the same way, reason "auction price too old (8 days)"
+(operator, same day: "Stale prices go too"). Grey junk stays for the vendor; a failed price
+call stays (never "no price yet"); the hard keeps and the profession keep come first; without a bank alt (or with it
+skipped) it stays like the rest of the bank alt's share. An item whose disenchant value alone
+doesn't pay goes the same way (the auction house may still pay). Unpriced green and blue
+gear goes too (`Valuation.UNPRICED_GEAR`; operator: "Yes, gear goes too"). A class binding never takes an unpriced item
+(`Routes.PriceKeep`: the cap can't be checked). Replaces the launch-days 0-13 exception for
+white trade goods (research 4.2, 2026-10-20).
+
+**Staple trade goods (the flat rules, operator, 2026-11-08):** `Valuation.STAPLES`, one table
+of item IDs: cloth, leather and hides, ore, bars and stone, herbs, elemental materials and
+enchanting dust, essences and shards (Classic IDs, about 110). With no auction price they are
+mailed as a **common item** ("always mail", no invented copper value: a fixed price would be a
+guess shown as a gain, and would go stale as the realm's market forms), so the Bank verdict
+still applies on top (late-demand goods before the first raids are B). Without any price
+source they are mailed too, whatever their quality (essences, shards and elemental essences
+are green or blue; operator, same day, for the no-price-source case: "Whites + staples + recipes").
+
+**Recipes (operator, 2026-11-08):** "recipes should go to their respective profession
+mappings or default to the bank alt if no AH data is found". A recipe (item class 9) is one
+of its profession's things for a binding: its subclass (`Enum.ItemRecipeSubclass`, Forever's
+generated API docs) names the profession (`Valuation.RECIPE_PROFESSION`; books and Fishing
+have none). A profession binding takes it whatever its price, as its materials, and the price
+cap works the same: a recipe priced at or above the cap goes by the normal rule (the bank alt
+for the auction house when it pays, else it stays). Without a binding, a recipe follows the
+normal rule: priced, the numbers decide; unpriced, the bank alt.
 
 **Bank (research 4.4):** an item that would be mailed for the auction house (or as a
 common item) is mailed as **bank** instead, meaning "hold it on the alt": before launch
@@ -192,14 +220,14 @@ The full research, sources and ranking: [ALGORITHM-RESEARCH.md](ALGORITHM-RESEAR
 
 "With Auctionator" in this rule and in AGENTS.md Safety means with an auction price source:
 Auctionator, else TradeSkillMaster (`Prices.Source`, 2026-11-08). TSM alone follows every
-price rule below the same way (an item it has no price for stays; a failed call never counts
-as "no price yet"); what it can't give is a price age, exactness or history, so with TSM alone
+price rule the same way (an item it has no price for goes to the bank alt; a failed call never
+counts as "no price yet"); what it can't give is a price age, exactness or history, so with TSM alone
 the age limit, the 3-day median, the glut check and the stale nudge don't apply.
 
 **Without Auctionator** (no price source) there's nothing to compare, so the rule
 is simple: mail every tradeable **white (common, quality 1)** item that isn't
-locked; grey junk and everything uncommon or better stay in the bags
-(operator, 2026-10-13). The preview says "no price data: mailing common items".
+locked, and the staple trade goods whatever their quality (2026-11-08); grey junk and
+everything else uncommon or better stay in the bags (operator, 2026-10-13). The preview says "no price data: mailing common items".
 
 The item stays in your bags (listed in the preview's kept list with the
 reason) when any of these hold:
@@ -211,9 +239,9 @@ reason) when any of these hold:
 - it's a profession tool (fishing poles, Mining Pick, Blacksmith Hammer, Skinning
   Knife, Flint and Tinder, Arclight Spanner, enchanting rods): the v0.2.0 scan put
   a Fishing Pole on the mail list;
-- it has no price while Auctionator is installed (missing data for one item never
-  means "mail it"; without Auctionator at all, the common-items rule above applies);
-- its price is older than the age limit;
+- it is grey junk with no price (or only an old one), or its price call failed (with Auctionator
+  installed an item with no price, or one past the age limit, otherwise goes to the bank alt
+  since 2026-11-08; without Auctionator at all, the common-items rule above applies);
 - the player is the bank alt, or no bank alt is set, or the bank alt is skipped for this
   mailbox visit (Skip once beside its "To:" line): its share stays, bindings still go.
 

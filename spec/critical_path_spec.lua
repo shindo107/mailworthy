@@ -1,10 +1,11 @@
 -- CRITICAL PATH: the shipping gate. Every build must still mail, safely, the way a
 -- player does it: a mailbox visit with a realistic bag, the mouse (the Mailworthy button or
 -- the Send Mail tab alone) and the controller,
--- with and without Auctionator, with TradeSkillMaster alone and with both, with a binding (a
--- profession's or a class's), with a guild template, without a bank alt or with it skipped for the
--- visit, with Return to sender (on a main and on the bank alt itself), and on SavedVariables an
--- older build left behind. CI runs this file on its own before the rest, and a tag can't publish
+-- with and without Auctionator, with TradeSkillMaster alone and with both, items with no auction
+-- price yet (to the bank alt), with a binding (a profession's or a class's, recipes to their
+-- profession's), with a guild template, without a bank alt or with it skipped for the visit, with
+-- Return to sender (on a main and on the bank alt itself), and on SavedVariables an older build
+-- left behind. CI runs this file on its own before the rest, and a tag can't publish
 -- unless it passes.
 --
 -- These tests check outcomes, not tuning: what was previewed is exactly what was sent,
@@ -29,6 +30,8 @@ local HARD_KEEPS = {
     [2901] = "profession tool",
     [4306] = "in use (locked by the game)",
     [1081] = "an active quest's objective (Crisp Spider Meat for Redridge Goulash)",
+    [7976] = "locked by the player, no auction price (Plans: Locked Recipe)",
+    [7977] = "soulbound, no auction price (Bound Recipe)",
 }
 
 --- A level-20ish character's bags on a fresh realm: trade goods, a BoE green, junk,
@@ -287,15 +290,152 @@ describe("critical path: mailing", function()
         end
     end)
 
-    it("with Auctionator an unpriced item stays, except a white trade good in launch days 0-13", function()
+    it("with Auctionator an unpriced item goes to the bank alt on any launch day; junk and hard keeps stay", function()
+        -- Rule changed on purpose (operator, 2026-11-08): "going to the bank alt on no data is better than
+        -- holding on the main". Was: an unpriced item stays, except a white trade good in launch days 0-13.
+        local function unpricedHardKeeps()
+            local locked = WowStub.item(7976, "Plans: Locked Recipe", { quality = 2, sell = 450, class = 9, subclass = 4 })
+            WowStub.setBag(1, 4, locked)
+            ns.Locks.ToggleItem(7976, locked.hyperlink, "spec")
+            WowStub.setBag(2, 5, WowStub.item(7977, "Bound Recipe", { bound = true, quality = 2, sell = 450, class = 9, subclass = 4 }))
+        end
+        unpricedHardKeeps()
+        local launchWeek = WowStub.state.serverTime
+        WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 30 * 86400
         mailbox()
         _G.MailworthyMailButton:Click()
         local preview = previewed(ns)
-        assert.is_nil(preview[858], "an unpriced potion stays")
-        assert.truthy(preview[2318], "an unpriced white trade good goes on a fresh realm")
-        WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 30 * 86400
+        assert.equal(BANK_ALT, preview[858], "an unpriced potion goes to the bank alt")
+        assert.equal(BANK_ALT, preview[2318], "an unpriced staple trade good goes, past launch day 13 too")
+        assert.is_nil(preview[4865], "unpriced grey junk stays for the vendor")
+        assert.is_nil(preview[7976], "a locked unpriced recipe stays")
+        assert.is_nil(preview[7977], "a soulbound unpriced recipe stays")
+        assert.is_nil(preview[1081], "what a quest needs stays")
+        WowStub.state.serverTime = launchWeek
         ns.MailWindow.Refresh()
-        assert.is_nil(previewed(ns)[2318], "past launch day 13 it stays like anything unpriced")
+        preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[858], "launch week the same")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("a stale price (older than 7 days) goes to the bank alt like no price; a hard keep with one still stays", function()
+        -- operator, 2026-11-08: "Stale prices go too" (rule changed on purpose; was: it stays)
+        local green = WowStub.link(6515, "Spellbinder Robes")
+        local stale = { [green] = true, [WowStub.link(2775, "Silver Ore")] = true, [WowStub.link(5022, "Bundle of Letters")] = true }
+        Auctionator.API.v1.GetAuctionAgeByItemLink = function(_, l) return stale[l] and 9 or 0 end
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[6515], "the green with a 9-day-old price goes to the bank alt")
+        assert.is_nil(preview[2775], "locked, stale: stays")
+        assert.is_nil(preview[5022], "a quest item, stale: stays")
+        for _, it in ipairs(ns.MailWindow.Result().mail) do
+            if it.itemID == 6515 then
+                assert.equal("noprice", it.result.route)
+                assert.is_nil(it.result.gain, "the old price isn't used")
+            end
+        end
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("with Auctionator but no bank alt (or skipped): an unpriced item stays, as the rest of its share", function()
+        MailworthyDB.bankAlts = {}
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, ENCHANTING)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.is_nil(preview[858], "no bank alt: the unpriced potion stays")
+        assert.is_nil(preview[2318], "no bank alt: the unpriced staple stays")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BOB] = true })
+    end)
+
+    it("a recipe goes to the friend bound to its profession, unpriced or under the cap; at the cap to the bank alt", function()
+        -- operator, 2026-11-08: "recipes should go to their respective profession mappings or default to
+        -- the bank alt if no AH data is found"
+        local SMITH = "Smith Anvil"
+        local hammer = WowStub.item(7975, "Plans: Iridescent Hammer", { quality = 2, sell = 450, class = 9, subclass = 4 })
+        local pants = WowStub.item(7978, "Plans: Pricey Pants", { quality = 3, sell = 450, class = 9, subclass = 4 })
+        local tailor = WowStub.item(7979, "Pattern: Some Robe", { quality = 2, sell = 450, class = 9, subclass = 2 })
+        WowStub.setBag(2, 5, hammer)    -- no auction price
+        WowStub.setBag(2, 6, pants)
+        prices[pants.hyperlink] = 90000  -- 9g: at or above the 5g default cap
+        WowStub.setBag(1, 4, tailor)    -- no Tailoring binding, no price
+        ns.Routes.Add(SMITH, 164)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(SMITH, preview[7975], "the unpriced Blacksmithing recipe goes to the blacksmith friend")
+        assert.equal(BANK_ALT, preview[7978], "at or above the cap: the normal rule, the bank alt for the AH")
+        assert.equal(BANK_ALT, preview[7979], "no binding for Tailoring, no price: the bank alt")
+        prices[pants.hyperlink] = 2000  -- 20s: under the cap
+        ns.MailWindow.Refresh()
+        preview = previewed(ns)
+        assert.equal(SMITH, preview[7978], "under the cap: the friend")
+        -- Codex review: a failed price call mails nothing, a stale price over the cap doesn't reach the friend
+        local broken = WowStub.item(7980, "Plans: Broken Lookup", { quality = 2, sell = 450, class = 9, subclass = 4 })
+        local old = WowStub.item(7981, "Plans: Old Price", { quality = 3, sell = 450, class = 9, subclass = 4 })
+        WowStub.setBag(2, 4, broken)
+        WowStub.setBag(2, 3, old)
+        prices[old.hyperlink] = 90000
+        local v1 = Auctionator.API.v1
+        local lookup = v1.GetAuctionPriceByItemLink
+        v1.GetAuctionPriceByItemLink = function(c, l)
+            if l == broken.hyperlink then error("boom") end
+            return lookup(c, l)
+        end
+        v1.GetAuctionAgeByItemLink = function(_, l) return l == old.hyperlink and 9 or 0 end
+        ns.MailWindow.Refresh()
+        preview = previewed(ns)
+        assert.is_nil(preview[7980], "the price call failed: it stays, binding or not")
+        assert.equal(BANK_ALT, preview[7981], "a 9g price 9 days old still caps it: the bank alt, not the friend")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [SMITH] = true })
+    end)
+
+    it("a class binding never takes an unpriced item, even one worth disenchanting: it goes to the bank alt", function()
+        WowStub.setBag(0, 13, WowStub.item(211234, "Scroll: VOCE WELL", { sell = 15, class = 0 }))
+        WowStub.state.itemClasses[211234] = "Mage"
+        -- Codex review: a disenchant value alone (route "de") isn't an auction price
+        WowStub.setBag(0, 14, WowStub.item(211235, "Mage Robe", { quality = 2, sell = 100, class = 4, level = 20 }))
+        WowStub.state.itemClasses[211235] = "Mage"
+        _G.DisenchantValueAPI = { GetValue = function(l) return l:find("Mage Robe", 1, true) and 5000 or nil end }
+        ns.Routes.Add(BOB, "MAGE")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[211234])
+        assert.equal(BANK_ALT, preview[211235], "disenchant pays, no auction price: the bank alt")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+        _G.DisenchantValueAPI = nil
+    end)
+
+    it("without a price source a staple trade good goes whatever its quality; other non-white items stay", function()
+        _G.Auctionator = nil
+        WowStub.setBag(2, 5, WowStub.item(10938, "Lesser Magic Essence", { count = 2, quality = 2, sell = 4, class = 7, subclass = 12 }))
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[10938])
+        assert.is_nil(preview[6515], "a green that isn't a staple stays without prices")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+        for i in ipairs(WowStub.state.sent) do
+            for _, it in ipairs(WowStub.state.sentItems[i]) do
+                assert.is_true(it.quality == 1 or ns.Valuation.STAPLES[it.itemID] ~= nil, "item " .. it.itemID)
+            end
+        end
     end)
 
     it("TradeSkillMaster alone: its prices count like Auctionator's, an unpriced item stays", function()
@@ -306,28 +446,33 @@ describe("critical path: mailing", function()
         _G.MailworthyMailButton:Click()
         local preview = previewed(ns)
         assert.truthy(preview[6515], "a priced BoE green goes")
-        assert.is_nil(preview[858], "an unpriced potion stays")
-        assert.truthy(preview[2318], "an unpriced white trade good goes on a fresh realm")
+        -- operator, 2026-11-08 (rule changed on purpose; was: an unpriced potion stays)
+        assert.equal(BANK_ALT, preview[858], "an unpriced potion goes to the bank alt")
+        assert.truthy(preview[2318], "an unpriced staple trade good goes")
         assert.is_nil(preview[4865], "junk without a price stays")
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
     end)
 
-    it("TradeSkillMaster alone: past launch day 13, or when its price call fails, unpriced items stay", function()
+    it("TradeSkillMaster alone: unpriced items go on any launch day; when its price call fails, they stay", function()
+        -- operator, 2026-11-08 (rule changed on purpose; was: past launch day 13 an unpriced item stays)
         _G.Auctionator = nil
         useTSM(prices)
         local launchWeek = WowStub.state.serverTime
         WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 30 * 86400
         mailbox()
         _G.MailworthyMailButton:Click()
-        assert.is_nil(previewed(ns)[2318], "past launch day 13 it stays like anything unpriced")
+        assert.equal(BANK_ALT, previewed(ns)[2318], "past launch day 13 it goes to the bank alt")
         WowStub.state.serverTime = launchWeek
         ns.MailWindow.Refresh()
-        assert.truthy(previewed(ns)[2318], "back in launch week it would go")
+        assert.truthy(previewed(ns)[2318], "launch week the same")
         _G.TSM_API.GetCustomPriceValue = function() error("boom") end
+        -- and not for a disenchant value either (Codex review, 2026-11-08)
+        _G.DisenchantValueAPI = { GetValue = function(l) return l:find("Spellbinder Robes", 1, true) and 50000 or nil end }
         ns.MailWindow.Refresh()
         assert.same({}, previewed(ns), "a failing price call is never 'no price yet': nothing goes")
+        _G.DisenchantValueAPI = nil
     end)
 
     it("Auctionator and TradeSkillMaster both installed: Auctionator's prices decide", function()
@@ -339,7 +484,11 @@ describe("critical path: mailing", function()
         _G.MailworthyMailButton:Click()
         local preview = previewed(ns)
         assert.truthy(preview[6515], "Auctionator's price for the green")
-        assert.is_nil(preview[858], "unpriced in Auctionator: stays, whatever TSM says")
+        -- operator, 2026-11-08 (rule changed on purpose; was: stays): unpriced in Auctionator, whatever TSM says
+        assert.equal(BANK_ALT, preview[858], "unpriced in Auctionator: to the bank alt, whatever TSM says")
+        for _, it in ipairs(ns.MailWindow.Result().mail) do
+            if it.itemID == 858 then assert.equal("noprice", it.result.route, "not TSM's price") end
+        end
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })

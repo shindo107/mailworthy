@@ -25,8 +25,8 @@ describe("report", function()
         has(text, "settings: 24h listing, min gain 1s and 25%, disenchant off, max price age 7 days, tags bank alt only")
         has(text, "server: launch day 0 (realm first seen 2026-10-13)")
         has(text, "prices: none")
-        has(text, "features: altClickLock=on, arkInventoryTags=on, autoOpen=on, baganatorTags=on, bagnonTags=on, "
-            .. "bankAltMail=on, bankAltTags=on")
+        has(text, "features: altClickLock=on, arkInventoryTags=on, auctionatorTags=on, autoOpen=on, baganatorTags=on, "
+            .. "bagnonTags=on, bankAltMail=on, bankAltTags=on")
         has(text, "bag addon: Baganator not loaded")
         has(text, "bag addon: Bagnon not loaded")
         has(text, "bag addon: ArkInventory not loaded")
