@@ -221,8 +221,15 @@ sent with Blizzard's Send button never do, and neither does mail to your own cha
 who is the guild's crafter included). Items count as **stack units** (20 Strange Dust in one mail
 = 20), per sending character, per UTC day for the last 35 days, plus an all-time total since the
 character's first counted mail. Nothing sent before this version is counted. The mail log
-marks those mails "guild rule: Enchanting" in Export log. There is no switch: the counts stay in
-your SavedVariables (`MailworthyDB.guildGiven`) until an addon you run reads them.
+marks those mails "guild rule: Enchanting" in Export log. There is no switch.
+
+Each character also tells its **guild** (only the guild) its own counts, right after its hello and
+when you close the mailbox after mailing something because of the template, so any guildmate who
+exports with LedgerLink carries everyone's (operator, 2026-11-08: "Yes, share in hellos"). Only the
+counts and since when go; never the items or who got them. A guildmate's counts are kept
+(`MailworthyDB.guildHeard`) while they're on your roster and heard from in the last 60 days, are
+checked like every hello, and change nothing Mailworthy mails. Your own counts are in
+`MailworthyDB.guildGiven`.
 
 **`MailworthyAPI.v1.GetGuildExport(guildName)`** is a read-only global for other addons
 (LedgerLink calls it when it builds its export string for Raid Ledger). `guildName` is optional
@@ -241,9 +248,11 @@ defines (story ROK-2148; a part with nothing in it is left out):
   peers = { { name = "<Name>", lastSeenAt = <server time> }, ... },
     -- Mailworthy users on this guild's roster heard from in the last 60 days, newest first, at most 1000
   givers = { { characterName = "<Name>", itemsAllTime = <n>, countingSince = <server time>,
-               days = { { day = <floor(server time / 86400)>, items = <n> }, ... } }, ... },
-    -- your characters with anything counted for this guild, most first, at most 50;
-    -- days ascending, the last 35 UTC days, non-zero only
+               days = { { day = <floor(server time / 86400)>, items = <n> }, ... },
+               asOf = <server time those counts were taken> }, ... },
+    -- your characters with anything counted for this guild (asOf = generatedAt), then guildmates whose
+    -- Mailworthy told yours theirs (asOf = when they did; only while on the roster); yours first, then
+    -- theirs, each most first; at most 200; days ascending, the last 35 UTC days, non-zero only
 }
 ```
 
@@ -302,6 +311,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Items an active quest needs: `C_QuestLog.GetNumQuestLogEntries` / `GetInfo` (`title`, `questID`, `isHeader`) / `GetQuestObjectives` (`text`, `type` "item") from Forever's `QuestLogDocumentation.lua`; the Vanilla quest log's `GetNumQuestLogEntries` / `GetQuestLogTitle` / `GetNumQuestLeaderBoards` / `GetQuestLogLeaderBoard` as the fallback; the objective text as "Name: 3/5" (or "3/5 Name"), matched to the bag item's name; event `QUEST_LOG_UPDATE`. A quest under a collapsed header may not be counted | with Redridge Goulash in the log, Crisp Spider Meat: Staying "Redridge Goulash needs it", `/mw scan` "KEEP [Crisp Spider Meat] ...: a quest needs it (Redridge Goulash)", no V tag; turn the quest in and it's valued again | open (operator, 2026-11-08) |
 | Class-only items: `C_TooltipInfo.GetItemByID(itemID).lines[i].leftText` (TooltipDataLineType.UsageRequirement, RaceClass; `args` with `field = "leftText"` as the fallback) starting with `ITEM_CLASSES_ALLOWED` ("Classes: %s"), class names through `LOCALIZED_CLASS_NAMES_MALE` / `_FEMALE`; a guild member's class from `C_Club.GetMemberInfo` `classID` | a "Mage items" binding to a mage friend: a mage-only scroll shows "to Bob" in the Mailworthy window and arrives; `/mw report` "binding: Mage items to ..." | open (operator, 2026-11-08) |
 | Lock glow only while the Mailworthy window is open (its `OnShow` / `OnHide`, `IsVisible` under the mail frame), "always" setting; a new lock flashes 3 s anywhere; a tooltip line on a glowing item (`TooltipDataProcessor.AddTooltipPostCall`, item type, `data.id`) | lock an item away from a mailbox: a 3 s glow on every stack, then nothing; open a mailbox: still nothing; open the Mailworthy window: glow, and hovering a glowing item shows "Locked in Mailworthy: ..."; close the window or the mailbox: gone | open (operator, 2026-11-07; before: any open mailbox, 2026-10-21) |
+| Guild contributions shared in hellos: `G2\|<asOf>\|<i>/<n>\|<total>\|<since>\|<days back>:<units>;...` on `SendAddonMessage(prefix, text, "GUILD")` only, right after the hello and at `MAIL_CLOSED` after a counted mail; this character's own counts only | two guild members with Mailworthy, one mails a guild rule's materials and closes the mailbox: the other's `/mw report` "guild export: ..., 2 giver(s)" (theirs and the guildmate's) | open (2026-11-08) |
 | Guild contributions' peer list at logout: the guild roster (`C_Club.GetClubMembers` / `GetMemberInfo`, `GetGuildRosterInfo` fallback) read every time the API is called, and on `GUILD_ROSTER_UPDATE` (at most every 10 seconds, with one more read after a burst); at `PLAYER_LOGOUT` the roster and `GetGuildInfo` may already be gone, so the last read of this session stands in for the name passed | log out with LedgerLink: its export carries `mailworthy.peers`; `/mw report` "guild contributions: this guild, N character(s), M unit(s) counted" after a guild rule's mail | open (2026-11-08) |
 | The Mailworthy mark: the addon icon inline after a name (`\|TInterface\AddOns\Mailworthy\Textures\Icon:0\|t`, the same file as the minimap button; a texture escape in our own font strings, no frame) | `/mw friends` with a guild member who runs Mailworthy: the icon after their name, the footer "(icon) runs Mailworthy"; the bank alt's "To:" line at the mailbox | open (2026-11-08) |
 

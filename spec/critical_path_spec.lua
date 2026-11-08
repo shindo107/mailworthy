@@ -4,7 +4,8 @@
 -- with and without Auctionator, with TradeSkillMaster alone and with both, items with no auction
 -- price yet (to the bank alt), with a binding (a profession's or a class's, recipes to their
 -- profession's), with a guild template (its mail tagged in the log and counted for the guild
--- contributions, nobody else's, never mail to the player's own characters), without a bank alt or with it skipped for the visit, with
+-- contributions, nobody else's, never mail to the player's own characters; guildmates' shared counts
+-- change nothing mailed), without a bank alt or with it skipped for the visit, with
 -- Return to sender (on a main and on the bank alt itself), and on SavedVariables an older build
 -- left behind (an early alpha's, and v0.30.0's guild template with a full mail log). CI runs this
 -- file on its own before the rest, and a tag can't publish unless it passes.
@@ -667,7 +668,8 @@ describe("critical path: mailing", function()
         local counted = MailworthyDB.guildGiven[key][me:lower()]
         assert.equal(units, counted.total)
         local export = MailworthyAPI.v1.GetGuildExport()
-        assert.same({ { characterName = me, itemsAllTime = units, countingSince = counted.since,
+        -- asOf (Raid Ledger's contract delta, operator 2026-11-08 "Yes, share in hellos"): own givers carry generatedAt.
+        assert.same({ { characterName = me, itemsAllTime = units, countingSince = counted.since, asOf = export.generatedAt,
             days = { { day = math.floor(now / 86400), items = units } } } }, export.givers)
         assert.equal(ns.Guild.Template().rev, export.template.rev)
     end
@@ -719,6 +721,30 @@ describe("critical path: mailing", function()
         local export = MailworthyAPI.v1.GetGuildExport()
         assert.is_nil(export.givers, "an own alt's mail reached the export")
         assert.same({ { professionSkillLineId = ENCHANTING, recipientName = ALT } }, export.template.rules)
+    end)
+
+    -- Shared in hellos (operator, 2026-11-08: "Yes, share in hellos"): a guildmate's counts are information
+    -- only. What they say never changes what is previewed or sent; the export carries them after ours.
+    it("a guildmate's shared counts change nothing mailed; the export carries them after this account's", function()
+        guildTemplate()
+        ns.Guild.SetUse(true)
+        local now = WowStub.state.serverTime
+        for _, m in ipairs(ns.Contributions.Encode({ total = 500, since = now - 86400,
+            days = { [math.floor(now / 86400)] = 500 } }, now - 30)) do
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m, "GUILD", BOB)
+        end
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+        local givers = MailworthyAPI.v1.GetGuildExport().givers
+        assert.equal(2, #givers)
+        assert.equal(ns.PlayerName(), givers[1].characterName)
+        assert.same({ characterName = BOB, itemsAllTime = 500, countingSince = now - 86400, asOf = now - 30,
+            days = { { day = math.floor(now / 86400), items = 500 } } }, givers[2])
     end)
 
     it("a guild template turned off in one press: only the bank alt gets mail", function()
@@ -940,6 +966,7 @@ describe("critical path: an older build's SavedVariables", function()
         ns.Fire("ADDON_LOADED", "Mailworthy")
         ns.Fire("PLAYER_LOGIN")
         assert.same({}, MailworthyDB.guildGiven, "the counters start empty: nothing before this build is counted")
+        assert.same({}, MailworthyDB.guildHeard, "no guildmate's counts before this build")
         ns.Fire("MAIL_SHOW")
         mailbox()
         _G.MailworthyMailButton:Click()

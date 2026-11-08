@@ -27,6 +27,9 @@
 --       held until the sender is heard from)
 --   U2|<this build's release: v0.31.0>   (Version.lua: right after a hello, release builds only;
 --       fields after the version are left out; v0.30.0 and older drop it)
+--   G2|<asOf>|<i>/<n>|<total>|<since>|<days back>:<units>;...   (Contributions.lua: this character's own
+--       guild-rule giving, right after a hello and after a mailbox visit that counted some; GUILD only;
+--       information only, for Raid Ledger's guild contributions; older Mailworthys drop it)
 --
 -- What arrives is data from other players, never instructions: names are
 -- cleaned and length-checked, professions must be crafting skill lines
@@ -212,6 +215,10 @@ function Comms.Decode(text)
         return ns.Version and ns.Version.Parse(release) and { kind = "release", version = tonumber(version), release = release }
             or nil
     end
+    if kind == "G" then
+        local part = ns.Contributions and ns.Contributions.DecodePart(rest)
+        return part and { kind = "giving", version = tonumber(version), part = part } or nil
+    end
     if kind == "F" then
         local day = rest:match("^(%d+)$")
         return day and #day <= 7 and { kind = "fresh", version = tonumber(version), day = tonumber(day) } or nil
@@ -311,6 +318,16 @@ function Comms.Announce(reason)
     if sent and release then
         local _, releaseWhere = send(release)
         results[#results + 1] = { release:sub(1, 2), releaseWhere }
+    end
+    -- This character's guild-rule giving (Contributions.lua), to the guild only.
+    local giving = sent and ns.Contributions and ns.Contributions.Messages() or {}
+    if #giving > 0 and call(IsInGuild) == true then
+        local chat, givingWhere = rawget(_G, "C_ChatInfo"), "GUILD"
+        for _, message in ipairs(giving) do
+            local ok, result = pcall(chat.SendAddonMessage, Comms.PREFIX, message, "GUILD")
+            if not sentOk(ok, result) then givingWhere = "GUILD error " .. tostring(result) end
+        end
+        results[#results + 1] = { "G2", givingWhere }
     end
     ns.Log.Add("comms", "hello (%s): %s", tostring(reason), Comms.ResultText(results))
     return sent
@@ -490,6 +507,9 @@ function Comms.Hear(sender, text, channel)
     end
     if msg.kind == "template" or msg.kind == "templateAsk" then
         return ns.Guild and ns.Guild.Hear(name, msg, channel) or nil
+    end
+    if msg.kind == "giving" then
+        return ns.Contributions and ns.Contributions.Hear(name, msg.part, channel) or nil
     end
     local old = store()[name:lower()]
     if msg.kind == "skills" then

@@ -49,9 +49,10 @@ local function assertContract(e)
         end
     end
     if e.givers ~= nil then
-        assert.is_true(#e.givers >= 1 and #e.givers <= 50, "givers: none is nil, never empty")
+        assert.is_true(#e.givers >= 1 and #e.givers <= 200, "givers: none is nil, never empty")
         for _, g in ipairs(e.givers) do
-            onlyKeys(g, { "characterName", "itemsAllTime", "countingSince", "days" }, "a giver")
+            onlyKeys(g, { "characterName", "itemsAllTime", "countingSince", "days", "asOf" }, "a giver")
+            assert.is_true(unix(g.asOf) and g.asOf <= e.generatedAt, "asOf: the giver's own time, never after generatedAt")
             assert.is_true(name(g.characterName))
             assert.is_true(count(g.itemsAllTime))
             assert.is_true(unix(g.countingSince))
@@ -198,7 +199,8 @@ describe("guild contributions", function()
             assert.equal(ns.Ledger.LOG_MAX, #log)
             for _, e in ipairs(log) do assert.is_nil(e.guild, "the tagged entry should be pruned") end
             local g = MailworthyAPI.v1.GetGuildExport().givers
-            assert.same({ { characterName = ME, itemsAllTime = 20, countingSince = NOW, days = { { day = TODAY, items = 20 } } } }, g)
+            assert.same({ { characterName = ME, itemsAllTime = 20, countingSince = NOW, asOf = NOW,
+                days = { { day = TODAY, items = 20 } } } }, g)
         end)
     end)
 
@@ -257,7 +259,8 @@ describe("guild contributions", function()
         end
 
         -- Raid Ledger's golden fixture `char-mailworthy` (packages/contract/ledgerlink/v1/fixtures, branch
-        -- feat/rok-2148-guild-contributions): the same state in Mailworthy's tables gives the same block.
+        -- feat/rok-2148-guild-contributions): the same state in Mailworthy's tables gives the same block
+        -- (with the 2026-11-08 delta's `asOf`: own givers carry generatedAt).
         it("matches Raid Ledger's char-mailworthy fixture for the same state", function()
             local fixture = {
                 generatedAt = 1789999940,
@@ -269,10 +272,10 @@ describe("guild contributions", function()
                     { name = "Member1", lastSeenAt = 1789996340 }, { name = "Member2", lastSeenAt = 1789992740 },
                     { name = "Member3", lastSeenAt = 1789989140 }, { name = "Member4", lastSeenAt = 1789985540 } },
                 givers = {
-                    { characterName = "Ana Forever", itemsAllTime = 140, countingSince = 1782224000, days = {
+                    { characterName = "Ana Forever", itemsAllTime = 140, countingSince = 1782224000, asOf = 1789999940, days = {
                         { day = 20686, items = 20 }, { day = 20688, items = 12 }, { day = 20717, items = 8 } } },
-                    { characterName = "Anabelle Forever", itemsAllTime = 20, countingSince = 1789136000, days = {
-                        { day = 20715, items = 20 } } } },
+                    { characterName = "Anabelle Forever", itemsAllTime = 20, countingSince = 1789136000, asOf = 1789999940,
+                        days = { { day = 20715, items = 20 } } } },
             }
             local peers, roster = {}, { ["ana forever"] = true }
             for i = 4, 1, -1 do -- stored by name, in no order; one more Mailworthy user outside the guild
@@ -344,9 +347,9 @@ describe("guild contributions", function()
             assert.is_nil(MailworthyAPI.v1.GetGuildExport())
         end)
 
-        it("givers: total above zero, most first, at most 50; days ascending, the last 35, non-zero", function()
+        it("givers: total above zero, most first, at most 200; days ascending, the last 35, non-zero", function()
             local given = {}
-            for i = 1, 55 do
+            for i = 1, 205 do
                 local days = {}
                 for d = 0, 39 do days[TODAY - d] = 1 end
                 days[TODAY - 2] = 0
@@ -357,10 +360,10 @@ describe("guild contributions", function()
             MailworthyDB.guildGiven = { [KEY] = given }
             local e = MailworthyAPI.v1.GetGuildExport()
             assertContract(e)
-            assert.equal(50, #e.givers)
-            assert.equal("Giver 55", e.givers[1].characterName)
-            assert.equal(155, e.givers[1].itemsAllTime)
-            assert.equal("Giver 6", e.givers[50].characterName)
+            assert.equal(200, #e.givers)
+            assert.equal("Giver 205", e.givers[1].characterName)
+            assert.equal(305, e.givers[1].itemsAllTime)
+            assert.equal("Giver 6", e.givers[200].characterName)
             local days = e.givers[1].days
             assert.equal(34, #days) -- 35 days in the window, one of them zero
             assert.same({ day = TODAY - 34, items = 1 }, days[1])
@@ -470,6 +473,201 @@ describe("guild contributions", function()
             assert.same(before, MailworthyDB.log, "the API wrote to the saved log")
             MailworthyDB.peers = {} -- the junk peer above is Comms' own report's business
             assert.truthy(ns.Report.Build():find("guild export error: ", 1, true), "/mw report shows the error")
+        end)
+    end)
+    -- Sharing in hellos (operator, 2026-11-08: "Yes, share in hellos"): G2 on GUILD only, the sender's own
+    -- counter only, validated like every hello, information only.
+    describe("sharing with guildmates", function()
+        local function hearG(sender, messages, channel)
+            for _, m in ipairs(messages) do ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m, channel or "GUILD", sender) end
+        end
+        local function sentG()
+            local out = {}
+            for _, m in ipairs(WowStub.state.addonMessages) do
+                if m.message:sub(1, 2) == "G2" then out[#out + 1] = m end
+            end
+            return out
+        end
+
+        it("encodes a counter and decodes it back; 35 days of the longest numbers fit in WIRE_PARTS messages", function()
+            local days = {}
+            for d = 0, 34 do days[TODAY - d] = 2147483647 - d end
+            days[TODAY - 40] = 9 -- outside the window: not sent
+            local msgs = ns.Contributions.Encode({ total = 2147483647, since = NOW - 86400 * 400, days = days }, NOW)
+            assert.is_true(#msgs >= 2 and #msgs <= ns.Contributions.WIRE_PARTS)
+            local seen = 0
+            for i, m in ipairs(msgs) do
+                assert.is_true(#m <= 255, "message " .. i .. " is " .. #m .. " bytes")
+                local msg = ns.Comms.Decode(m)
+                assert.equal("giving", msg.kind)
+                assert.equal(i, msg.part.index)
+                assert.equal(#msgs, msg.part.count)
+                assert.equal(NOW, msg.part.asOf)
+                for _, d in ipairs(msg.part.days) do
+                    assert.equal(2147483647 - d.back, d.units)
+                    seen = seen + 1
+                end
+            end
+            assert.equal(35, seen)
+            assert.same({ "G2|" .. NOW .. "|1/1|5|" .. (NOW - 10) .. "|0:3;2:2" },
+                ns.Contributions.Encode({ total = 5, since = NOW - 10, days = { [TODAY] = 3, [TODAY - 2] = 2 } }, NOW))
+            assert.same({}, ns.Contributions.Encode({ total = 0, since = NOW, days = {} }, NOW))
+        end)
+
+        it("junk is dropped", function()
+            for _, junk in ipairs({
+                "G2|" .. NOW .. "|1/1|5|" .. NOW + 1 .. "|0:3",     -- since after asOf
+                "G2|" .. NOW .. "|2/1|5|" .. NOW .. "|0:3",         -- part past the count
+                "G2|" .. NOW .. "|1/5|5|" .. NOW .. "|0:3",         -- more parts than WIRE_PARTS
+                "G2|" .. NOW .. "|1/1|0|" .. NOW .. "|",            -- nothing given
+                "G2|" .. NOW .. "|1/1|5|" .. NOW .. "|35:3",        -- a day outside the 35
+                "G2|" .. NOW .. "|1/1|5|" .. NOW .. "|0:0",         -- an empty day
+                "G2|" .. NOW .. "|1/1|5|" .. NOW .. "|0:x",
+                "G2|" .. NOW .. "|1/1|2147483648|" .. NOW .. "|",   -- past int4
+                "G2|99999999999|1/1|5|" .. NOW .. "|",
+                "G2|" .. NOW .. "|1/1|5|" .. NOW .. "|0:3|Bob",     -- a name: never accepted
+                "G2|" .. NOW .. "|1/1|5|" .. NOW,
+            }) do
+                assert.is_nil(ns.Comms.Decode(junk), junk)
+            end
+        end)
+
+        it("a guildmate's counter is kept under their name, newest asOf wins, and reaches the export", function()
+            local msgs = ns.Contributions.Encode({ total = 30, since = NOW - 86400 * 10,
+                days = { [TODAY] = 10, [TODAY - 3] = 5 } }, NOW - 100)
+            hearG(BOB, msgs)
+            local older = ns.Contributions.Encode({ total = 12, since = NOW - 86400 * 10, days = { [TODAY - 3] = 5 } }, NOW - 5000)
+            hearG(BOB, older)
+            assert.same({ name = BOB, total = 30, since = NOW - 86400 * 10, asOf = NOW - 100,
+                days = { [TODAY] = 10, [TODAY - 3] = 5 } }, MailworthyDB.guildHeard[KEY][BOB:lower()])
+            MailworthyDB.guildGiven = { [KEY] = { [ME:lower()] = { name = ME, total = 4, since = NOW, days = { [TODAY] = 4 } } } }
+            local e = MailworthyAPI.v1.GetGuildExport()
+            assertContract(e)
+            assert.same({ -- this account's first, then heard ones (Raid Ledger's fill order)
+                { characterName = ME, itemsAllTime = 4, countingSince = NOW, asOf = NOW, days = { { day = TODAY, items = 4 } } },
+                { characterName = BOB, itemsAllTime = 30, countingSince = NOW - 86400 * 10, asOf = NOW - 100,
+                    days = { { day = TODAY - 3, items = 5 }, { day = TODAY, items = 10 } } },
+            }, e.givers)
+        end)
+
+        it("fill order past the cap: own first, then heard by items, ties by the newest asOf; heard ones dropped first", function()
+            local given, heard = {}, {}
+            for i = 1, 3 do given["own " .. i] = { name = "Own " .. i, total = i, since = NOW, days = {} } end
+            local roster = {}
+            for i = 1, 200 do
+                local name = "Heard " .. i
+                heard[name:lower()] = { name = name, total = 1000 + (i % 100), since = NOW - 86400, asOf = NOW - i, days = {} }
+                roster[name:lower()] = true
+            end
+            local e = ns.Contributions.Build({ now = NOW, givers = given, heard = heard, roster = roster })
+            assertContract(e)
+            assert.equal(200, #e.givers)
+            assert.same({ "Own 3", "Own 2", "Own 1" }, { e.givers[1].characterName, e.givers[2].characterName,
+                e.givers[3].characterName })
+            assert.equal("Heard 99", e.givers[4].characterName)  -- 1099, asOf NOW - 99
+            assert.equal("Heard 199", e.givers[5].characterName) -- 1099, asOf NOW - 199: older
+            assert.equal(1001, e.givers[200].itemsAllTime) -- dropped: the three lowest heard (1000, 1000, 1001)
+            local stale = ns.Contributions.Build({ now = NOW, roster = roster, heard = { x = { name = "Heard 1", total = 5,
+                since = NOW - 86400, asOf = NOW + 1, days = {} } } })
+            assert.is_nil(stale, "asOf after generatedAt never leaves")
+        end)
+
+        it("a counter in several parts is kept only once every part arrived", function()
+            local days = {}
+            for d = 0, 34 do days[TODAY - d] = 50000000 end
+            local msgs = ns.Contributions.Encode({ total = 2000000000, since = NOW - 86400 * 40, days = days }, NOW - 10)
+            assert.is_true(#msgs > 1)
+            hearG(BOB, { msgs[1] })
+            assert.is_nil((MailworthyDB.guildHeard or {})[KEY])
+            hearG(BOB, { unpack(msgs, 2) })
+            local kept = MailworthyDB.guildHeard[KEY][BOB:lower()]
+            local n = 0
+            for _ in pairs(kept.days) do n = n + 1 end
+            assert.equal(35, n)
+        end)
+
+        it("only on the guild channel, never in the future, never more days than the total, never this account's", function()
+            local function g(total, asOf, days)
+                return ns.Contributions.Encode({ total = total, since = NOW - 86400, days = days }, asOf)
+            end
+            hearG(BOB, g(5, NOW - 10, { [TODAY] = 5 }), "PARTY")
+            hearG(BOB, g(5, NOW - 10, { [TODAY] = 5 }), "WHISPER")
+            hearG(CARA, { "G2|" .. (NOW + 60) .. "|1/1|5|" .. (NOW - 86400) .. "|0:5" })
+            hearG(CARA, { "G2|" .. (NOW - 10) .. "|1/1|5|" .. (NOW - 86400) .. "|0:5;1:5" })
+            hearG(CARA, { "G2|" .. (NOW - 10) .. "|1/1|9|" .. (NOW - 86400) .. "|0:5;0:4" })
+            hearG(BANK_ALT, g(5, NOW - 10, { [TODAY] = 5 }))
+            assert.is_nil((MailworthyDB.guildHeard or {})[KEY])
+        end)
+
+        it("heard givers leave the export when they leave the guild roster, and never override this account's", function()
+            hearG(BOB, ns.Contributions.Encode({ total = 30, since = NOW - 86400, days = { [TODAY] = 30 } }, NOW - 100))
+            MailworthyDB.guildHeard[KEY][ME:lower()] = { name = ME, total = 999, since = NOW - 86400, asOf = NOW - 1,
+                days = { [TODAY] = 999 } }
+            MailworthyDB.guildGiven = { [KEY] = { [ME:lower()] = { name = ME, total = 4, since = NOW, days = { [TODAY] = 4 } } } }
+            local e = MailworthyAPI.v1.GetGuildExport()
+            assert.equal(2, #e.givers)
+            assert.equal(BOB, e.givers[2].characterName)
+            assert.same({ characterName = ME, itemsAllTime = 4, countingSince = NOW, asOf = NOW,
+                days = { { day = TODAY, items = 4 } } }, e.givers[1])
+            table.remove(WowStub.state.guild.members, 2) -- Bob leaves
+            assert.same({ { characterName = ME, itemsAllTime = 4, countingSince = NOW, asOf = NOW,
+                days = { { day = TODAY, items = 4 } } } }, MailworthyAPI.v1.GetGuildExport().givers)
+        end)
+
+        it("heard counters change nothing that gets mailed", function()
+            publish({ { profession = ENCHANTING, to = BOB } })
+            ns.Guild.SetUse(true)
+            WowStub.setBag(0, 1, dust(20))
+            local before = ns.Bags.Evaluate()
+            hearG(BOB, ns.Contributions.Encode({ total = 30, since = NOW - 86400, days = { [TODAY] = 30 } }, NOW - 100))
+            hearG(CARA, ns.Contributions.Encode({ total = 99, since = NOW - 86400, days = { [TODAY] = 99 } }, NOW - 100))
+            local after = ns.Bags.Evaluate()
+            assert.equal(#before.mail, #after.mail)
+            for i, it in ipairs(before.mail) do
+                assert.equal(it.itemID, after.mail[i].itemID)
+                assert.equal(it.result.to, after.mail[i].result.to)
+            end
+        end)
+
+        it("the hello carries this character's own counter, on GUILD only; a mailbox visit that counted tells it again", function()
+            WowStub.state.group = { members = { { name = CARA, online = true } } }
+            ns.Comms.Announce("test")
+            assert.same({}, sentG(), "nothing counted yet: no G2")
+            publish({ { profession = ENCHANTING, to = BOB } })
+            ns.Guild.SetUse(true)
+            WowStub.setBag(0, 1, dust(20))
+            WowStub.state.addonMessages = {}
+            send()
+            assert.same({}, sentG(), "not before the mailbox closes")
+            ns.Fire("MAIL_CLOSED")
+            local g = sentG()
+            assert.equal(1, #g)
+            assert.equal("GUILD", g[1].channel)
+            assert.equal("G2|" .. NOW .. "|1/1|20|" .. NOW .. "|0:20", g[1].message)
+            WowStub.state.addonMessages = {}
+            ns.Fire("MAIL_CLOSED")
+            assert.same({}, sentG(), "nothing new: told once")
+            WowStub.state.now = WowStub.state.now + 60
+            ns.Comms.Announce("again")
+            g = sentG()
+            assert.equal(1, #g)
+            assert.equal("GUILD", g[1].channel)
+            for _, m in ipairs(WowStub.state.addonMessages) do
+                if m.channel ~= "GUILD" then assert.is_true(m.message:sub(1, 2) ~= "G2", "G2 left the guild channel") end
+            end
+        end)
+
+        it("heard counters are cleaned at login and dropped after 60 days", function()
+            ns = loadAddon({ db = { guildHeard = { [KEY] = {
+                [BOB:lower()] = { name = BOB, total = 5, since = NOW - 86400, asOf = NOW - 100,
+                    days = { [TODAY] = 5, [TODAY - 50] = 9 } },
+                ["old"] = { name = "Old", total = 5, since = NOW - 86400 * 90, asOf = NOW - 86400 * 61, days = {} },
+                ["junk"] = "junk",
+            } } }, charDB = {} })
+            ns.Fire("ADDON_LOADED", "Mailworthy")
+            ns.Fire("PLAYER_LOGIN")
+            assert.same({ [KEY] = { [BOB:lower()] = { name = BOB, total = 5, since = NOW - 86400, asOf = NOW - 100,
+                days = { [TODAY] = 5 } } } }, MailworthyDB.guildHeard)
         end)
     end)
 end)
