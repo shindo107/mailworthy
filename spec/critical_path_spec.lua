@@ -468,8 +468,11 @@ describe("critical path: mailing", function()
         ns.MailWindow.Refresh()
         assert.truthy(previewed(ns)[2318], "launch week the same")
         _G.TSM_API.GetCustomPriceValue = function() error("boom") end
+        -- and not for a disenchant value either (Codex review, 2026-11-08)
+        _G.DisenchantValueAPI = { GetValue = function(l) return l:find("Spellbinder Robes", 1, true) and 50000 or nil end }
         ns.MailWindow.Refresh()
         assert.same({}, previewed(ns), "a failing price call is never 'no price yet': nothing goes")
+        _G.DisenchantValueAPI = nil
     end)
 
     it("Auctionator and TradeSkillMaster both installed: Auctionator's prices decide", function()

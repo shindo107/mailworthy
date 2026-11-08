@@ -355,7 +355,11 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   recipes", "Yes, gear goes too", "Stale prices go too" (the stale nudge now says old-priced items go
   to the bank alt). Class bindings never take an item without a current auction price, whatever
   its route (`Routes.Divert`; a disenchant value alone isn't one: Codex review). A failed price
-  call reaches no binding either (Codex review; materials included). Staple trade goods (`Valuation.STAPLES`, ~110 Classic IDs, one table) are
+  call reaches no binding either (Codex review; materials included), and mails nothing on a
+  disenchant value either (second Codex pass). The total line counts them ("+9s more than
+  vendoring, 2 with no price yet", `MailWindow.TotalText`); the bank alt's own tooltip says why its
+  share stays (`OtherLine` with `Bags.HoldReason`); the stale nudge says old-priced items "count as
+  unpriced". Staple trade goods (`Valuation.STAPLES`, ~110 Classic IDs, one table) are
   "always mail" as a common item when unpriced (Bank on top), and without any price source whatever
   their quality. Recipes: `Valuation.RecipeProfession` (class 9, `Enum.ItemRecipeSubclass`) makes a
   recipe part of its profession's binding (`Routes.Matches`; reason "Blacksmithing recipe goes to

@@ -136,7 +136,8 @@ function Bags.Evaluate(settings)
     local priced = source ~= nil
     local routes = settings.routes or ns.Routes.Active()
     local result = { settings = settings, priced = priced, source = source, routes = routes, mail = {}, keep = {}, unmailable = {},
-        totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, recipients = {}, byRecipient = {} } }
+        totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, unpriced = 0, recipients = {},
+            byRecipient = {} } }
     local stacksTo = {}
     -- Class bindings (Routes, Classes.lua) need each item's class line: read only when there's one.
     local classRoutes = false
@@ -166,6 +167,8 @@ function Bags.Evaluate(settings)
             t.postage = t.postage + item.result.postage
             local to = item.result.to or "" -- "" = the bank alt
             if item.result.to then t.routed = t.routed + item.stacks else t.gain = t.gain + (item.result.gain or 0) end
+            -- To the bank alt with no gain known (no auction price yet): the total says so (Codex review).
+            if priced and not item.result.to and item.result.gain == nil then t.unpriced = t.unpriced + 1 end
             if not stacksTo[to] then
                 stacksTo[to] = {}
                 t.recipients[#t.recipients + 1] = to

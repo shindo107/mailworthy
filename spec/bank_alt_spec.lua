@@ -172,6 +172,9 @@ describe("bank alt view", function()
         -- No bank alt: nothing goes to one, so the tooltip never says it does (Codex review).
         assert.same({ "Keep", "Stays in your bags: no bank alt (common item (no price data))." },
             { other({ result = { action = "mail", route = "common", reason = "common item (no price data)" } }, true) })
+        -- On the bank alt itself (or skipped): never "goes to your bank alt" (Codex review, 2026-11-08).
+        assert.same({ "Keep", "Stays in your bags: this is your bank alt (no auction price yet)." },
+            { other({ result = { action = "mail", route = "noprice", reason = "no auction price yet" } }, "this is your bank alt") })
     end)
 
     it("without Auctionator: no tags, only why it was mailed", function()

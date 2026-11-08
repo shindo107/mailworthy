@@ -118,6 +118,21 @@ end
 
 local function firstName(name) return tostring(name):match("^(%S+)") or tostring(name) end
 
+--- Pure: the total line and the fees note under the lists, for a scan (Bags.Evaluate). Items going
+--- to the bank alt with no auction price have no gain: the line counts them (Codex review, 2026-11-08).
+function UI.TotalText(scan)
+    local t = scan.totals
+    if scan.priced then
+        return "+" .. money(t.gain) .. " more than vendoring" .. ((t.unpriced or 0) > 0
+                and string.format(", %d with no price yet", t.unpriced) or ""),
+            string.format("after the %d%% AH cut, %dh deposits and %s postage",
+                math.floor(scan.settings.cut * 100 + 0.5), ns.Valuation.DURATION_HOURS[scan.settings.duration],
+                money(t.postage))
+    end
+    return string.format("%d item%s to mail", t.items, t.items == 1 and "" or "s"),
+        "No Auctionator: white items and staple trade goods go. Postage " .. money(t.postage) .. "."
+end
+
 -- `text` (default: the name) with the Mailworthy mark when `name` runs Mailworthy (Comms.Mark).
 local function withMark(name, text)
     local out, m = ns.Comms.Mark(name, text)
@@ -700,15 +715,9 @@ function UI.Refresh(keepScan)
         if shown.stay > 0 then w:Show() else w:Hide() end
     end
 
-    if result.priced then
-        totalLine:SetText("+" .. money(t.gain) .. " more than vendoring")
-        totalNote:SetText(string.format("after the %d%% AH cut, %dh deposits and %s postage",
-            math.floor(result.settings.cut * 100 + 0.5), ns.Valuation.DURATION_HOURS[result.settings.duration],
-            money(t.postage)))
-    else
-        totalLine:SetText(string.format("%d common item%s to mail", t.items, t.items == 1 and "" or "s"))
-        totalNote:SetText("No Auctionator: only white items go. Postage " .. money(t.postage) .. ".")
-    end
+    local line, note = UI.TotalText(result)
+    totalLine:SetText(line)
+    totalNote:SetText(note)
     -- While sending (and after), the mailer's progress or problem takes the fees line.
     local status = ns.Mailer.Status()
     if status then totalNote:SetText(status) end

@@ -493,6 +493,9 @@ evaluate = function(item, price, settings)
             { vendor = vendor })
     end
 
+    -- The auction price call failed: nothing is mailed on it, not even for a disenchant value
+    -- (AGENTS safety: never when the price call failed; Codex review, 2026-11-08).
+    if price.failed then return keep("no price", { vendor = vendor, failed = true }) end
     local r = { vendor = vendor, postage = postage }
     local stale = price.ah ~= nil and price.age ~= nil and price.age > settings.maxAgeDays
     if price.ah ~= nil and not stale then
