@@ -56,6 +56,10 @@ textures / font strings on Blizzard frames kept in our own tables, read-only
 - No right-click-only, modifier-only (Alt+click has the controller's L3 twin),
   drag or hover-only actions; no required typing.
 - Every piece that touches Blizzard UI has a `/mw feature` switch.
+- CI's `controller` job is the controller gate: `spec/dpad_reach_spec.lua` walks the D-pad over
+  every view of every window (each button reachable from the top-left one, a way back from each)
+  and fails for a window with no walk; with the padkey, nav, ux_views and no_gamepad_taint specs.
+  A new window or view adds its walk there; never loosen it to make a change pass.
 
 ## Critical path (STRICT)
 

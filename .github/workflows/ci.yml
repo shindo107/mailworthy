@@ -35,6 +35,27 @@ jobs:
       - name: critical path (mailing)
         run: busted --lua=luajit spec/critical_path_spec.lua
 
+  # Controller support (AGENTS.md "Input" and "Never write into Blizzard's controller UI"), its
+  # own job so main's branch protection can require it by name: "controller". The D-pad reaches
+  # every button of every view and back (spec/dpad_reach_spec.lua, over solved layouts; a new
+  # window fails it until it has a walk), Mailworthy's own bindings come and go with focus,
+  # combat and a hidden interface (padkey), the direction search (nav), each view reaches only
+  # its own buttons (ux_views), and no file writes into Blizzard's gamepad UI (no_gamepad_taint).
+  controller:
+    name: controller
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LuaJIT + luarocks
+        run: sudo apt-get update && sudo apt-get install -y luajit lua5.1 liblua5.1-0-dev luarocks
+      - name: Install rocks
+        run: |
+          for rock in luacheck busted; do sudo luarocks --lua-version=5.1 install "$rock"; done
+      - name: controller specs
+        run: >-
+          busted --lua=luajit spec/dpad_reach_spec.lua spec/padkey_spec.lua spec/nav_spec.lua
+          spec/ux_views_spec.lua spec/no_gamepad_taint_spec.lua
+
   lua:
     runs-on: ubuntu-latest
     steps:

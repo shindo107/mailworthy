@@ -156,8 +156,32 @@ local function newWidget(kind, name)
         if key == "Hide" then return function() self.shown = false; runHooks("OnHide") end end
         if key == "IsShown" then return function() return self.shown end end
         if key == "SetText" then return function(_, t) self.text = t end end
-        if key == "SetPoint" then return function(_, ...) rawset(self, "point", { ... }) end end
-        if key == "ClearAllPoints" then return function() rawset(self, "point", nil) end end
+        if key == "SetPoint" then
+            return function(_, ...)
+                rawset(self, "point", { ... })
+                local points = rawget(self, "points") or {}
+                rawset(self, "points", points)
+                points[(...)] = { ... } -- one per anchor, as in game
+            end
+        end
+        if key == "SetAllPoints" then
+            return function(_, rel)
+                rawset(self, "points", { TOPLEFT = { "TOPLEFT", rel, "TOPLEFT" },
+                    BOTTOMRIGHT = { "BOTTOMRIGHT", rel, "BOTTOMRIGHT" } })
+            end
+        end
+        if key == "ClearAllPoints" then return function() rawset(self, "point", nil) rawset(self, "points", nil) end end
+        if key == "SetSize" then return function(_, width, height) rawset(self, "w", width) rawset(self, "h", height) end end
+        if key == "SetWidth" then return function(_, width) rawset(self, "w", width) end end
+        if key == "SetHeight" then return function(_, h) rawset(self, "h", h) end end
+        -- Sizes and positions only with WowStub.state.layout (the D-pad graph specs): the others
+        -- keep the old answers (nil sizes, every button at 1, 1 unless cx / cy are set).
+        if key == "GetWidth" or key == "GetHeight" then
+            return function()
+                if not s().layout then return nil end
+                return rawget(self, key == "GetWidth" and "w" or "h") or 0
+            end
+        end
         if key == "SetAttribute" then
             return function(_, k, v) rawset(self, "attributes", rawget(self, "attributes") or {}); self.attributes[k] = v end
         end
@@ -177,7 +201,15 @@ local function newWidget(kind, name)
         if key == "GetParent" then return function() return self.parent end end
         if key == "GetChildren" then return function() return unpack(self.children) end end
         if key == "IsObjectType" then return function(_, t) return self.kind == t end end
-        if key == "GetCenter" then return function() return self.cx or 1, self.cy or 1 end end
+        if key == "GetCenter" then
+            return function()
+                if s().layout and not rawget(self, "cx") then
+                    local l, b, r, t = WowStub.rect(self)
+                    if l then return (l + r) / 2, (b + t) / 2 end
+                end
+                return self.cx or 1, self.cy or 1
+            end
+        end
         if key == "GetFrameLevel" then return function() return 1 end end
         if key == "IsVisible" then
             return function()
@@ -203,6 +235,54 @@ local function newWidget(kind, name)
     end })
 end
 WowStub.newWidget = newWidget
+
+-- A small anchor solver for the stub's widgets (WowStub.state.layout): each SetPoint pins one
+-- edge or centre of the widget to a point of another (its parent by default), sizes come from
+-- SetSize / SetWidth / SetHeight. Enough for Nav's direction search over real positions.
+-- Returns left, bottom, right, top (y grows upwards, as in game), or nil.
+local SCREEN = { 0, 0, 1920, 1080 }
+local function pointOf(rect, name)
+    local l, b, r, t = rect[1], rect[2], rect[3], rect[4]
+    local x = name:find("LEFT") and l or name:find("RIGHT") and r or (l + r) / 2
+    local y = name:find("TOP") and t or name:find("BOTTOM") and b or (b + t) / 2
+    return x, y
+end
+function WowStub.rect(w, depth)
+    depth = depth or 0
+    if w == nil or w == _G.UIParent or depth > 40 then return SCREEN[1], SCREEN[2], SCREEN[3], SCREEN[4] end
+    local parent = rawget(w, "parent")
+    local width, height = rawget(w, "w") or 0, rawget(w, "h") or 0
+    local L, R, CX, B, T, CY
+    for name, p in pairs(rawget(w, "points") or {}) do
+        local rel, relPoint, x, y = parent, name, 0, 0
+        local a, b, c, d = p[2], p[3], p[4], p[5]
+        if type(a) == "number" then
+            x, y = a, b or 0
+        elseif a ~= nil then
+            rel = type(a) == "string" and _G[a] or a
+            if type(b) == "string" then relPoint, x, y = b, c or 0, d or 0
+            elseif type(b) == "number" then x, y = b, c or 0 end
+        end
+        local rl, rb, rr, rt = WowStub.rect(rel, depth + 1)
+        local px, py = pointOf({ rl, rb, rr, rt }, relPoint)
+        px, py = px + x, py + y
+        if name:find("LEFT") then L = px elseif name:find("RIGHT") then R = px else CX = px end
+        if name:find("TOP") then T = py elseif name:find("BOTTOM") then B = py else CY = py end
+    end
+    if not (L or R or CX) or not (T or B or CY) then
+        local pl, pb, pr, pt = WowStub.rect(parent, depth + 1)
+        CX, CY = CX or (pl + pr) / 2, CY or (pb + pt) / 2
+    end
+    if L and R then -- luacheck: ignore 542
+    elseif L then R = L + width
+    elseif R then L = R - width
+    else L, R = CX - width / 2, CX + width / 2 end
+    if B and T then -- luacheck: ignore 542
+    elseif T then B = T - height
+    elseif B then T = B + height
+    else B, T = CY - height / 2, CY + height / 2 end
+    return L, B, R, T
+end
 WowStub.frames = {}
 _G.CreateFrame = function(kind, name, parent, template)
     local w = newWidget(kind, name)

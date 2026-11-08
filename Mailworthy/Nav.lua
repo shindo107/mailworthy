@@ -22,6 +22,10 @@ Nav.DIRECTIONS = { up = { 0, 1 }, down = { 0, -1 }, left = { -1, 0 }, right = { 
 -- Every Mailworthy window registered with Attach; the last one shown is on top
 -- and is the one the D-pad navigates. Each has its own highlight.
 local roots, highlights, current = {}, {}, nil
+-- The window the highlight was last placed for (Nav.Follow) and, per window, the button it was
+-- on there, so coming back to a window (the one above it closed) returns to that button.
+local lastRoot, remembered = nil, setmetatable({}, { __mode = "k" })
+Nav.stats = { follows = 0, returns = 0 } -- /mw report: window changes the highlight followed
 
 --- The window the controller drives: the most recently shown visible one.
 function Nav.Root()
@@ -92,7 +96,9 @@ end
 function Nav.Select(button)
     current = button
     for _, h in pairs(highlights) do h:Hide() end
-    local highlight = button and highlights[Nav.Root()]
+    local root = Nav.Root()
+    if button and root then remembered[root] = button end
+    local highlight = button and highlights[root]
     if highlight then
         highlight:ClearAllPoints()
         highlight:SetPoint("TOPLEFT", button, "TOPLEFT", -4, 4)
@@ -131,9 +137,45 @@ function Nav.Stop()
 end
 
 --- After a window changed what it shows (a view switch, rows hidden): while the
---- controller is navigating and its button went away, start again at the top-left.
+--- controller is navigating and its button went away, start again at the top-left (or, when the
+--- window it was in closed, on the button the window now on top had: Nav.Resume).
 function Nav.Revalidate()
-    if current and not (current:IsVisible() and entryFor(current, Nav.Candidates())) then Nav.Reset() end
+    if current and not (current:IsVisible() and entryFor(current, Nav.Candidates())) then Nav.Resume() end
+end
+
+--- Put the highlight back in the window the controller drives: on the button it was on there
+--- (still shown), else the top-left one; none when no window shows.
+function Nav.Resume()
+    local root = Nav.Root()
+    lastRoot = root
+    if not root then return Nav.Select(nil) end
+    local back = remembered[root]
+    if back and back:IsVisible() and entryFor(back, Nav.Candidates()) then
+        Nav.stats.returns = Nav.stats.returns + 1
+        return Nav.Select(back)
+    end
+    return Nav.Reset()
+end
+
+--- Keep the highlight with the window on top (PadKey's watcher, every tick while the controller
+--- navigates; `force` when it starts). Another window opened over this one (Cross on Settings...,
+--- Friends...): its top-left button. The top one closed by mouse, Escape or Circle: back to the
+--- button the window below had. The selected button hidden by a view switch: start again. Before,
+--- the highlight stayed on the window below and the first D-pad press only moved it over.
+function Nav.Follow(force)
+    local root = Nav.Root()
+    if force or root ~= lastRoot then
+        if root ~= lastRoot and root then Nav.stats.follows = Nav.stats.follows + 1 end
+        return Nav.Resume()
+    end
+    if root and not (current and current:IsVisible()) then return Nav.Resume() end
+end
+
+--- Every window registered with Attach (specs: the D-pad reach spec walks each one).
+function Nav.Windows()
+    local list = {}
+    for frame in pairs(highlights) do list[#list + 1] = frame end
+    return list
 end
 
 --- Close the window the controller is in (Circle).
@@ -149,6 +191,7 @@ function Nav.Attach(frame)
     if highlights[frame] then return end
     roots[#roots + 1] = frame
     frame:HookScript("OnShow", function(self)
+        remembered[self] = nil -- a window that opens starts at its top-left button
         for i = #roots, 1, -1 do
             if roots[i] == self then table.remove(roots, i) end
         end
