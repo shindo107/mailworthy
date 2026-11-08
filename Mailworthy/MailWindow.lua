@@ -39,6 +39,7 @@ local friendsButton
 local result
 local shownAlt -- the bank alt the list on screen was drawn for (UI.Send compares against it)
 local pages = { mail = 1, stay = 1 }
+local marked -- a name on screen carries the Mailworthy mark: the footer says what it means
 
 UI.CHIPS = {
     ah = { "Auction", 0.2, 0.4, 0.75 },
@@ -50,6 +51,8 @@ UI.CHIPS = {
 
 function UI.Frame() return frame end
 function UI.Result() return result end
+--- The footer (the Mailworthy mark's key, the controller legend), for specs.
+function UI.Footer() return legend and legend:GetText() end
 --- The texts at the top ("To:" and the recipient lines) and the fees / status line, for specs and the report.
 function UI.Texts()
     local to = { toName and toName:GetText() }
@@ -102,6 +105,13 @@ function UI.StayReason(r)
 end
 
 local function firstName(name) return tostring(name):match("^(%S+)") or tostring(name) end
+
+-- `text` (default: the name) with the Mailworthy mark when `name` runs Mailworthy (Comms.Mark).
+local function withMark(name, text)
+    local out, m = ns.Comms.Mark(name, text)
+    marked = marked or m
+    return out
+end
 
 --- Pure: the Send button's text: "Send to Roknua", "Send to Roknua, Bob", "Send to Roknua +2".
 --- `recipients` lists the scan's recipients ("" = the bank alt); `skipped`: the bank alt is skipped.
@@ -307,7 +317,7 @@ local function fillRoutes()
         elseif r then
             local to, crafter = ns.Routes.Recipient(r)
             local skipped = ns.Routes.Skipped(r.key)
-            row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. firstName(to) .. "|r"
+            row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. withMark(to, firstName(to)) .. "|r"
                 .. (crafter and (" |cff888888(" .. firstName(r.to) .. "'s crafter)|r") or "")
                 .. UI.RouteTags(r.scope == "guild", ns.Routes.Skill(r))
                 .. (skipped and " |cff888888skipped this time|r" or ""))
@@ -410,6 +420,7 @@ function UI.Create()
     sendButton = W.Button(frame, "Send", 190, function() UI.Send() end, "MailworthyMailSend")
     settingsButton = W.Button(frame, "Settings", 110, function() ns.SettingsUI.Show(frame) end, "MailworthyMailSettings")
     legend = W.Label(frame, "GameFontHighlightSmall")
+    legend:SetJustifyH("RIGHT")
 
     frame:SetScript("OnHide", function(self)
         if type(send) == "table" and self:GetParent() ~= send then self:SetParent(send) end
@@ -470,11 +481,12 @@ local function pageLabel(button, list, rows)
     button:Show()
 end
 
---- Pure: the pay-back line for the ledger's debts (Ledger.Debts: most first), or nil.
+--- The pay-back line for the ledger's debts (Ledger.Debts: most first), or nil; the name carries
+--- the Mailworthy mark (Comms.Mark).
 function UI.OwedText(debts)
     local d = debts and debts[1]
     if not d then return nil end
-    local text = ns.Ledger.DebtText(d.name, d.net)
+    local text = ns.Ledger.DebtText(withMark(d.name), d.net)
     if #debts > 1 then text = text .. string.format(" |cffaaaaaa(and %d more)|r", #debts - 1) end
     return text
 end
@@ -566,7 +578,13 @@ function UI.Refresh(keepScan)
     local t = result.totals
     local skipped = ns.Bags.BankAltSkipped()
     local recipients = UI.Recipients(t, bankAlt, isBankAlt, skipped)
-    toName:SetText("|cffffd100To:|r " .. recipients[1].name)
+    marked = false
+    -- The bank alt's line names it only when there is one ("No bank alt" otherwise).
+    local function lineName(r)
+        local who = r.bank and bankAlt or (not r.bank and r.name) or nil
+        return who and withMark(who, r.name) or r.name
+    end
+    toName:SetText("|cffffd100To:|r " .. lineName(recipients[1]))
     toNote:SetText(recipients[1].note)
     local canSkip = recipients[1].bank and bankAlt ~= nil and not isBankAlt and not ns.Mailer.Busy()
     skipAltButton:SetText(skipped and "Undo skip" or "Skip once")
@@ -580,7 +598,7 @@ function UI.Refresh(keepScan)
             line.name:SetText(string.format("|cffaaaaaa+ %d more (see Mailing)|r", #recipients - UI.TO_LINES))
             line.note:SetText("")
         elseif r then
-            line.name:SetText(r.name)
+            line.name:SetText(lineName(r))
             line.note:SetText(r.note)
         end
         if r then
@@ -651,7 +669,7 @@ function UI.Refresh(keepScan)
     else
         sendButton:Enable()
     end
-    legend:SetText(pad and W.Legend() or "")
+    legend:SetText(W.Footer(pad, marked, "\n"))
     frame:SetHeight(UI.Layout(shown))
     ns.Nav.Revalidate()
 end

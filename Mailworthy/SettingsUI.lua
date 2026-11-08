@@ -38,6 +38,8 @@ local W = ns.Widgets
 local money = function(c) return ns.Valuation.Money(c) end
 
 function UI.Frame() return frame end
+--- The footer (the Mailworthy mark's key, the controller legend), for specs.
+function UI.Footer() return legend and legend:GetText() end
 --- "main" (the settings) or "pick" (choosing the bank alt).
 function UI.View() return view end
 
@@ -330,8 +332,9 @@ local function showAll(list, on)
     end
 end
 
---- Pure: the bank alt row: "Name  (class level)" or "(this character)", or none yet.
-function UI.BankAltText(bankAlt, here, choices)
+--- Pure: the bank alt row: "Name  (class level)" or "(this character)", or none yet. `mark` (the
+--- Mailworthy mark, Comms.Mark) shows after the name.
+function UI.BankAltText(bankAlt, here, choices, mark)
     if not bankAlt then return "|cffaaaaaaNone: what's worth selling stays in your bags.|r" end
     local detail = here and "this character" or nil
     for _, c in ipairs(choices or {}) do
@@ -339,19 +342,21 @@ function UI.BankAltText(bankAlt, here, choices)
             detail = c.known and (tostring(c.class or "?"):lower() .. " " .. tostring(c.level or "?")) or "not seen yet"
         end
     end
-    return "|cff33ff99" .. bankAlt .. "|r" .. (detail and ("  |cffaaaaaa" .. detail .. "|r") or "")
+    return "|cff33ff99" .. bankAlt .. "|r" .. (mark and (" " .. mark) or "") .. (detail and ("  |cffaaaaaa" .. detail .. "|r") or "")
 end
 
 local function fillPicker(bankAlt, here, choices)
     hereButton:SetText(selected("This character is my bank alt", here))
-    local shown = 0
+    local shown, marked = 0, false
     for i, row in ipairs(choiceRows) do
         local c = choices[i]
         row.name = c and c.name or nil
         if c then
             local detail = c.known and string.format("(%s %s)", tostring(c.class or "?"):lower(), tostring(c.level or "?"))
                 or "(not seen)"
-            row.button:SetText(selected(c.name .. "  " .. detail, bankAlt == c.name))
+            local nameText, m = ns.Comms.Mark(c.name)
+            marked = marked or m
+            row.button:SetText(selected(nameText .. "  " .. detail, bankAlt == c.name))
             row.button:Show()
             if c.known then row.forget:Hide() else row.forget:Show() end
             shown = shown + 1
@@ -361,7 +366,7 @@ local function fillPicker(bankAlt, here, choices)
         end
     end
     if shown == 0 then emptyHint:Show() else emptyHint:Hide() end
-    return shown
+    return shown, marked
 end
 
 local function hideChoices()
@@ -379,7 +384,9 @@ function UI.GuildButtonText(inGuild, template)
 end
 
 local function fillMain(bankAlt, here, choices)
-    current:SetText(UI.BankAltText(bankAlt, here, choices))
+    local _, marked = ns.Comms.Mark(bankAlt)
+    if not bankAlt then marked = false end
+    current:SetText(UI.BankAltText(bankAlt, here, choices, marked and ns.Comms.MARK or nil))
     changeButton:SetText(bankAlt and "Change..." or "Choose...")
     local v = ns.Config.Values()
     amountLabel:SetText("Gain at least |cffffffff" .. money(v.minGain) .. "|r")
@@ -407,6 +414,7 @@ local function fillMain(bankAlt, here, choices)
     minimapButton:SetText("Minimap button: " .. (ns.Config.MinimapShown() and "shown" or "hidden"))
     pricesLine:SetText("Prices: " .. (ns.Prices.Auctionator() and "Auctionator"
         or "none (install Auctionator; only white items are mailed)"))
+    return marked
 end
 
 function UI.Refresh()
@@ -416,15 +424,15 @@ function UI.Refresh()
     local choices = ns.Config.Choices()
     showAll(mainWidgets, view == "main")
     showAll(pickWidgets, view == "pick")
-    fillMain(bankAlt, here, choices)
-    local shown = fillPicker(bankAlt, here, choices)
+    local markedMain = fillMain(bankAlt, here, choices)
+    local shown, markedPick = fillPicker(bankAlt, here, choices)
     if view == "pick" then
         frame:SetHeight(layoutPicker(shown))
     else
         hideChoices()
         frame:SetHeight(MAIN_HEIGHT)
     end
-    legend:SetText(ns.MailButton.GamepadUI() and W.Legend() or "")
+    legend:SetText(W.Footer(ns.MailButton.GamepadUI(), (view == "pick" and markedPick) or (view ~= "pick" and markedMain)))
     ns.Nav.Revalidate()
 end
 

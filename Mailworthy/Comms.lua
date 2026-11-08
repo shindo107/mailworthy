@@ -298,6 +298,44 @@ function Comms.Peer(name)
     return name and store()[name:lower()] or nil
 end
 
+-- The Mailworthy mark (operator, 2026-11-08: "a mailworthy icon or some sort of indicator on the
+-- mailworthy ui when a player's name is mentioned showing if they have mailworthy as well"): the
+-- addon's icon right after a name, as a texture escape in our own font strings (no frame, no
+-- texture on anything of Blizzard's, no tooltip). Each window that shows one says what it means in
+-- its footer (MARK_KEY, Widgets.Footer), so nothing depends on hovering. Switch: peerMark.
+Comms.MARK = "|TInterface\\AddOns\\Mailworthy\\Textures\\Icon:0|t"
+Comms.MARK_KEY = Comms.MARK .. " runs Mailworthy"
+
+--- Whether `name` is known to run Mailworthy: this character, one of the account's characters
+--- on this realm + faction (Mailworthy recorded them), a player whose Mailworthy said hello, or a
+--- character that player's hello listed as theirs. Peers go after PEER_DAYS (Prune).
+function Comms.Runs(name)
+    name = ns.Routes.Clean(name)
+    if not name then return false end
+    local lower = name:lower()
+    if lower == tostring(ns.PlayerName()):lower() then return true end
+    for _, entry in ipairs(ns.Characters.Mailable()) do
+        if tostring(entry.name):lower() == lower then return true end
+    end
+    local peers = store()
+    if type(peers[lower]) == "table" then return true end
+    for _, peer in pairs(peers) do
+        local characters = type(peer) == "table" and peer.characters
+        for _, c in ipairs(type(characters) == "table" and characters or {}) do
+            if type(c) == "table" and tostring(c.name):lower() == lower then return true end
+        end
+    end
+    return false
+end
+
+--- `text` (default: the name) with the Mailworthy mark after it when `name` runs Mailworthy, and
+--- whether it was marked (the window then shows MARK_KEY in its footer).
+function Comms.Mark(name, text)
+    text = text or tostring(name)
+    if not ns.Features.On("peerMark") or not Comms.Runs(name) then return text, false end
+    return text .. " " .. Comms.MARK, true
+end
+
 --- Record a hello from `sender` (a name, possibly with a realm suffix) on `channel`.
 function Comms.Hear(sender, text, channel)
     local msg = Comms.Decode(text)

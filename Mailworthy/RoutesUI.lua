@@ -41,6 +41,7 @@ local bindingRows, candidateRows, professionRows = {}, {}, {}
 local pages = { bind = 1, cand = 1 }
 local candidates, picked = {}, nil
 local view = "list"
+local marked -- a name on screen carries the Mailworthy mark: the footer says what it means
 local target = "me" -- what the add view makes: "me" (a binding) or "guild" (a template rule)
 
 function UI.Frame() return frame end
@@ -50,6 +51,10 @@ function UI.Picked() return picked end
 --- "list" (the bindings), "add" (step 1: a player; step 2, once picked: the profession) or
 --- "guild" (the guild template: on / off, its rules; the editor for the guild master and officers).
 function UI.View() return view end
+--- Whether a name in the current view carries the Mailworthy mark (its key is in the footer).
+function UI.Marked() return marked end
+--- The footer line (the mark's key, the controller legend), for specs.
+function UI.Footer() return legend and legend:GetText() end
 --- What the add view makes: "me" (a binding) or "guild" (a guild template rule).
 function UI.Target() return target end
 
@@ -58,6 +63,13 @@ local function selected(text, on)
 end
 
 local function setHint(text) if hint then hint:SetText(text or "") end end
+
+-- `text` (default: the name) with the Mailworthy mark when `name` runs Mailworthy (Comms.Mark).
+local function withMark(name, text)
+    local out, m = ns.Comms.Mark(name, text)
+    marked = marked or m
+    return out
+end
 
 local function pageOf(list, rows, key)
     local count = math.max(1, math.ceil(#list / rows))
@@ -81,14 +93,15 @@ function UI.OwedText(name)
 end
 
 --- Pure: the guild template line's text and its toggle's ("Guild rules: on" / "off" / "Use guild
---- rules" before the player chose), or nil toggle when there is no template.
-function UI.GuildText(template, canPublish)
+--- rules" before the player chose), or nil toggle when there is no template. `fromText` shows in
+--- place of the author's name (with the Mailworthy mark).
+function UI.GuildText(template, canPublish, fromText)
     if not template then
         return canPublish and "No guild template yet: add a rule for each profession, then Publish to guild."
             or "No guild template yet: your guild master or an officer makes it here.", nil
     end
     local n = #(template.rules or {})
-    local text = string.format("Guild template from %s: %d rule%s", tostring(template.from), n, n == 1 and "" or "s")
+    local text = string.format("Guild template from %s: %d rule%s", fromText or tostring(template.from), n, n == 1 and "" or "s")
     if template.use == nil then return text .. " |cff33ff99(new)|r", "Use guild rules" end
     return text, template.use and "Guild rules: on" or "Guild rules: off"
 end
@@ -303,15 +316,16 @@ local function fillRows(list, top, kindOf, emptyText)
             placeRow(row, top - shown * BIND_ROW)
             if row.kind == "draft" then
                 local me = tostring(r.to):lower() == tostring(ns.PlayerName()):lower()
-                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r" .. (me and " |cffaaaaaa(you)|r" or ""))
+                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. withMark(r.to) .. "|r"
+                    .. (me and " |cffaaaaaa(you)|r" or ""))
             elseif row.kind == "guild" then
                 local why = ns.Guild.Why(r, ns.Routes.Personal(), ns.Characters.Professions(), ns.PlayerName())
-                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r"
+                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. withMark(r.to) .. "|r"
                     .. (why and (" |cffaaaaaa(not here: " .. why .. ")|r") or ""))
             else
                 local to, crafter = ns.Routes.Recipient(r)
-                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. r.to .. "|r"
-                    .. (crafter and (" |cffaaaaaa(delivered to " .. to .. ")|r") or "") .. UI.OwedText(r.to))
+                row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. withMark(r.to) .. "|r"
+                    .. (crafter and (" |cffaaaaaa(delivered to " .. withMark(to) .. ")|r") or "") .. UI.OwedText(r.to))
             end
             row.cap:SetText(UI.CapText(r))
             row.scope:SetText(ns.Routes.SCOPES[r.scope] or tostring(r.scope))
@@ -358,7 +372,8 @@ local function fillGuildHead(canPublish)
     elseif not name then
         text = "Not in a guild (or the game hasn't said which yet)."
     else
-        text, toggle = UI.GuildText(ns.Guild.Template(), canPublish)
+        local template = ns.Guild.Template()
+        text, toggle = UI.GuildText(template, canPublish, template and withMark(template.from) or nil)
     end
     guildLabel:SetText(text)
     at(guildLabel, 28, GUILD_LINE - 4)
@@ -382,7 +397,7 @@ local function fillCandidates()
     for i, b in ipairs(candidateRows) do
         local c = candidates[first + i]
         if c then
-            b:SetText(ns.Routes.CandidateText(c))
+            b:SetText(ns.Routes.CandidateText(c, withMark(c.name)))
             b:Show()
             shown = shown + 1
         else
@@ -431,7 +446,7 @@ end
 local function fillProfessions()
     stepLabel:SetText("|cffaaaaaa2 of 2|r  |cffffd100What should " .. (tostring(picked.name):match("^(%S+)") or picked.name)
         .. " get" .. (target == "guild" and " from the guild" or "") .. "?|r")
-    chosenLabel:SetText(ns.Routes.CandidateText(picked))
+    chosenLabel:SetText(ns.Routes.CandidateText(picked, withMark(picked.name)))
     chosenLabel:Show()
     local shown = 0
     local options = UI.Options(picked, target == "guild")
@@ -458,6 +473,7 @@ end
 function UI.Refresh()
     if not frame then return end
     local list, guild, add = view == "list", view == "guild", view == "add"
+    marked = false
     title:SetText((guild or (add and target == "guild")) and UI.TITLE.guild or UI.TITLE.friends)
     show({ sub }, list)
     show({ stepLabel }, not list)
@@ -532,7 +548,7 @@ function UI.Refresh()
         at(doneButton, -24, y - 10, "TOPRIGHT")
     end
     frame:SetHeight(-(y - 10) + 22 + 40)
-    legend:SetText(ns.MailButton.GamepadUI() and W.Legend() or "")
+    legend:SetText(W.Footer(ns.MailButton.GamepadUI(), marked))
     ns.Nav.Revalidate()
 end
 

@@ -19,6 +19,10 @@ local debts = {}
 
 function UI.Frame() return frame end
 function UI.Debts() return debts end
+--- The footer (the Mailworthy mark's key, the controller legend), for specs.
+function UI.Footer() return legend and legend:GetText() end
+--- A row's first line, for specs.
+function UI.RowLine(i) return rows[i] and rows[i].text:IsShown() and rows[i].text:GetText() or nil end
 
 local function at(widget, x, y, point)
     widget:ClearAllPoints()
@@ -27,11 +31,12 @@ end
 
 local function setHint(text) if hint then hint:SetText(text or "") end end
 
---- Pure: a row's two lines for one debt ({ name, net, items, gold }).
-function UI.RowText(d)
+--- Pure: a row's two lines for one debt ({ name, net, items, gold }). `nameText` shows in place of
+--- the name (with the Mailworthy mark, Comms.Mark).
+function UI.RowText(d, nameText)
     local got = d.items ~= "" and d.items or ""
     if (d.gold or 0) > 0 then got = got ~= "" and (got .. " and " .. ns.Valuation.Money(d.gold)) or ns.Valuation.Money(d.gold) end
-    return string.format("|cffffd100%s|r: %s more than you've sent back", d.name, ns.Valuation.Money(d.net)),
+    return string.format("|cffffd100%s|r: %s more than you've sent back", nameText or d.name, ns.Valuation.Money(d.net)),
         got ~= "" and ("|cffaaaaaareceived " .. got .. "|r") or ""
 end
 
@@ -101,12 +106,15 @@ function UI.Refresh()
     local pages = math.max(1, math.ceil(#debts / UI.ROWS))
     if page > pages then page = 1 end
     local first, shown = (page - 1) * UI.ROWS, 0
+    local marked = false
     for i, row in ipairs(rows) do
         local d = debts[first + i]
         for _, w in ipairs(row.widgets) do w:Hide() end
         if d then
             local y = TOP - shown * ROW
-            local text, detail = UI.RowText(d)
+            local nameText, m = ns.Comms.Mark(d.name)
+            marked = marked or m
+            local text, detail = UI.RowText(d, nameText)
             row.text:SetText(text)
             row.detail:SetText(detail)
             row.paid:SetText(armed == d.name and "Sure?" or "Mark paid")
@@ -136,7 +144,7 @@ function UI.Refresh()
     at(hint, 164, y - 14)
     at(doneButton, -24, y - 10, "TOPRIGHT")
     frame:SetHeight(-(y - 10) + 22 + 40)
-    legend:SetText(ns.MailButton.GamepadUI() and W.Legend() or "")
+    legend:SetText(W.Footer(ns.MailButton.GamepadUI(), marked))
     ns.Nav.Revalidate()
 end
 
