@@ -5,7 +5,7 @@
 local loadAddon = require("spec.support.load_addon")
 
 describe("prices", function()
-    local P
+    local P, ns
     local link = WowStub.link(2589, "Linen Cloth")
 
     local function auctionator(history, keyFn)
@@ -24,7 +24,10 @@ describe("prices", function()
         }
     end
 
-    before_each(function() P = loadAddon().Prices end)
+    before_each(function()
+        ns = loadAddon()
+        P = ns.Prices
+    end)
     after_each(function() _G.Auctionator, _G.DisenchantValueAPI, _G.DisenchantryDB, _G.TSM_API = nil, nil, nil, nil end)
 
     describe("disenchant addon", function()
@@ -229,6 +232,46 @@ describe("prices", function()
             assert.is_nil(p.failed)
             values["DBMarket i:2589"] = -5
             assert.is_nil(P.Lookup(link).ah, "a negative value is no price")
+        end)
+
+        it("one source raising: the other's price counts; with no price there it is a failed call (Codex review)", function()
+            local api = tsm()
+            local real = api.GetCustomPriceValue
+            api.GetCustomPriceValue = function(source, itemString)
+                if source == "DBMinBuyout" then error("boom") end
+                return real(source, itemString)
+            end
+            values["DBMarket i:2589"] = 70
+            local p = P.Lookup(link)
+            assert.equal(70, p.ah)
+            assert.is_nil(p.failed)
+            values["DBMarket i:2589"] = nil
+            p = P.Lookup(link)
+            assert.is_nil(p.ah)
+            assert.is_true(p.failed, "no data from one, an error from the other: never 'no price yet'")
+        end)
+
+        it("asks IsCustomPriceValid again until it says yes, then keeps the yes (Codex review)", function()
+            local api = tsm()
+            local asked, answer = 0, false
+            api.IsCustomPriceValid = function() asked = asked + 1 return answer end
+            api.GetCustomPriceValue = function() return nil, "No value was returned" end -- no data
+            assert.is_true(P.Lookup(link).failed)
+            assert.is_true(P.Lookup(link).failed)
+            assert.equal(4, asked, "a no is asked again (both sources, twice)")
+            answer = true
+            assert.is_nil(P.Lookup(link).failed)
+            assert.is_nil(P.Lookup(link).failed)
+            assert.equal(6, asked, "a yes is kept")
+        end)
+
+        it("prices the disenchant tables' materials, so a green gets a disenchant value with TSM alone", function()
+            local green = { quality = 2, level = 20, classID = 4 }
+            assert.is_nil(ns.Disenchant.Value(green), "no source: no value")
+            local api = tsm()
+            api.GetCustomPriceValue = function() return 100 end
+            local de = ns.Disenchant.Value(green)
+            assert.is_true(type(de) == "number" and de > 0, tostring(de))
         end)
 
         it("falls back to i:<item ID> when ToItemString fails, and never passes a link as the item string", function()
