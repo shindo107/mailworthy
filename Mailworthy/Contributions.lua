@@ -209,11 +209,12 @@ end
 
 -- GUILD_ROSTER_UPDATE: read the roster again, at most every ROSTER_GAP seconds; an update inside the gap
 -- gets one read when it ends, so a member who left drops out (Codex review).
-local trailing = false
+local trailing, lastUpdate = false, -math.huge
 local function onRosterUpdate()
     local guild = ns.Guild.Mine()
     if not guild then return end
-    local wait = roster.at + Contributions.ROSTER_GAP - (call(GetTime) or 0)
+    lastUpdate = call(GetTime) or 0
+    local wait = roster.at + Contributions.ROSTER_GAP - lastUpdate
     if wait <= 0 then return Contributions.Roster(guild) end
     if trailing then return end
     trailing = true
@@ -225,7 +226,8 @@ local function onRosterUpdate()
     timer.After(wait, function()
         trailing = false
         local g = ns.Guild.Mine()
-        if g then pcall(Contributions.Roster, g) end
+        -- a read since the last update (an API call, or an update right at the gap's end) covers it
+        if g and roster.at < lastUpdate then pcall(Contributions.Roster, g) end
     end)
 end
 

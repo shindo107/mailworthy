@@ -393,6 +393,28 @@ describe("guild contributions", function()
             assert.same({ { name = CARA, lastSeenAt = NOW - 6 } }, MailworthyAPI.v1.GetGuildExport(GUILD).peers)
         end)
 
+        it("roster updates read the roster at most every 10 seconds, and once more after a burst", function()
+            local reads, members = 0, C_Club.GetClubMembers
+            C_Club.GetClubMembers = function(...) reads = reads + 1; return members(...) end
+            WowStub.timers = {}
+            ns.Fire("GUILD_ROSTER_UPDATE") -- t=0: read
+            assert.equal(1, reads)
+            WowStub.state.now = WowStub.state.now + 1
+            ns.Fire("GUILD_ROSTER_UPDATE") -- t=1: a read when the gap ends
+            ns.Fire("GUILD_ROSTER_UPDATE") -- the same burst: no second timer
+            assert.equal(1, reads)
+            WowStub.state.now = WowStub.state.now + 9
+            ns.Fire("GUILD_ROSTER_UPDATE") -- t=10: the gap is over, read now
+            assert.equal(2, reads)
+            WowStub.runTimers(ns.Contributions.ROSTER_GAP) -- the pending read: covered by the one at t=10
+            assert.equal(2, reads)
+            WowStub.state.now = WowStub.state.now + 1
+            ns.Fire("GUILD_ROSTER_UPDATE")
+            WowStub.runTimers(ns.Contributions.ROSTER_GAP)
+            assert.equal(3, reads)
+            C_Club.GetClubMembers = members
+        end)
+
         it("all-time is never below the days' sum, and names longer than 48 are dropped, never shortened", function()
             MailworthyDB.guildGiven = { [KEY] = { me = { name = ME, total = 2, since = NOW, days = { [TODAY] = 9 } } } }
             assert.equal(9, MailworthyAPI.v1.GetGuildExport().givers[1].itemsAllTime)
