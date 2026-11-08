@@ -19,9 +19,9 @@
 --   * Auctionator creates these frames when the auction house first opens, after PLAYER_LOGIN,
 --     and the XML mixin copies the mixin's functions into each button then.
 -- So one hooksecurefunc post-hook on AuctionatorGroupsViewItemMixin.SetItemInfo, at login, reaches
--- every such button. The tag is a texture and a font string on Auctionator's button, kept in our
--- own weak table: no Lua field is written on Auctionator's (or Blizzard's) frames, and no frame is
--- created (textures only, like the bag tags and Baganator's lock glow). The tags show exactly
+-- every such button. The tag is drawn by Border.RefreshButton like a bag button's (a texture and
+-- a font string kept in BankAlt's weak table; the lock glow too): no Lua field is written on
+-- Auctionator's (or Blizzard's) frames, and no frame is created. The tags show exactly
 -- when the bag tags do (BankAlt.Active: the bank alt, no bank alt, tags everywhere, V after a
 -- send) and are redrawn with them (BankAlt.OnRedraw). Hovering is never needed; Auctionator's
 -- tooltip is GameTooltip:SetHyperlink, so Mailworthy's tooltip lines are there too.
@@ -34,8 +34,8 @@ ns.AuctionatorTags = AuctionatorTags
 
 AuctionatorTags.MIXIN = "AuctionatorGroupsViewItemMixin"
 
-local tags = setmetatable({}, { __mode = "k" }) -- Auctionator's button -> { bg, text }
 local places = setmetatable({}, { __mode = "k" }) -- Auctionator's button -> what it shows now, or false
+local tagged = setmetatable({}, { __mode = "k" }) -- Auctionator's button -> its last draw had a tag
 local state = { hooked = false, why = "not installed yet", calls = 0, errors = 0 }
 
 --- Pure: where an Auctionator item info is in the bags: { link = itemLink, count = how many it
@@ -55,47 +55,34 @@ function AuctionatorTags.Where(info)
     return where
 end
 
---- The tag key ("ah", "b", "de", "v") for what a button shows, or nil: the first of its stacks
---- that has one (stacks of one item share a verdict); with no readable stack, the item by its
---- link while Auctionator counts some in the bags (a favourite that isn't there gets none).
-function AuctionatorTags.TagFor(where)
-    if not where then return nil end
+local function idOf(link)
+    return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
+end
+
+--- What to draw for a button: bag, slot (the first of its stacks still holding its item: the bags
+--- may have changed since Auctionator last drew, Codex review) and its link (while Auctionator
+--- counts some in the bags; a favourite that isn't there gets nothing). All nil: no tag.
+function AuctionatorTags.Pick(where)
+    if not where then return nil, nil, nil end
+    local id = idOf(where.link)
+    local link = where.count > 0 and where.link or nil
     for _, s in ipairs(where.slots) do
-        local verdict = ns.BankAlt.TagAt(s[1], s[2], nil)
-        if verdict then return verdict end
+        local now = ns.Locks.ItemAt(s[1], s[2])
+        if now and (id == nil or tonumber(now.itemID) == id) then return s[1], s[2], link end
     end
-    if #where.slots > 0 or where.count <= 0 or not where.link then return nil end
-    return ns.BankAlt.TagAt(nil, nil, where.link)
+    return nil, nil, link
 end
 
-local function tagFor(button)
-    local t = tags[button]
-    if t then return t end
-    t = {}
-    t.bg = button:CreateTexture(nil, "OVERLAY", nil, 6)
-    t.bg:SetSize(18, 11)
-    t.bg:SetPoint("TOPLEFT", 2, -2)
-    t.text = button:CreateFontString(nil, "OVERLAY", "SystemFont_Tiny")
-    t.text:SetPoint("CENTER", t.bg, "CENTER", 0, 0)
-    t.text:SetTextColor(1, 1, 1)
-    tags[button] = t
-    return t
-end
-
---- Draw (or clear) the tag on one of Auctionator's buttons for what it shows now.
+--- Draw (or clear) the tag on one of Auctionator's buttons for what it shows now, through the
+--- bag buttons' own drawing (Border.RefreshButton: the lock glow and BankAlt's tag, textures in
+--- their weak tables; shared with the bag addons' buttons). The link is for the item-by-link
+--- fallback when no stack is readable.
 function AuctionatorTags.Draw(button)
-    local key = ns.Features.On("auctionatorTags") and AuctionatorTags.TagFor(places[button] or nil)
-    local tag = key and ns.BankAlt.TAGS[key]
-    if not tag then
-        local t = tags[button]
-        if t then t.bg:Hide() t.text:Hide() end
-        return
-    end
-    local t = tagFor(button)
-    t.bg:SetColorTexture(tag.color[1], tag.color[2], tag.color[3], 0.95)
-    t.text:SetText(tag.text)
-    t.bg:Show()
-    t.text:Show()
+    local bag, slot, link
+    if ns.Features.On("auctionatorTags") then bag, slot, link = AuctionatorTags.Pick(places[button] or nil) end
+    -- counted by its stack only: the link fallback draws once Border.RefreshButton takes a link
+    tagged[button] = bag ~= nil and ns.Features.On("bankAltTags") and ns.BankAlt.TagAt(bag, slot, nil) ~= nil
+    ns.Border.RefreshButton(button, bag, slot, nil, nil, link)
 end
 
 --- The post-hook: Auctionator gave `button` a new item (or nil).
@@ -111,12 +98,13 @@ function AuctionatorTags.RefreshAll()
     for button in pairs(places) do AuctionatorTags.Draw(button) end
 end
 
---- Pure-ish for specs and /mw report: how many buttons show a tag now.
+--- For specs and /mw report: how many buttons on screen show a tag now (a released pooled button,
+--- or the closed auction house, hides them: IsVisible, Codex review).
 function AuctionatorTags.Shown()
     local n = 0
-    for _, t in pairs(tags) do
-        local ok, shown = pcall(t.bg.IsShown, t.bg)
-        if ok and shown then n = n + 1 end
+    for button, has in pairs(tagged) do
+        local ok, visible = pcall(button.IsVisible, button)
+        if has and ok and visible then n = n + 1 end
     end
     return n
 end

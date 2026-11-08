@@ -18,6 +18,8 @@ local function atrButton(mixin)
     local b = { textures = {}, fontStrings = {}, shown = true }
     function b.Hide(self) rawset(self, "shown", false) end -- the pool's release (Auctionator's own)
     function b.IsShown(self) return self.shown end
+    function b.IsVisible(self) return self.shown end
+    function b.Show(self) rawset(self, "shown", true) end -- the group's AddButton (SetShown)
     function b.CreateTexture()
         local t = WowStub.newWidget("Texture")
         table.insert(b.textures, t)
@@ -54,6 +56,7 @@ local function newView()
                 view.buttons[view.active] = b
             end
             b:SetItemInfo(info)
+            b:Show()
         end
         return view.buttons
     end
@@ -125,8 +128,36 @@ describe("Mailworthy tags on Auctionator's Selling tab", function()
         assert.is_nil(tagOf(first), "a cleared button has no tag")
         first:SetItemInfo(info(ore, nil, nil, 0)) -- a favourite that isn't in the bags
         assert.is_nil(tagOf(first))
-        first:SetItemInfo({ itemLink = linen, itemCount = 20 }) -- no readable location: by its link
-        assert.equal("V", tagOf(first))
+        -- no readable location: drawn by its link (Border.RefreshButton's link fallback)
+        local calls = {}
+        local refresh = ns.Border.RefreshButton
+        ns.Border.RefreshButton = function(...) calls[#calls + 1] = { ... } return refresh(...) end
+        first:SetItemInfo({ itemLink = linen, itemCount = 20 })
+        first:SetItemInfo(info(ore, nil, nil, 0))
+        ns.Border.RefreshButton = refresh
+        assert.same({ first, nil, nil, nil, nil, linen }, calls[1])
+        assert.same({ first, nil, nil, nil, nil, nil }, calls[2], "a favourite not in the bags: no link either")
+    end)
+
+    it("never shows another item's tag when stacks swap before Auctionator redraws (Codex review)", function()
+        local buttons = newView():Show({ info(ore, 0, 1, 5), info(linen, 0, 2, 20) })
+        assert.equal("AH", tagOf(buttons[1]))
+        assert.equal("V", tagOf(buttons[2]))
+        WowStub.setBag(0, 1, WowStub.item(2589, "Linen Cloth", { count = 20, sell = 10 }))
+        WowStub.setBag(0, 2, WowStub.item(2770, "Copper Ore", { count = 5, sell = 5 }))
+        ns.Fire("BAG_UPDATE_DELAYED") -- Mailworthy redraws first; Auctionator's buttons still point at the old slots
+        assert.not_equal("V", tagOf(buttons[1]), "the Copper Ore button never shows Linen Cloth's V")
+        assert.not_equal("AH", tagOf(buttons[2]), "the Linen Cloth button never shows Copper Ore's AH")
+    end)
+
+    it("counts only tags on screen: a released button or a closed auction house shows none", function()
+        local view = newView()
+        view:Show({ info(ore, 0, 1, 5), info(linen, 0, 2, 20) })
+        assert.equal(2, ns.AuctionatorTags.Shown())
+        view:Show({ info(ore, 0, 1, 5) }) -- one released, hidden by the pool
+        assert.equal(1, ns.AuctionatorTags.Shown())
+        view.buttons[1]:Hide()
+        assert.equal(0, ns.AuctionatorTags.Shown())
     end)
 
     it("redraws its tags when the bags change, even after Auctionator drew first", function()

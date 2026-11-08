@@ -92,7 +92,7 @@ describe("no writes into the controller UI", function()
         WowStub.state.gamepadUI = true
         _G.AuctionatorGroupsViewItemMixin.SetItemInfo(button, { itemLink = WowStub.link(2770, "Copper Ore"), itemCount = 20,
             locations = { { GetBagAndSlot = function() return 0, 1 end } } })
-        assert.equal(1, ns.AuctionatorTags.Shown())
+        assert.equal("AH", button.fontStrings[1] and button.fontStrings[1].text)
         _G.Auctionator, _G.AuctionatorGroupsViewItemMixin = nil, nil
         assert.falsy(table.concat(MailworthyDB.log, "\n"):find("Mailworthy called", 1, true))
         assert.falsy(table.concat(MailworthyDB.log, "\n"):find("error", 1, true))
