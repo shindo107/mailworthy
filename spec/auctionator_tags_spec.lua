@@ -150,7 +150,15 @@ describe("Mailworthy tags on Auctionator's Selling tab", function()
         assert.not_equal("AH", tagOf(buttons[2]), "the Linen Cloth button never shows Copper Ore's AH")
     end)
 
-    it("counts only tags on screen: a released button or a closed auction house shows none", function()
+    it("never trusts a slot it can't match: no link, or a link without an item ID (Codex review)", function()
+        local view = newView()
+        local buttons = view:Show({ { itemCount = 1, locations = { location(0, 1) } }, -- no link
+            info("|cff0070dd|Hbattlepet:261:1:3:152:13:10:0x0|h[Personal World Destroyer]|h|r", 0, 1),
+            info("|cffa335ee|Hkeystone:180653:375:2|h[Keystone]|h|r", 0, 1) })
+        for i = 1, 3 do assert.is_nil(tagOf(buttons[i]), "button " .. i .. ": Copper Ore sits in that slot") end
+    end)
+
+    it("counts only tags on screen:a released button or a closed auction house shows none", function()
         local view = newView()
         view:Show({ info(ore, 0, 1, 5), info(linen, 0, 2, 20) })
         assert.equal(2, ns.AuctionatorTags.Shown())

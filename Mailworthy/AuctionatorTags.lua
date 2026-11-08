@@ -62,13 +62,17 @@ end
 --- What to draw for a button: bag, slot (the first of its stacks still holding its item: the bags
 --- may have changed since Auctionator last drew, Codex review) and its link (while Auctionator
 --- counts some in the bags; a favourite that isn't there gets nothing). All nil: no tag.
+--- A stack counts only when the slot provably holds the button's item: the same item ID, or, for a
+--- link with none (a battle pet, a keystone), the same link; no link, no stack (Codex review).
 function AuctionatorTags.Pick(where)
     if not where then return nil, nil, nil end
     local id = idOf(where.link)
     local link = where.count > 0 and where.link or nil
+    if where.link == nil then return nil, nil, nil end
     for _, s in ipairs(where.slots) do
         local now = ns.Locks.ItemAt(s[1], s[2])
-        if now and (id == nil or tonumber(now.itemID) == id) then return s[1], s[2], link end
+        local same = now and (id ~= nil and tonumber(now.itemID) == id or id == nil and now.hyperlink == where.link)
+        if same then return s[1], s[2], link end
     end
     return nil, nil, link
 end
