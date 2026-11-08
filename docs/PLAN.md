@@ -356,6 +356,10 @@ them) then I just keep going to the AH. Same methodology for all crafting materi
   acquire some minor pieces"): `Routes.Matches` takes a trade good of the profession's own
   subclasses (plus Enchanting's gear), never a `Tiers.KEEP` side item (an engineer's Linen
   Cloth). That stays on the normal rule. Own professions still keep their side items.
+- **Overlapping bindings** (operator, 2026-11-07: Blacksmithing and Engineering both take metal
+  and stone; "Lowest skill first"): `Routes.Before` picks this character's bindings, then the
+  account's, then the guild's; within one, the recipient with the lower `route.skill`, a known
+  skill before an unknown one, then the list's order. The chosen binding's cap decides.
 - **Bindings:** `Routes.Matches(route, item, tiers)` is false for a material the recipient's
   `route.skill` is past, so the next binding that needs it, or the normal rule (the bank alt),
   gets it; the workings say "not to Bob: their First Aid (80) is past it". `Routes.Skill(route)`

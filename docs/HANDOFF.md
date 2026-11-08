@@ -259,7 +259,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
 - Bindings and guild rules take primary materials only (operator, 2026-11-07, after Linen
   Cloth went to a guild engineer: "only focus on the primary materials ... they can ask or
   acquire some minor pieces"): `Routes.Matches` checks the profession's own subclasses, not
-  `Tiers.KEEP`. The mailbox window's binding rows show the recipient's skill ("(guild, skill
+  `Tiers.KEEP`. Two bindings taking one material (metal and stone: Blacksmithing and
+  Engineering) go to the lower-skilled recipient (`Routes.Before`; operator: "Lowest skill
+  first"). The mailbox window's binding rows show the recipient's skill ("(guild, skill
   120)"), so a material past it going to the bank alt explains itself. Button labels fit
   their border (`Widgets.Fit` after every SetText: small font, then "...").
 - Popups beside their opener (operator, same day: the new popups "overlap the existing menus

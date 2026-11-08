@@ -68,7 +68,9 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   mailed until they press **Use guild rules** once. Later updates then apply on their own
   (with a chat line). **One press turns the guild rules off** again: "Guild rules: on" in the
   Guild window, or on the Bindings heading of the Mailworthy window. Like a binding, a rule
-  takes only the profession's primary materials. Your own bindings come
+  takes only the profession's primary materials. When two rules take the same material
+  (metal and stone: Blacksmithing and Engineering), it goes to whichever recipient has the lower
+  skill in their profession, so both keep levelling. Your own bindings come
   first, and a rule for a profession you have yourself is left out (a tailor keeps their
   cloth). Skip once works on guild rules too. Any guildmate running Mailworthy passes a copy on
   to whoever logs in (hidden addon messages), so the guild master doesn't need to be online; a

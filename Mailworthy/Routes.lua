@@ -209,30 +209,50 @@ end
 --- item, `routes` the active bindings (Routes.Active()). Returns the new verdict, or nil
 --- when no binding applies; a second return names the binding whose cap kept the item on
 --- the normal rule, a third the binding whose player's skill is past the material (Tiers).
+local GROUP = { character = 1, account = 2, guild = 3 }
+
+--- Pure: of two bindings that both take an item, `a` goes first: this character's, then the
+--- account's, then the guild's (this character's win, personal wins), then within one of those
+--- the recipient with the lower skill in their profession (`skill`, Routes.Active; operator,
+--- 2026-11-07, Blacksmithing and Engineering both taking metal and stone: "Lowest skill first",
+--- so both crafters keep levelling), a known skill before an unknown one; else the list's order.
+function Routes.Before(a, b)
+    local ga, gb = GROUP[a.scope] or 2, GROUP[b.scope] or 2
+    if ga ~= gb then return ga < gb end
+    local sa, sb = tonumber(a.skill), tonumber(b.skill)
+    if sa and sb then return sa < sb end
+    return sa ~= nil and sb == nil
+end
+
+--- Pure: divert an item to a binding. `verdict` is Valuation.Evaluate's result for the
+--- item, `routes` the active bindings (Routes.Active()). Returns the new verdict, or nil
+--- when no binding applies; a second return names the binding whose cap kept the item on
+--- the normal rule, a third the binding whose player's skill is past the material (Tiers).
+--- Several bindings taking the item (metal and stone: Blacksmithing and Engineering): the first
+--- by Routes.Before; its cap decides, as if it were the only one.
 function Routes.Divert(item, verdict, price, settings, routes)
     if verdict and verdict.action == "keep" and Routes.HARD_KEEPS[verdict.reason] then return nil end
-    local outgrown
-    for _, route in ipairs(routes or {}) do
-        local matches, past = Routes.Matches(route, item, settings and settings.tiers, settings and settings.priceOf)
-        if past then outgrown = outgrown or route end
-        if matches then
-            local unit
-            if type(price) == "table" and price.ah ~= nil
-                and (price.age == nil or price.age <= (settings and settings.maxAgeDays or math.huge)) then
-                unit = ns.Valuation.SmoothedPrice(price)
-            end
-            if route.cap and unit and unit >= route.cap then return nil, route end
-            local to, crafter = Routes.Recipient(route)
-            local n = item.count or 1
-            return {
-                action = "mail", route = Routes.ROUTE, to = to, crafter = crafter, key = route.key, what = Routes.What(route),
-                reason = Routes.What(route) .. " go to " .. tostring(to),
-                vendor = (item.vendor or 0) * n, postage = (settings and settings.postage or 30) * (item.stacks or 1),
-                ahUnit = unit,
-            }
-        end
+    local outgrown, route
+    for _, r in ipairs(routes or {}) do
+        local matches, past = Routes.Matches(r, item, settings and settings.tiers, settings and settings.priceOf)
+        if past then outgrown = outgrown or r end
+        if matches and (not route or Routes.Before(r, route)) then route = r end
     end
-    return nil, nil, outgrown
+    if not route then return nil, nil, outgrown end
+    local unit
+    if type(price) == "table" and price.ah ~= nil
+        and (price.age == nil or price.age <= (settings and settings.maxAgeDays or math.huge)) then
+        unit = ns.Valuation.SmoothedPrice(price)
+    end
+    if route.cap and unit and unit >= route.cap then return nil, route end
+    local to, crafter = Routes.Recipient(route)
+    local n = item.count or 1
+    return {
+        action = "mail", route = Routes.ROUTE, to = to, crafter = crafter, key = route.key, what = Routes.What(route),
+        reason = Routes.What(route) .. " go to " .. tostring(to),
+        vendor = (item.vendor or 0) * n, postage = (settings and settings.postage or 30) * (item.stacks or 1),
+        ahUnit = unit,
+    }
 end
 
 -- Saved bindings ----------------------------------------------------------------
