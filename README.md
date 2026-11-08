@@ -4,11 +4,13 @@ A WoW Forever addon. Open a mailbox, press the **Mailworthy** button, and
 every bag item worth more on the auction house (after fees) or disenchanted
 than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 
-- **Prices** come from Auctionator (optional, recommended). **Disenchant values** of
+- **Prices** come from Auctionator (optional, recommended) or, without it, from
+  TradeSkillMaster (its AuctionDB minimum buyout, capped by its market value; Auctionator
+  wins when both are installed). **Disenchant values** of
   green, blue and purple gear come from Siz DisenchantValue (optional; learned from your
-  own disenchants) or from the era disenchant tables priced with Auctionator, the same
-  number Disenchantry's tooltip shows; either addon installed switches the disenchant
-  comparison on. Without Auctionator, Mailworthy mails every unlocked, tradeable white
+  own disenchants) or from the era disenchant tables priced with Auctionator (or TSM), the
+  same number Disenchantry's tooltip shows; either addon installed switches the disenchant
+  comparison on. Without Auctionator or TSM, Mailworthy mails every unlocked, tradeable white
   (common) item.
 - **Preview first:** it shows the recipient, what goes and why, what stays and
   why, and a **Settings** button to fix anything before you press Send.
@@ -188,6 +190,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | `## Interface: 16001` | addon loads without "out of date" | confirmed for LedgerLink (build 1.60.1.70205) |
 | Auctionator `API.v1` on Forever | S5 | **confirmed** (Auctionator 340; price, age, exactness, disenchant calls) |
 | Real AH prices for bag items | `/mw scan` after an Auctionator scan | **seen** (v0.2.0 scan: Copper Ore 1s 74c, Fishing Pole 9s, all age 0); per unit still to confirm against the tooltip; Mailworthy assumes `GetAuctionPriceByItemLink` is per unit and `GetAuctionAgeByItemLink` is in days (Auctionator's convention; S5 saw age 0) |
+| TradeSkillMaster as the price source (2026-11-08, a CurseForge request; TSM 4.15 announces Forever support): `TSM_API.ToItemString(link)` -> "i:ID" (else "i:ID" read from the link), `TSM_API.GetCustomPriceValue("DBMinBuyout" / "DBMarket", itemString)` -> copper or nil + message, `TSM_API.IsCustomPriceValid(source)` to tell "no data" from a source TSM doesn't have (read in TSM 4.x's `Core/API.lua`; every call `pcall`'d, a raise or an unknown source = a failed call). Only used without Auctionator. No price age, exactness or history through the API, so with TSM alone there's no "price too old" keep, no 3-day median, no glut check and no stale-prices nudge | TSM only (Auctionator disabled), after TSM's desktop app has synced: `/mw report` "prices: TradeSkillMaster", `/mw scan` prices match TSM's tooltip "Min Buyout" (or "Market Value" when lower); with both: "prices: Auctionator (TSM installed, not used)". Open: whether Forever's TSM has realm AuctionDB data at all without the desktop app (an empty AuctionDB = every non-white item stays) | open (2026-11-08) |
 | Auctionator's history: `Auctionator.Database:GetPriceHistory(key)` rows `{ rawDay, minSeen, maxSeen, available }` and `Auctionator.Utilities.BasicDBKeyFromLink(link)` (not its stable API; guarded, nil = last scan's price only) | `/mw scan` workings show "(3-day median; last scan ...)" or "(last scan; 3-day median ...)" and "market: N listed" | open |
 | `GetServerTime()` as the launch-day anchor (`Valuation.LAUNCH_EPOCH` = Nov 4, 2026 15:00 PST) | `/mw report` "server: launch day N" | open |
 | Trade-goods subclass numbers on Forever (`GetItemInfoInstant`: 7 metal, 9 herb, 10 elemental, 12 enchanting) | a Strange Dust / Bruiseweed stack shows **B** before Dec 9 | open |

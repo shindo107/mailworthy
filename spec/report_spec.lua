@@ -34,6 +34,23 @@ describe("report", function()
         assert.equal(0, WowStub.focusCalls)
     end)
 
+    it("/mw report and the settings' Prices line name the auction source in use (TSM: 2026-11-08)", function()
+        finally(function() _G.TSM_API, _G.Auctionator = nil, nil end)
+        local function tsm() _G.TSM_API = { GetCustomPriceValue = function() end } end
+        local function atr() _G.Auctionator = { API = { v1 = { GetAuctionPriceByItemLink = function() end } } } end
+        assert.equal("Prices: none (install Auctionator or TSM; only white items are mailed)", ns.SettingsUI.PricesText())
+        tsm()
+        ns.HandleSlash("report")
+        has(ns.Report.Text(), "prices: TradeSkillMaster")
+        assert.equal("Prices: TradeSkillMaster", ns.SettingsUI.PricesText())
+        atr()
+        ns.HandleSlash("report")
+        has(ns.Report.Text(), "prices: Auctionator (TSM installed, not used)")
+        assert.equal("Prices: Auctionator (TSM installed, not used)", ns.SettingsUI.PricesText())
+        _G.TSM_API = nil
+        assert.equal("Prices: Auctionator", ns.SettingsUI.PricesText())
+    end)
+
     it("the discovery self-test is gone, and its saved data with it", function()
         local saved = { selftest = { answers = { icon = { value = "yes" } }, log = { "old" } }, characters = {} }
         local ns2 = loadAddon()

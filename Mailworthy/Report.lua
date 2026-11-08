@@ -91,7 +91,7 @@ function Report.Build()
             ns.Config.Flag("tagsEverywhere") and "every character" or "bank alt only",
             ns.Config.Flag("glowEverywhere") and "always" or "with the Mailworthy window open", ns.Bags.LastBag(),
             ns.Bags.ProfessionMatsText(ns.Bags.Evaluate(v).settings)),
-        "prices: " .. (ns.Prices.Auctionator() and "Auctionator" or "none")
+        "prices: " .. (ns.Prices.SourceText() or "none")
             .. (ns.Prices.DisenchantAddon() and (", " .. ns.Prices.DisenchantAddon() .. " installed") or ""),
         string.format("controller: %s, labelStyle=%s", ns.MailButton.GamepadUI() and "on" or "off",
             tostring(ns.Gamepad.LabelStyle())),

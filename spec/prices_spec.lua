@@ -1,6 +1,7 @@
 -- Prices.History: Auctionator's per-day price history, read from its database
 -- (not the stable API), guarded so that anything odd is "no history"; the
--- disenchant value from Siz DisenchantValue's API, else Auctionator's call.
+-- disenchant value from Siz DisenchantValue's API, else Auctionator's call; TradeSkillMaster as
+-- the auction source when Auctionator isn't installed (TSM_API, its public API).
 local loadAddon = require("spec.support.load_addon")
 
 describe("prices", function()
@@ -24,7 +25,7 @@ describe("prices", function()
     end
 
     before_each(function() P = loadAddon().Prices end)
-    after_each(function() _G.Auctionator, _G.DisenchantValueAPI, _G.DisenchantryDB = nil, nil, nil end)
+    after_each(function() _G.Auctionator, _G.DisenchantValueAPI, _G.DisenchantryDB, _G.TSM_API = nil, nil, nil, nil end)
 
     describe("disenchant addon", function()
         it("is Siz DisenchantValue by its API table, Disenchantry by its saved variables, else none", function()
@@ -130,6 +131,133 @@ describe("prices", function()
             assert.is_true(p.failed)
             _G.Auctionator.API.v1.GetAuctionPriceByItemLink = nil
             assert.is_nil(P.Lookup(link), "no price call at all = no price source: the no-Auctionator rule")
+        end)
+    end)
+
+    describe("TradeSkillMaster", function()
+        -- TSM_API as TSM 4.x's Core/API.lua has it: GetCustomPriceValue checks its arguments and
+        -- raises on a bad item string or a colon call; nil + a message for no data or a bad source.
+        local values, calls
+        local function tsm()
+            values, calls = {}, {}
+            local api = {}
+            api.ToItemString = function(item)
+                assert.is_true(item ~= api, "never called with a colon")
+                local id = type(item) == "string" and item:match("item:(%d+)")
+                return id and ("i:" .. id) or nil
+            end
+            api.IsCustomPriceValid = function(source)
+                return source == "DBMinBuyout" or source == "DBMarket" or source == "DBRecent"
+            end
+            api.GetCustomPriceValue = function(source, itemString)
+                assert.is_true(source ~= api, "never called with a colon")
+                if type(itemString) ~= "string" or not itemString:find("^[ip]:%d+") then
+                    error("Invalid 'itemString' argument type (must be a TSM item string): " .. tostring(itemString))
+                end
+                calls[#calls + 1] = source .. " " .. itemString
+                if not api.IsCustomPriceValid(source) then return nil, "'" .. source .. "' is not a valid source." end
+                local v = values[source .. " " .. itemString]
+                if v == nil then return nil, "No value was returned by the custom price for the specified item." end
+                return v
+            end
+            _G.TSM_API = api
+            P.ResetTSM()
+            return api
+        end
+
+        it("is the source only when Auctionator isn't installed; Auctionator wins when both are", function()
+            assert.is_nil(P.Source())
+            assert.is_nil(P.SourceText())
+            assert.is_nil(P.Lookup(link), "no source: the no-Auctionator rule")
+            _G.TSM_API = { ToItemString = function() end } -- no GetCustomPriceValue: not the API we need
+            assert.is_nil(P.Source())
+            tsm()
+            assert.equal("TSM", P.Source())
+            assert.equal("TradeSkillMaster", P.SourceText())
+            auctionator({})
+            assert.equal("Auctionator", P.Source())
+            assert.equal("Auctionator (TSM installed, not used)", P.SourceText())
+            values["DBMinBuyout i:2589"] = 9999
+            local p = P.Lookup(link)
+            assert.equal("Auctionator", p.source)
+            assert.equal(40, p.ah, "Auctionator's price, not TSM's")
+            assert.same({}, calls, "TSM isn't asked while Auctionator is the source")
+        end)
+
+        it("prices an item by its TSM item string: the lower of DBMinBuyout and DBMarket", function()
+            tsm()
+            values["DBMinBuyout i:2589"], values["DBMarket i:2589"] = 45, 60
+            local p = P.Lookup(link)
+            assert.equal("TSM", p.source)
+            assert.equal(45, p.ah)
+            assert.equal(45, p.minBuyout)
+            assert.equal(60, p.market)
+            assert.is_nil(p.failed)
+            assert.is_nil(p.age, "TSM's API gives no age")
+            assert.is_nil(p.exact)
+            assert.is_nil(p.history)
+            assert.same({ "DBMinBuyout i:2589", "DBMarket i:2589" }, calls, "realm sources only, never region")
+            values["DBMarket i:2589"] = 30
+            assert.equal(30, P.Lookup(link).ah, "the market value caps a high minimum buyout")
+            values["DBMinBuyout i:2589"] = nil
+            assert.equal(30, P.Lookup(link).ah, "nothing listed: the market value")
+            values["DBMinBuyout i:2589"], values["DBMarket i:2589"] = 52.6, nil
+            assert.equal(53, P.Lookup(link).ah, "whole copper")
+        end)
+
+        it("no data is 'no price yet'; an error or a source TSM doesn't know is a failed call", function()
+            local api = tsm()
+            local p = P.Lookup(link)
+            assert.is_nil(p.ah)
+            assert.is_nil(p.failed, "TSM has no data for it: no price yet")
+            api.GetCustomPriceValue = function() error("boom") end
+            p = P.Lookup(link)
+            assert.is_nil(p.ah)
+            assert.is_true(p.failed)
+            tsm()
+            _G.TSM_API.IsCustomPriceValid = function() return false, "not a valid source" end
+            assert.is_true(P.Lookup(link).failed, "a source TSM doesn't know (no AuctionDB) is never 'no price yet'")
+            _G.TSM_API.IsCustomPriceValid = function() error("boom") end
+            assert.is_true(P.Lookup(link).failed)
+            _G.TSM_API.IsCustomPriceValid = nil
+            assert.is_true(P.Lookup(link).failed, "can't tell no data from a bad source: failed")
+            tsm()
+            values["DBMarket i:2589"] = 70
+            _G.TSM_API.IsCustomPriceValid = function(source) return source == "DBMarket" end
+            p = P.Lookup(link)
+            assert.equal(70, p.ah, "one source answering is a price")
+            assert.is_nil(p.failed)
+            values["DBMarket i:2589"] = -5
+            assert.is_nil(P.Lookup(link).ah, "a negative value is no price")
+        end)
+
+        it("falls back to i:<item ID> when ToItemString fails, and never passes a link as the item string", function()
+            local api = tsm()
+            values["DBMinBuyout i:2589"] = 45
+            api.ToItemString = function() error("boom") end
+            assert.equal("i:2589", P.TSMItemString(link))
+            assert.equal(45, P.Lookup(link).ah)
+            api.ToItemString = function() return "[Linen Cloth]" end
+            assert.equal("i:2589", P.TSMItemString(link))
+            api.ToItemString = function() return "i:2589::r5" end
+            assert.equal("i:2589::r5", P.TSMItemString(link))
+            api.ToItemString = function() return nil end
+            assert.is_nil(P.TSMItemString("no link"))
+            assert.is_nil(P.TSMItemString(nil))
+            local p = P.LookupTSM("no link")
+            assert.is_nil(p.ah)
+            assert.is_true(p.failed, "an item TSM can't name is never 'no price yet'")
+        end)
+
+        it("prices materials by item ID for the disenchant tables and leather conversions", function()
+            tsm()
+            assert.is_nil(P.MaterialPrice(10940))
+            values["DBMinBuyout i:10940"] = 25
+            assert.equal(25, P.MaterialPrice(10940))
+            assert.is_nil(P.MaterialPrice("x"))
+            auctionator({})
+            _G.Auctionator.API.v1.GetAuctionPriceByItemID = function() return 11 end
+            assert.equal(11, P.MaterialPrice(10940), "Auctionator's while it is the source")
         end)
     end)
 end)
