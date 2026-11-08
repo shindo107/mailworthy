@@ -131,11 +131,19 @@ end
 
 --- Pure: the last "To:" line when more recipients mail than lines show: every one of them still
 --- named (operator, 2026-11-08: "any new recipient should be shown even if its a return to sender").
---- `recipients` from UI.Recipients; lines from `from` on are folded into this one.
+--- `recipients` from UI.Recipients; lines from `from` on are folded into this one, UI.FOLD_NAMES
+--- names a row, so a long list wraps instead of running off the window (Codex review). Returns the
+--- text and how many rows it takes.
+UI.FOLD_NAMES = 4
 function UI.MoreRecipientsText(recipients, from)
     local names = {}
     for i = from, #recipients do names[#names + 1] = firstName(recipients[i].name) end
-    return string.format("|cffaaaaaa+ %d more: %s (see Mailing)|r", #names, table.concat(names, ", "))
+    local rows = {}
+    for i = 1, #names, UI.FOLD_NAMES do
+        rows[#rows + 1] = table.concat(names, ", ", i, math.min(i + UI.FOLD_NAMES - 1, #names))
+    end
+    local text = string.format("+ %d more: %s (see Mailing)", #names, table.concat(rows, ",\n"))
+    return "|cffaaaaaa" .. text:gsub("\n", "|r\n|cffaaaaaa") .. "|r", math.max(1, #rows)
 end
 
 local function mailsText(n) return string.format("%d mail%s", n, n == 1 and "" or "s") end
@@ -392,6 +400,8 @@ function UI.Create()
     for i = 1, UI.TO_LINES do
         local name = W.Label(frame, "GameFontHighlight")
         local note = W.Label(frame, "GameFontDisableSmall")
+        name:SetWidth(WIDTH - 76) -- never past the window's edge
+        name:SetJustifyH("LEFT")
         name:Hide()
         note:Hide()
         toLines[i] = { name = name, note = note }
@@ -508,7 +518,8 @@ end
 
 --- Place everything top to bottom for the rows that show; returns the window height.
 --- `n` = { routes = , mail = , stay = } shown row counts; `n.stale` = the stale-prices line shows;
---- `n.to` = recipient lines under "To:" (more than one recipient).
+--- `n.to` = recipient lines under "To:" (more than one recipient); `n.toRows` = extra rows the
+--- folded last line wraps onto (UI.MoreRecipientsText).
 function UI.Layout(n)
     local y = -76
     for i, line in ipairs(toLines) do
@@ -518,6 +529,7 @@ function UI.Layout(n)
             y = y - 20
         end
     end
+    y = y - 14 * (n.toRows or 0)
     if (n.to or 0) > 0 then y = y - 6 end
     if n.stale then
         at(staleLine, 24, y)
@@ -607,11 +619,13 @@ function UI.Refresh(keepScan)
     if isBankAlt then summaryButton:Show() else summaryButton:Hide() end
     at(summaryButton, -20, -44, "TOPRIGHT")
     at(toNote, (canSkip or isBankAlt) and -112 or -26, -52, "TOPRIGHT")
-    local more = 0
+    local more, foldRows = 0, 1
     for i, line in ipairs(toLines) do
         local r = recipients[i + 1]
         if r and i == UI.TO_LINES and #recipients > UI.TO_LINES + 1 then
-            line.name:SetText(UI.MoreRecipientsText(recipients, UI.TO_LINES + 1))
+            local text
+            text, foldRows = UI.MoreRecipientsText(recipients, UI.TO_LINES + 1)
+            line.name:SetText(text)
             line.note:SetText("")
         elseif r then
             line.name:SetText(r.name)
@@ -645,6 +659,7 @@ function UI.Refresh(keepScan)
     end
     local shown = {
         to = more,
+        toRows = foldRows - 1,
         stale = staleText ~= nil,
         owed = owedText ~= nil,
         routes = fillRoutes(),

@@ -71,7 +71,17 @@ describe("return to sender", function()
 
     it("more recipients than To: lines: the last line still names each one", function()
         local r = { { name = "Roknua Themicrulah" }, { name = BOB }, { name = ANN }, { name = "Cid Third" } }
-        assert.equal("|cffaaaaaa+ 2 more: Ann, Cid (see Mailing)|r", ns.MailWindow.MoreRecipientsText(r, 3))
+        assert.equal("|cffaaaaaa+ 2 more: Ann, Cid (see Mailing)|r", (ns.MailWindow.MoreRecipientsText(r, 3)))
+        -- Codex review: many senders wrap, 4 names a row, and the window grows to fit them
+        local many = { { name = "Roknua Themicrulah" } }
+        for i = 1, 9 do many[#many + 1] = { name = "Sender" .. i .. " Surname" } end
+        local text, rows = ns.MailWindow.MoreRecipientsText(many, 2)
+        assert.equal(3, rows)
+        assert.truthy(text:find("Sender1, Sender2, Sender3, Sender4,|r\n|cffaaaaaaSender5", 1, true), text)
+        assert.equal("Sender9 (see Mailing)|r", text:sub(-#"Sender9 (see Mailing)|r"))
+        local base = { to = 2, routes = 0, mail = 1, stay = 0 }
+        local tall = { to = 2, toRows = 2, routes = 0, mail = 1, stay = 0 }
+        assert.equal(ns.MailWindow.Layout(base) + 28, ns.MailWindow.Layout(tall))
     end)
 
     describe("Split (pure)", function()
