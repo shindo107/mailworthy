@@ -88,8 +88,11 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   their binding in Friends. Pay back by mail, materials or gold; it counts when it goes.
   **Mark paid** (two presses) clears it if you settled another way. Only your own side ever
   shows: nobody is listed as owing you. Values are taken when the mail is sent: your prices
-  for what you send; for what you receive, the sender's value when they run Mailworthy (it
-  tells yours, at most 3x your own price), else your price when you take it. Your own
+  for what you send; for what you receive, when the sender runs Mailworthy too, whichever of
+  the two players had the more recent auction scan when the mail went (theirs counts at most
+  3x your own price), else your price when you take it. When that value differs from the
+  sender's, the receiver's Mailworthy tells theirs (as soon as the two are online in the same
+  guild or group), so both see the same number. The export shows each value's scan age. Your own
   characters, the auction house, system mail and COD mail don't count; a returned mail takes
   back what you sent. `/mw feature ledger off` stops all of it.
 - Profession tools (fishing poles, Mining Pick, Blacksmith Hammer, Skinning Knife, ...)

@@ -18,9 +18,13 @@
 --       Name=197:150,333:120;Other Name=165:90>   (right after a hello, for the material
 --       tiers: a binding stops taking what the bound player's skill is past; Mailworthys
 --       before v0.18 drop it)
---   V2|<mail's sender>|<recipient>|<server time>|<itemID>:<count>:<copper>;...   (Ledger.lua: what a
---       mail to another player was worth when it went; WHISPER only, to the recipient or one of their
---       characters once they are heard from; older Mailworthys drop it)
+--   M2|<mail's sender>|<recipient>|<server time>|<mail id>|<itemID>:<count>:<copper>:<scan age>:<k>;...
+--       (Ledger.lua: what a mail to another player was worth when it went; WHISPER only, to the
+--       recipient once heard from. v0.25.0 sent V2|<sender>|<recipient>|<time>|<itemID>:<count>:<copper>;...,
+--       still read, and drops M2)
+--   R2|<recipient>|<mail's sender>|<mail id>|<itemID>:<count>:<copper>:<k>;...   (Ledger.lua: the value the
+--       recipient settled on when it differs from the M2 one, so the sender's log matches; WHISPER only,
+--       held until the sender is heard from)
 --
 -- What arrives is data from other players, never instructions: names are
 -- cleaned and length-checked, professions must be crafting skill lines
@@ -185,9 +189,13 @@ function Comms.Decode(text)
         end
         return { kind = "skills", version = tonumber(version), skills = (decodeSkills(own)), characters = characters }
     end
-    if kind == "V" then
-        local values = ns.Ledger and ns.Ledger.DecodeValues(rest)
+    if kind == "V" or kind == "M" then
+        local values = ns.Ledger and ns.Ledger.DecodeValues(rest, kind)
         return values and { kind = "values", version = tonumber(version), values = values } or nil
+    end
+    if kind == "R" then
+        local answers = ns.Ledger and ns.Ledger.DecodeAnswers(rest)
+        return answers and { kind = "answers", version = tonumber(version), answers = answers } or nil
     end
     if kind == "F" then
         local day = rest:match("^(%d+)$")
@@ -301,6 +309,12 @@ function Comms.Hear(sender, text, channel)
         local values = ns.Ledger.HearValues(name, msg.values)
         ns.Ledger.Heard(name)
         return values
+    end
+    if msg.kind == "answers" then
+        if channel ~= "WHISPER" or not ns.Ledger then return nil end
+        local changed = ns.Ledger.HearAnswers(name, msg.answers)
+        ns.Ledger.Heard(name)
+        return changed
     end
     if ns.Ledger then pcall(ns.Ledger.Heard, name) end -- online: values waiting for them go now
     if msg.kind == "ask" then

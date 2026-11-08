@@ -508,7 +508,10 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   never changes it: items received at their value plus gold received, minus items and gold
   sent. Not counted: this account's characters (known characters and the bank alt), system
   mail (`canReply` false, GM, AH invoices), COD (a sale). A returned mail taken back undoes the
-  "sent". A Mailworthy peer's characters (from their hello) count as one player.
+  "sent". Two Mailworthy peers count as one player only when each one's own hello lists the
+  other (a hello is anyone's word); such links are followed through the whole group, named
+  after its alphabetically first name (`Ledger.Groups`, built once from the peers and again
+  after the next Mailworthy message).
 - **Only your own side shows** (operator): the ledger window lists players you received more
   from than you sent back, with what they sent, and **Mark paid** (two presses: a trade or gold
   in person; logged); a chat line when you take a counted mail; the Mailworthy window's line at
@@ -517,14 +520,51 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
 - **Values, captured at the time of send** (operator, asked "if both players have mailworthy
   can the apps communicate?"): what you send is valued with your own prices when it goes
   (`Valuation.SmoothedPrice`, the decision rule's price). After a counted send, the item values
-  go to the recipient's Mailworthy: `V2|<mail's sender>|<recipient>|<server time>|<itemID>:
-  <count>:<copper>;...`, WHISPER only, and only to a player just heard from (any Mailworthy
+  go to the recipient's Mailworthy: `M2|<mail's sender>|<recipient>|<send time>|<mail id>|
+  <itemID>:<count>:<copper>:<scan age>:<k>;...`, WHISPER only, and only to a player just heard from (any Mailworthy
   message: they're online; else `Comms.Ask` prompts hellos, and the values wait up to 30 days in
-  `outbox`), to the recipient or another character their hello lists. The receiver keeps them in
-  `expect` (31 days) when the recipient is one of its own characters and the mail's sender is
-  the whisperer or one of their listed characters, and uses the oldest match (item and count)
-  when the item is taken, **at most 3x its own price** (a made-up value can't run up a debt).
+  `outbox`), to the recipient's own character, never another one their hello claims. The receiver
+  keeps them in `expect` (31 days) when the recipient is one of its own characters and the
+  mail's sender is the whisperer, and uses the oldest match (item, count and the character
+  taking it) when the item is taken, **at most 3x its own price** (a made-up value can't run up
+  a debt).
   Otherwise its own price when taken. No price: listed by count, not in gold.
+- **The more up-to-date scan wins** (operator, 2026-11-07: "we should trust the more up to date
+  value at time of send"): each value carries its Auctionator scan's age in days (v0.25.0's
+  `V2` values carry none; they are still read, used as the sender's and never answered, and
+  v0.25.0 drops `M2`, using its own price). On
+  receipt, the receiver's own price as it stood the day the mail went (days counted as
+  Auctionator counts them, `Ledger.ScanDay`: floor((local time - SCAN_DAY_0) / 86400); `PriceThen`: its
+  last scan when that was already in, else that day in Auctionator's history, its lowest price
+  seen) is compared with the sender's: the fresher scan at the time of send wins; a tie, an
+  unknown age or no price of ours that day keeps the sender's (still capped at 3x ours). The
+  export shows each value's source and scan age.
+- **Answer back** (operator, same day, so both players see the same value): when the receiver
+  settles on a value other than the sender's (its scan was fresher, or the cap), it queues
+  `R2|<recipient>|<mail's sender>|<mail id>|<itemID>:<count>:<copper>:<k>;...` for the sender,
+  held in `outbox` like the values (WHISPER only, sent once the mail's sender character is heard
+  from, 30 days at most). **The mail id** is an account counter (`ledger[realm|faction].nextId`),
+  never reused even when the log is pruned, and **k** numbers a stack among the mail's stacks of
+  that item and count (unpriced ones too), so an answer names one stack of one mail (Codex
+  review, 2026-11-07: send times and "the next unsettled stack" were not unique; send times stay
+  real, so scan days are never moved). The sender finds that mail (id, sender, recipient,
+  counted mails only) and stack, takes the value (`agreed`, the old one kept as `mine`) and
+  moves its balance by the difference; an answer under a third or over 3x its own value is
+  ignored, and a stack takes one answer. Until the answer arrives, the sender shows its own value.
+  Still unmatched: a mail whose values never reached the receiver before it was taken (the
+  receiver then used its own price and has nothing to answer to).
+- **Trust** (Codex review, 2026-11-07): a hello's "my other characters" list is never evidence for
+  reading or settling a mail. Values go to, and answers come from, the exact character the mail
+  names; a stranger listing Bob as their alt gets none of Bob's values, can't answer for him and
+  doesn't take his balance. The outbox is account-wide, but each message waits until the
+  character it names as its author is the one logged in (the other side takes it only from
+  them).
+- **Never seen by the players** (operator: "as long as these messages back and forth are all
+  obscured by the player"): values and answers are addon messages, which no chat window shows,
+  and whispers, so only the two players' clients get them. A whisper to an offline player would
+  print "No player named ... is currently playing", so one goes at once only to a player heard
+  within `HEARD_FRESH` (60 s); otherwise Mailworthy asks for hellos (`A2`, guild and group) and
+  sends when their reply proves they're online.
 - Not built: face-to-face trades (Mark paid covers them), a shared "who owes whom" view (on
   purpose), merging characters of a player who doesn't run Mailworthy.
 - Switch `/mw feature ledger off` (no hooks, nothing logged).

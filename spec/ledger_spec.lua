@@ -106,7 +106,7 @@ describe("mail ledger", function()
     end)
 
     it("the sender's Mailworthy value is used, at most 3x the receiver's own price", function()
-        local msg = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", WowStub.state.serverTime, {
+        local msg = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", WowStub.state.serverTime, 7, {
             { itemID = LINEN.id, count = 20, value = 1500 }, { itemID = ORE.id, count = 20, value = 99999 } })
         assert.equal(1, #msg)
         ns.Fire("CHAT_MSG_ADDON", "Mailworthy", msg[1], "WHISPER", BOB)
@@ -119,18 +119,185 @@ describe("mail ledger", function()
         assert.truthy(ns.Ledger.ExportText():find("capped at 3x my price", 1, true))
     end)
 
+    describe("the more up-to-date scan at the time of send wins (operator, 2026-11-07)", function()
+        local ages, rows
+
+        --- Bob's values for 20 Linen Cloth mailed `daysAgo` days ago, his scan `theirAge` days old then.
+        local function bobSent(value, theirAge, daysAgo)
+            local item = { itemID = LINEN.id, count = 20, value = value, age = theirAge }
+            local m = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", WowStub.state.serverTime - daysAgo * 86400,
+                #ns.Ledger.Store().log + 1, { item })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+            inboxMail(LINEN, 20, { subject = "mats " .. #ns.Ledger.Store().log }) -- a new mail each time
+            take(LINEN.id)
+            return ns.Ledger.Store().log[#ns.Ledger.Store().log].items[1]
+        end
+
+        before_each(function()
+            ages, rows = {}, {}
+            local api = _G.Auctionator.API.v1
+            api.GetAuctionAgeByItemLink = function(_, l) return ages[l] end
+            _G.Auctionator.Database = { GetPriceHistory = function(_, key) return rows[key] end }
+            _G.Auctionator.Utilities = { BasicDBKeyFromLink = function(l) return l end }
+        end)
+
+        it("their scan is fresher: their value", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 5 -- ours: 50c each, 5 days old
+            local it = bobSent(1400, 0, 0)
+            assert.equal(1400, it.value)
+            assert.equal("sender", it.source)
+            assert.equal(0, it.age)
+        end)
+
+        it("ours is fresher: our value, even under theirs", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 1 -- ours: 50c each, a day old
+            local it = bobSent(1400, 6, 0)
+            assert.equal(1000, it.value)
+            assert.equal("fresher", it.source)
+            assert.truthy(ns.Ledger.ExportText():find("my scan was more up to date, scan 1 day old", 1, true))
+        end)
+
+        it("ours as it stood that day: a scan since the send doesn't count, Auctionator's history does", function()
+            local l = WowStub.link(LINEN.id, LINEN.name)
+            ages[l] = 0 -- scanned today, after Bob's mail two days ago
+            rows[l] = { { rawDay = 100, minSeen = 40, maxSeen = 45 }, { rawDay = 97, minSeen = 30, maxSeen = 35 } }
+            local it = bobSent(1400, 3, 2) -- that day (raw day 98), our latest scan was day 97: 1 day old
+            assert.equal(600, it.value, "20 at day 97's 30c")
+            assert.equal("fresher", it.source)
+            assert.equal(1, it.age)
+            rows[l] = nil
+            local again = bobSent(1400, 3, 2)
+            assert.equal(1400, again.value, "no history back to that day: theirs")
+        end)
+
+        it("a tie, or a sender's value without an age (v0.25.0), keeps theirs", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 2
+            assert.equal("sender", bobSent(1400, 2, 0).source)
+            assert.equal("sender", bobSent(1400, nil, 0).source)
+        end)
+
+        it("the message: mail id, age and stack number; v0.25.0's V2 values still read", function()
+            local m = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", 1, 42, {
+                { itemID = LINEN.id, count = 20, value = 1000, age = 3 }, { itemID = ORE.id, count = 20, value = 1200 },
+                { itemID = LINEN.id, count = 20 }, { itemID = LINEN.id, count = 20, value = 1000 } })
+            assert.equal("M2|Bob Surname|Rettana Quilwrit|1|42|2589:20:1000:3:1;2770:20:1200::1;2589:20:1000::3", m[1],
+                "an unpriced stack still counts for k")
+            local decoded = ns.Comms.Decode(m[1]).values
+            assert.equal(42, decoded.id)
+            assert.equal(3, decoded.items[1].age)
+            assert.is_nil(decoded.items[2].age)
+            assert.equal(3, decoded.items[3].k)
+            local old = ns.Comms.Decode("V2|Bob Surname|Rettana Quilwrit|1|2589:20:1000:3;2770:20:1200").values
+            assert.is_nil(old.id, "v0.25.0's values: used, never answered")
+            assert.equal(1200, old.items[2].value)
+            assert.is_nil(ns.Comms.Decode("M2|Bob|Rettana|1|42|2589:20:5:1234:1"))
+            assert.is_nil(ns.Comms.Decode("M2|Bob|Rettana|1|42|2589:20:5:1"), "k is required")
+            assert.is_nil(ns.Comms.Decode("M2|Bob|Rettana|1|2589:20:5::1"), "the mail id is required")
+    end)
+
+        local function whispers(from)
+            local out = {}
+            for i = from + 1, #WowStub.state.addonMessages do
+                local m = WowStub.state.addonMessages[i]
+                if m.channel == "WHISPER" then out[#out + 1] = m end
+            end
+            return out
+        end
+
+        it("answer back: a value that differs from the sender's goes back to them", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 1
+            local before = #WowStub.state.addonMessages
+            bobSent(1400, 6, 0) -- ours is fresher: 10s, not their 14s
+            local sent = whispers(before)
+            assert.equal(1, #sent, "Bob was just heard from: the answer goes at once")
+            assert.equal(BOB, sent[1].target)
+            assert.truthy(sent[1].message:find("^R2|Rettana Quilwrit|Bob Surname|%d+|2589:20:1000:1$"), sent[1].message)
+            before = #WowStub.state.addonMessages
+            bobSent(1400, 0, 0) -- theirs is fresher: nothing to answer
+            assert.equal(0, #whispers(before))
+        end)
+
+        it("never a whisper to a player last heard over a minute ago (they may be offline): ask, wait", function()
+            WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = { { name = BOB, online = true } } }
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB)
+            WowStub.state.now = WowStub.state.now + 120
+            local before = #WowStub.state.addonMessages
+            sendByHand(BOB, ORE, 20)
+            assert.equal(0, #whispers(before), "a whisper to an offline player shows a chat error")
+            local asked = false
+            for i = before + 1, #WowStub.state.addonMessages do
+                asked = asked or WowStub.state.addonMessages[i].message == "A2"
+            end
+            assert.is_true(asked, "asks for hellos instead")
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB) -- Bob answers: online
+            local sent = whispers(before)
+            assert.equal(1, #sent)
+            assert.truthy(sent[1].message:find("^M2|Rettana Quilwrit|Bob Surname|"))
+        end)
+
+        it("answer back while the sender is offline: held until their Mailworthy is heard from", function()
+            ages[WowStub.link(LINEN.id, LINEN.name)] = 1
+            local at = WowStub.state.serverTime - 3600
+            ns.Ledger.Store().expect["bob surname"] = { -- their values came in an earlier session
+                { at = at, to = "Rettana Quilwrit", itemID = LINEN.id, count = 20, value = 1400, age = 6, id = 9, k = 1 } }
+            local before = #WowStub.state.addonMessages
+            inboxMail(LINEN, 20)
+            take(LINEN.id)
+            assert.equal(1000, (ns.Ledger.Net(BOB)))
+            assert.equal(0, #whispers(before), "never a whisper to someone not heard from")
+            assert.equal(1, #ns.Ledger.Store().outbox["bob surname"])
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB) -- Bob logs in
+            local sent = whispers(before)
+            assert.equal(1, #sent)
+            assert.equal("R2|Rettana Quilwrit|Bob Surname|9|2589:20:1000:1", sent[1].message)
+            assert.is_nil(ns.Ledger.Store().outbox["bob surname"])
+        end)
+
+        it("pure: the fresher scan, the cap on theirs, either side missing", function()
+            local Pick = ns.Ledger.Pick
+            assert.same({ 900, "fresher", 1 }, { Pick(5000, 4, 900, 1) })
+            assert.same({ 2700, "capped", 4 }, { Pick(5000, 4, 900, 4) })
+            assert.same({ 5000, "sender", 2 }, { Pick(5000, 2, nil, nil) })
+            assert.same({ 900, "mine", 1 }, { Pick(nil, nil, 900, 1) })
+        end)
+    end)
+
+    it("the sender takes the receiver's answer: its log and balance match theirs", function()
+        sendByHand(BOB, ORE, 20) -- 12s by our prices
+        local id = ns.Ledger.Store().log[1].id
+        local function answer(value, sender, mail)
+            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", mail or id, { { itemID = ORE.id, count = 20, value = value,
+                k = 1 } })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", sender or BOB)
+        end
+        answer(300) -- under a third of ours: ignored
+        answer(900, "Carl Other") -- not Bob or his character: dropped
+        answer(900, BOB, id + 1) -- no such mail
+        assert.equal(-1200, (ns.Ledger.Net(BOB)))
+        answer(900)
+        assert.equal(-900, (ns.Ledger.Net(BOB)), "Bob's value now, as on his side")
+        local it = ns.Ledger.Store().log[1].items[1]
+        assert.equal("agreed", it.source)
+        assert.equal(1200, it.mine)
+        assert.truthy(ns.Ledger.ExportText():find("9s, agreed with Bob Surname (mine said 12s)", 1, true))
+        answer(1100) -- once agreed, an item stays agreed
+        assert.equal(-900, (ns.Ledger.Net(BOB)))
+        assert.is_nil(ns.Comms.Decode("R2|Bob|Rettana|1|2770:20:5"), "k is required")
+        assert.is_nil(ns.Comms.Decode("R2|Bob|Rettana|1|2770:20:5:0"))
+    end)
+
     it("value messages: only whispers, only for this account's characters, only from the mail's sender", function()
         local function hear(from, to, channel, sender)
-            local m = ns.Ledger.EncodeValues(from, to, WowStub.state.serverTime, { { itemID = LINEN.id, count = 20, value = 9000 } })
+            local m = ns.Ledger.EncodeValues(from, to, WowStub.state.serverTime, 3, { { itemID = LINEN.id, count = 20, value = 9000 } })
             ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], channel, sender)
         end
         hear(BOB, "Rettana Quilwrit", "GUILD", BOB)
         hear(BOB, "Someone Else", "WHISPER", BOB)
         hear("Carl Other", "Rettana Quilwrit", "WHISPER", BOB)
         assert.is_nil(next(ns.Ledger.Store().expect))
-        assert.is_nil(ns.Comms.Decode("V2|Bob|Rettana|1|2589:20:99999999999"))
-        assert.is_nil(ns.Comms.Decode("V2|Bob|Rettana|1|"))
-        assert.is_nil(ns.Comms.Decode("V2|Bob|Rettana|x|2589:20:5"))
+        assert.is_nil(ns.Comms.Decode("M2|Bob|Rettana|1|3|2589:20:99999999999::1"))
+        assert.is_nil(ns.Comms.Decode("M2|Bob|Rettana|1|3|"))
+        assert.is_nil(ns.Comms.Decode("M2|Bob|Rettana|x|3|2589:20:5::1"))
     end)
 
     it("Mailworthy's own sends: the friend's mail counts and its values wait for the friend, the bank alt's don't", function()
@@ -163,7 +330,9 @@ describe("mail ledger", function()
         end
         assert.equal(1, #whispers, "the values go once Bob is heard from")
         assert.equal(BOB, whispers[1].target)
-        assert.equal("V2|Rettana Quilwrit|Bob Surname|" .. WowStub.state.serverTime .. "|10940:20:60", whispers[1].message)
+        assert.equal("M2|Rettana Quilwrit|Bob Surname|" .. WowStub.state.serverTime .. "|" .. log[2].id .. "|10940:20:60:0:1",
+            whispers[1].message,
+            "value and scan age (0 days)")
         assert.is_nil(next(ns.Ledger.Store().outbox))
     end)
 
@@ -213,8 +382,10 @@ describe("mail ledger", function()
         inboxMail(LINEN, 20)
         take(LINEN.id)
         local text = ns.Ledger.ExportText()
-        local sent = text:find("SENT      Rettana Quilwrit -> Bob Surname  \"for you\"  20x Copper Ore (item 2770, 12s)", 1, true)
-        local got = text:find("RECEIVED  Bob Surname -> Rettana Quilwrit  \"mats\"  20x Linen Cloth (item 2589, 10s)", 1, true)
+        local sent = text:find("SENT      Rettana Quilwrit -> Bob Surname  \"for you\"  "
+            .. "20x Copper Ore (item 2770, 12s, scan 0 days old)", 1, true)
+        local got = text:find("RECEIVED  Bob Surname -> Rettana Quilwrit  \"mats\"  "
+            .. "20x Linen Cloth (item 2589, 10s, scan 0 days old)", 1, true)
         assert.truthy(sent, text)
         assert.truthy(got, text)
         assert.is_true(sent < got)
@@ -245,14 +416,165 @@ describe("mail ledger", function()
         assert.is_true(ns.LedgerUI.Frame():IsShown())
     end)
 
-    it("a peer's characters count as one player", function()
-        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({ { skillLine = 197 } },
-            { { name = "Bobs Tailor", professions = { { skillLine = 197 } } } }), "GUILD", BOB)
+    local function hello(from, others)
+        local list = {}
+        for _, name in ipairs(others) do list[#list + 1] = { name = name, professions = { { skillLine = 197 } } } end
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({ { skillLine = 197 } }, list), "GUILD", from)
+    end
+
+    it("a peer's characters count as one player when each one's hello lists the other", function()
+        hello(BOB, { "Bobs Tailor" })
+        hello("Bobs Tailor", { BOB })
         inboxMail(LINEN, 20, { sender = "Bobs Tailor" })
         take(LINEN.id)
         assert.equal(1000, (ns.Ledger.Net(BOB)))
         sendByHand(BOB, LINEN, 20)
         assert.equal(0, (ns.Ledger.Net("Bobs Tailor")))
+    end)
+
+    it("a stranger claiming to be Bob's alt gets nothing of Bob's: not his balance, values or answers (Codex review)", function()
+        hello(BOB, {})
+        hello("Mallory Thief", { BOB }) -- "Bob is my alt"
+        inboxMail(LINEN, 20)
+        take(LINEN.id)
+        assert.equal(BOB, ns.Ledger.Debts()[1].name, "Bob's balance stays Bob's")
+        WowStub.state.now = WowStub.state.now + 120
+        sendByHand(BOB, ORE, 20) -- values wait for Bob
+        local before = #WowStub.state.addonMessages
+        hello("Mallory Thief", { BOB })
+        for i = before + 1, #WowStub.state.addonMessages do
+            assert.is_nil(WowStub.state.addonMessages[i].message:find("^M2"), "Bob's values went to Mallory")
+        end
+        local id = ns.Ledger.Store().log[#ns.Ledger.Store().log].id
+        local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", id, { { itemID = ORE.id, count = 20, value = 3600, k = 1 } })
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", "Mallory Thief")
+        assert.equal(1200, ns.Ledger.Store().log[#ns.Ledger.Store().log].items[1].value, "Mallory answered for Bob")
+        local v = ns.Ledger.EncodeValues(BOB, "Rettana Quilwrit", WowStub.state.serverTime, 5, { { itemID = LINEN.id, count = 20,
+            value = 3000 } })
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", v[1], "WHISPER", "Mallory Thief")
+        assert.is_nil(ns.Ledger.Store().expect["bob surname"], "Mallory spoke for Bob's mail")
+    end)
+
+    it("mail taken by this character never uses values meant for another of its characters (Codex review)", function()
+        MailworthyDB.characters["Alt Person|Classic Beta PvP|Alliance"] = { name = "Alt Person", realm = "Classic Beta PvP",
+            faction = "Alliance" }
+        local at = WowStub.state.serverTime
+        ns.Ledger.Store().expect["bob surname"] = {
+            { at = at - 60, to = "Alt Person", itemID = LINEN.id, count = 20, value = 1400 },
+            { at = at, to = "Rettana Quilwrit", itemID = LINEN.id, count = 20, value = 1100 } }
+        inboxMail(LINEN, 20)
+        take(LINEN.id)
+        assert.equal(1100, (ns.Ledger.Net(BOB)), "this character's own mail's value")
+        assert.equal(1, #ns.Ledger.Store().expect["bob surname"])
+        assert.equal("Alt Person", ns.Ledger.Store().expect["bob surname"][1].to, "the alt's value still waits for it")
+    end)
+
+    it("each mail has its own id; an answer names one mail and one stack, once (Codex review)", function()
+        sendByHand(BOB, ORE, 20)
+        WowStub.state.attached = { WowStub.item(ORE.id, ORE.name, { count = 20 }), WowStub.item(ORE.id, ORE.name, { count = 20 }) }
+        ns.Fire("MAIL_SEND_INFO_UPDATE")
+        SendMail(BOB, "two stacks", "")
+        ns.Fire("MAIL_SEND_SUCCESS")
+        local log = ns.Ledger.Store().log
+        assert.equal(log[1].at, log[2].at, "real send times, same second")
+        assert.equal(log[1].id + 1, log[2].id)
+        local function answer(id, k, value)
+            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", id, { { itemID = ORE.id, count = 20, value = value, k = k } })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+        end
+        answer(log[2].id, 2, 900)
+        answer(log[2].id, 2, 900) -- the same answer again settles nothing more
+        assert.equal(1200, log[1].items[1].value)
+        assert.equal(1200, log[2].items[1].value)
+        assert.equal(900, log[2].items[2].value)
+        assert.equal(-3300, (ns.Ledger.Net(BOB)))
+    end)
+
+    it("mail ids are never reused, even once the log is pruned (Codex review)", function()
+        ns.Ledger.LOG_MAX = 2
+        for _ = 1, 4 do sendByHand(BOB, ORE, 20) end
+        local log = ns.Ledger.Store().log
+        assert.equal(2, #log)
+        assert.same({ 3, 4 }, { log[1].id, log[2].id })
+        local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", 1, { { itemID = ORE.id, count = 20, value = 900, k = 1 } })
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+        assert.equal(1200, log[1].items[1].value, "an answer for a pruned mail changes nothing")
+    end)
+
+    it("an answer never lands on a mail that doesn't count (COD), even in the same second (Codex review)", function()
+        WowStub.state.attached = { WowStub.item(ORE.id, ORE.name, { count = 20 }) }
+        WowStub.state.cod = 5000
+        ns.Fire("MAIL_SEND_INFO_UPDATE")
+        SendMail(BOB, "cod", "")
+        ns.Fire("MAIL_SEND_SUCCESS")
+        WowStub.state.cod = 0
+        sendByHand(BOB, ORE, 20)
+        local log = ns.Ledger.Store().log
+        assert.is_false(log[1].counted)
+        for _, id in ipairs({ log[1].id, log[2].id }) do
+            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", id, { { itemID = ORE.id, count = 20, value = 900, k = 1 } })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+        end
+        assert.equal(1200, log[1].items[1].value, "the COD mail is untouched")
+        assert.equal(900, log[2].items[1].value)
+        assert.equal(-900, (ns.Ledger.Net(BOB)))
+    end)
+
+    it("groups: built once from the peers, pure", function()
+        local peers = {
+            ["anna aa"] = { name = "Anna Aa", characters = { { name = BOB } } },
+            ["bob surname"] = { name = BOB, characters = { { name = "Anna Aa" }, { name = "Carl Cc" } } },
+            ["carl cc"] = { name = "Carl Cc", characters = { { name = BOB } } },
+            ["mallory thief"] = { name = "Mallory Thief", characters = { { name = "Anna Aa" } } },
+        }
+        local g = ns.Ledger.Groups(peers)
+        assert.equal("Anna Aa", g["bob surname"])
+        assert.equal("Anna Aa", g["carl cc"])
+        assert.equal("Mallory Thief", g["mallory thief"], "a one-sided claim links nothing")
+    end)
+
+    it("queued messages go only from the character they name, whoever is logged in (Codex review)", function()
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = { { name = BOB, online = true } } }
+        sendByHand(BOB, ORE, 20) -- Bob not heard yet: the values wait
+        assert.equal(1, #ns.Ledger.Store().outbox["bob surname"])
+        WowStub.state.name = "Alt Person" -- another character of this account logs in
+        local before = #WowStub.state.addonMessages
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB)
+        for i = before + 1, #WowStub.state.addonMessages do
+            assert.is_nil(WowStub.state.addonMessages[i].message:find("^M2"), "Bob would reject Rettana's values from Alt Person")
+        end
+        assert.equal(1, #ns.Ledger.Store().outbox["bob surname"], "kept for Rettana")
+        WowStub.state.name = "Rettana Quilwrit"
+        WowStub.state.now = WowStub.state.now + 120
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB)
+        local last = WowStub.state.addonMessages[#WowStub.state.addonMessages]
+        assert.equal("WHISPER", last.channel)
+        assert.truthy(last.message:find("^M2|Rettana Quilwrit|Bob Surname|"))
+        assert.is_nil(ns.Ledger.Store().outbox["bob surname"])
+    end)
+
+    it("a linked group of characters has one name, followed link by link (Codex review)", function()
+        hello("Anna Aa", { BOB })
+        hello(BOB, { "Anna Aa", "Carl Cc" })
+        hello("Carl Cc", { BOB }) -- Anna's hello doesn't list Carl
+        for _, name in ipairs({ "Anna Aa", BOB, "Carl Cc" }) do assert.equal("Anna Aa", ns.Ledger.Owner(name), name) end
+        for _, name in ipairs({ "Anna Aa", BOB, "Carl Cc" }) do
+            inboxMail(LINEN, 20, { sender = name, subject = "from " .. name })
+            take(LINEN.id)
+        end
+        local debts = ns.Ledger.Debts()
+        assert.equal(1, #debts)
+        assert.equal(3000, debts[1].net)
+    end)
+
+    it("scan days are Auctionator's: a mail sent before its day boundary and taken after is a day old (Codex review)", function()
+        _G.Auctionator.Constants = { SCAN_DAY_0 = 0 }
+        local _time = _G.time
+        _G.time = function(t) if t then return _time(t) end return WowStub.state.serverTime end
+        local boundary = math.floor(WowStub.state.serverTime / 86400) * 86400
+        assert.equal(1, ns.Ledger.ScanDay(boundary + 60) - ns.Ledger.ScanDay(boundary - 3600), "an hour before, a minute after")
+        assert.equal(0, ns.Ledger.ScanDay(boundary + 7200) - ns.Ledger.ScanDay(boundary + 60))
+        _G.time = _time
     end)
 
     it("the report says how much is logged, never who or how much", function()

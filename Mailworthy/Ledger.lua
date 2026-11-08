@@ -15,10 +15,17 @@
 -- is ever listed as owing you. Kept as running totals, so they outlive the log's pruning.
 --
 -- Values, "captured at the time of send": what you send is valued with your own prices when it
--- goes. What you receive takes the sender's value when their Mailworthy told yours (a "V2"
--- whisper right after the send, or as soon as they hear from you later), else your own price
--- when you take it. A sender's value counts at most PRICE_CAP times your own price, so a
--- made-up value can't run up a debt. Without a price an item is listed by count only.
+-- goes, with the age of that Auctionator scan. What you receive: when the sender's Mailworthy
+-- told yours its value and scan age (a "V2" whisper right after the send, or as soon as they
+-- hear from you later), the more up-to-date of the two at the time of send wins (operator,
+-- 2026-11-07: "we should trust the more up to date value at time of send"): your own price as
+-- it stood that day (your last scan then, or that day in Auctionator's history) against theirs;
+-- a tie or an unknown age keeps the sender's. A sender's value counts at most PRICE_CAP times
+-- your own, so a made-up value can't run up a debt. Without their value, your own price when
+-- you take it. Without any price an item is listed by count only. When the receiver's value
+-- differs from the sender's, its Mailworthy answers ("R2", held like the values until the sender
+-- is heard from) and the sender's log and balance take the agreed value, so both sides match
+-- (operator, 2026-11-07); an answer more than PRICE_CAP times off the sender's own is ignored.
 --
 -- How it sees mail: hooksecurefunc post-hooks on SendMail, TakeInboxItem, AutoLootMailItem and
 -- TakeInboxMoney (AGENTS: post-hooks are allowed), confirmed by MAIL_SEND_SUCCESS and
@@ -90,38 +97,117 @@ function Ledger.IsOwn(name)
 end
 
 --- The player behind a character: a Mailworthy peer whose hello lists `name` as one of their
---- characters, else `name` itself (cleaned). Balances are shown per player.
-function Ledger.Owner(name)
-    name = clean(name)
-    if not name or not ns.Comms then return name end
-    local lower = name:lower()
-    for _, peer in pairs(ns.Comms.Peers()) do
-        if type(peer) == "table" then
-            if tostring(peer.name):lower() == lower then return peer.name end
+--- characters while `name`'s own hello lists them back, else `name` itself (cleaned). Balances
+--- are shown per player.
+local function lists(peer, lower)
+    for _, c in ipairs(type(peer) == "table" and type(peer.characters) == "table" and peer.characters or {}) do
+        if tostring(c.name):lower() == lower then return true end
+    end
+    return false
+end
+
+-- Lower-case name -> the name its group goes by, built once from the peers' hellos and again only
+-- after another Mailworthy message (Codex review: following links per record stalled the window
+-- with hundreds of peers).
+local ownerIndex
+
+--- Pure: the groups in `peers` (lower-case name -> { name, characters }): two names are linked
+--- when each one's own hello lists the other; linked names, followed through the whole group, go
+--- by the group's alphabetically first name. Returns lower-case name -> that name.
+function Ledger.Groups(peers)
+    local parent = {}
+    local function find(x)
+        while parent[x] and parent[x] ~= x do x = parent[x] end
+        return x
+    end
+    local names = {}
+    for _, peer in pairs(type(peers) == "table" and peers or {}) do
+        if type(peer) == "table" and peer.name then
+            local lower = tostring(peer.name):lower()
+            names[lower], parent[lower] = peer.name, parent[lower] or lower
             for _, c in ipairs(type(peer.characters) == "table" and peer.characters or {}) do
-                if tostring(c.name):lower() == lower then return peer.name end
+                local other = tostring(c.name):lower()
+                local back = peers[other]
+                if other ~= lower and type(back) == "table" and lists(back, lower) then
+                    names[other], parent[other] = back.name, parent[other] or other
+                    local a, b = find(lower), find(other)
+                    if a ~= b then if a < b then parent[b] = a else parent[a] = b end end
+                end
             end
         end
     end
-    return name
+    local index = {}
+    for lower in pairs(names) do index[lower] = names[find(lower)] end
+    return index
+end
+
+function Ledger.Owner(name)
+    name = clean(name)
+    if not name or not ns.Comms then return name end
+    -- A hello is anyone's word: two names are one player only when each one's own hello lists the
+    -- other (a stranger claiming "Bob is my alt" never takes Bob's balance); see Ledger.Groups.
+    ownerIndex = ownerIndex or Ledger.Groups(ns.Comms.Peers())
+    return ownerIndex[name:lower()] or name
 end
 
 --- This account's own value of one unit (copper): the price the decision rule uses (the last
---- scan, capped by the recent median), or nil without one.
+--- scan, capped by the recent median), or nil without one; and the scan's age in days (nil
+--- when Auctionator doesn't say).
 function Ledger.UnitValue(link)
     local price = link and ns.Prices.Lookup(link)
     if type(price) ~= "table" or price.ah == nil then return nil end
     local unit = ns.Valuation.SmoothedPrice(price)
-    return unit and math.floor(unit + 0.5) or nil
+    if not unit then return nil end
+    local age = tonumber(price.age)
+    return math.floor(unit + 0.5), age and math.max(0, math.floor(age)) or nil
 end
 
---- Pure: a sender's value checked against our own: { value, source = "sender" / "capped" /
---- "mine" }. `claimed` and `own` are totals for the stack (copper or nil).
-function Ledger.Choose(claimed, own, cap)
+--- Auctionator's scan day for a server time: floor((local time - SCAN_DAY_0) / 86400), as its
+--- database counts days (SCAN_DAY_0 = local midnight, Jan 1 2020; a price's age is today's scan
+--- day minus its newest). The client clock's offset from the server's is applied, so "how many
+--- scan days since the mail went" crosses the same boundary Auctionator does.
+function Ledger.ScanDay(serverTime)
+    local a = rawget(_G, "Auctionator")
+    local day0 = type(a) == "table" and type(a.Constants) == "table" and tonumber(a.Constants.SCAN_DAY_0)
+        or call(time, { year = 2020, month = 1, day = 1, hour = 0 }) or 0
+    local offset = (call(time) or 0) - (call(GetServerTime) or call(time) or 0)
+    return math.floor(((tonumber(serverTime) or 0) + offset - day0) / 86400)
+end
+
+--- Pure: our own price for one unit as it stood `daysAgo` scan days ago, and how old its scan was then.
+--- `price` = Prices.Lookup's table, `unit` = today's value of it (Ledger.UnitValue). Our last scan
+--- was already in when it is at least `daysAgo` old; a scan since then is newer than that day,
+--- so the day comes from Auctionator's history (the latest scanned day up to it, its lowest
+--- price seen), or nil when the history doesn't reach back.
+function Ledger.PriceThen(price, unit, daysAgo)
+    if type(price) ~= "table" or not unit then return nil end
+    local age = tonumber(price.age)
+    if age == nil then return unit, nil end
+    age = math.max(0, math.floor(age))
+    daysAgo = math.max(0, math.floor(daysAgo or 0))
+    if age >= daysAgo then return unit, age - daysAgo end
+    local history = type(price.history) == "table" and price.history or {}
+    if not history[1] or not tonumber(history[1].day) then return nil end
+    local thatDay = history[1].day + age - daysAgo
+    for _, row in ipairs(history) do -- newest first
+        if tonumber(row.day) and row.day <= thatDay and tonumber(row.minSeen) then
+            return math.floor(row.minSeen + 0.5), thatDay - row.day
+        end
+    end
+    return nil
+end
+
+--- Pure: the value of a received stack from the sender's (`claimed`, its scan `claimedAge` days
+--- old at the time of send) and ours as it stood then (`mine`, `mineAge`); totals in copper.
+--- The more up-to-date scan wins; a tie or an unknown age keeps the sender's, which counts at
+--- most `cap` times ours. Returns value, source ("sender" / "capped" / "fresher" / "mine"), age.
+function Ledger.Pick(claimed, claimedAge, mine, mineAge, cap)
     cap = cap or Ledger.PRICE_CAP
-    if claimed == nil then return own, own and "mine" or nil end
-    if own ~= nil and claimed > own * cap then return own * cap, "capped" end
-    return claimed, "sender"
+    if claimed == nil then return mine, mine and "mine" or nil, mineAge end
+    if mine == nil then return claimed, "sender", claimedAge end
+    if claimedAge ~= nil and mineAge ~= nil and mineAge < claimedAge then return mine, "fresher", mineAge end
+    if claimed > mine * cap then return mine * cap, "capped", mineAge end
+    return claimed, "sender", claimedAge
 end
 
 --- Pure: the priced total of an entry's items plus its gold, and how many items had no price.
@@ -181,7 +267,7 @@ end
 local listeners = {}
 --- fn() after the log or a balance changed (the ledger window, the mail window's line).
 function Ledger.OnChanged(fn) listeners[#listeners + 1] = fn end
-local function changed() for _, fn in ipairs(listeners) do pcall(fn) end end
+local function changed_() for _, fn in ipairs(listeners) do pcall(fn) end end
 
 --- Add an entry to the log (and its balance when it counts). Returns the entry.
 function Ledger.Add(entry)
@@ -197,7 +283,7 @@ function Ledger.Add(entry)
     ns.Log.Add("ledger", "%s %s %s: %d item(s), %s%s%s", entry.dir, entry.dir == "sent" and "to" or "from",
         tostring(entry.other), #(entry.items or {}), money(total), unpriced > 0 and (", " .. unpriced .. " unpriced") or "",
         entry.counted and "" or " (not counted)")
-    changed()
+    changed_()
     return entry
 end
 
@@ -275,24 +361,31 @@ function Ledger.MarkPaid(name)
     s.log[#s.log + 1] = { at = now(), dir = "paid", char = ns.PlayerName(), other = Ledger.Owner(name), money = net, items = {},
         counted = false }
     ns.Log.Add("ledger", "marked paid: %s %s", tostring(Ledger.Owner(name)), money(net))
-    changed()
+    changed_()
     return true
 end
 
 -- Values between Mailworthys --------------------------------------------------------------
 
---- Pure: the value messages for one sent mail: "V2|<from>|<to>|<at>|<itemID>:<count>:<copper>;..."
---- split to fit Comms.MAX_MESSAGE; priced items only.
-function Ledger.EncodeValues(from, to, at, items)
-    local head = string.format("V%d|%s|%s|%d|", ns.Comms.VERSION, tostring(from), tostring(to), math.floor(at))
-    local messages, parts = {}, {}
+--- Pure: the value messages for one sent mail: "M2|<from>|<to>|<send time>|<mail id>|<itemID>:<count>:
+--- <copper>:<scan age in days, or empty>:<k>;..." split to fit Comms.MAX_MESSAGE; priced items
+--- only. The mail id (Ledger.RecordSent's account counter, never reused) names the mail and k the
+--- stack among the mail's stacks of that item and count, so an answer names exactly one stack
+--- (Codex review: send times and "the next unsettled stack" were not unique).
+function Ledger.EncodeValues(from, to, at, id, items)
+    local head = string.format("M%d|%s|%s|%d|%d|", ns.Comms.VERSION, tostring(from), tostring(to), math.floor(at),
+        math.floor(id))
+    local messages, parts, seen = {}, {}, {}
     local function flush()
         if #parts > 0 then messages[#messages + 1] = head .. table.concat(parts, ";") end
         parts = {}
     end
     for _, it in ipairs(items or {}) do
+        local key = tostring(it.itemID) .. ":" .. tostring(it.count or 1)
+        seen[key] = (seen[key] or 0) + 1
         if it.value and it.itemID then
-            local part = string.format("%d:%d:%d", it.itemID, it.count or 1, math.floor(it.value))
+            local part = string.format("%d:%d:%d:%s:%d", it.itemID, it.count or 1, math.floor(it.value),
+                tonumber(it.age) and tostring(math.floor(it.age)) or "", seen[key])
             if #head + #table.concat(parts, ";") + #part + 1 > ns.Comms.MAX_MESSAGE then flush() end
             parts[#parts + 1] = part
         end
@@ -301,51 +394,80 @@ function Ledger.EncodeValues(from, to, at, items)
     return messages
 end
 
---- Pure: the body of a "V" message (after "V2|"), or nil: { from, to, at, items = { { itemID,
---- count, value } } }. Every field is checked; anything odd drops the message.
-function Ledger.DecodeValues(rest)
-    local from, to, at, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
-    from, to = from and clean(from), to and clean(to)
-    if not from or not to or #from > ns.Comms.MAX_NAME or #to > ns.Comms.MAX_NAME or #at > 12 then return nil end
+local function goodNames(a, b)
+    a, b = a and clean(a), b and clean(b)
+    if not a or not b or #a > ns.Comms.MAX_NAME or #b > ns.Comms.MAX_NAME then return nil end
+    return a, b
+end
+
+--- Pure: the body of an "M" message (after "M2|"), or of v0.25.0's "V" message ("V2|<from>|<to>|
+--- <time>|<itemID>:<count>:<copper>[:<age>];...", no mail id: its values are used, with no
+--- answer), or nil: { from, to, at, id, items = { { itemID, count, value, age, k } } }. Every field
+--- is checked; anything odd drops the message.
+function Ledger.DecodeValues(rest, kind)
+    local from, to, at, id, list
+    if kind == "V" then
+        from, to, at, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
+    else
+        from, to, at, id, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|(%d+)|([%d:;]+)$")
+        if not id or #id > 10 then return nil end
+    end
+    from, to = goodNames(from, to)
+    if not from or #at > 12 then return nil end
     local items = {}
-    for id, count, value in list:gmatch("(%d+):(%d+):(%d+)") do
-        id, count, value = tonumber(id), tonumber(count), tonumber(value)
-        if id < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER then return nil end
-        items[#items + 1] = { itemID = id, count = count, value = value }
+    for part in list:gmatch("[^;]+") do
+        local item, count, value, age, k
+        if kind == "V" then
+            item, count, value, age = part:match("^(%d+):(%d+):(%d+):?(%d*)$")
+        else
+            item, count, value, age, k = part:match("^(%d+):(%d+):(%d+):(%d*):(%d+)$")
+            if not k or #k > 2 then return nil end
+        end
+        if not item or #age > 3 then return nil end
+        item, count, value, age = tonumber(item), tonumber(count), tonumber(value), tonumber(age)
+        if item < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER then return nil end
+        items[#items + 1] = { itemID = item, count = count, value = value, age = age, k = tonumber(k) }
         if #items > Ledger.RECEIVE_SLOTS then return nil end
     end
     if #items == 0 then return nil end
-    return { from = from, to = to, at = tonumber(at), items = items }
+    return { from = from, to = to, at = tonumber(at), id = tonumber(id), items = items }
 end
 
-local heard = {} -- lower-case names heard from this session (online, running Mailworthy)
+-- lower-case name -> { name, at = GetTime() } of the last message heard from them. A whisper to
+-- an offline player prints "No player named ... is currently playing" in the sender's chat, so
+-- messages go at once only to a player heard within HEARD_FRESH seconds; otherwise Mailworthy
+-- asks for hellos and waits for theirs, which proves they're online.
+local heard = {}
+Ledger.HEARD_FRESH = 60
 
-local function namesOf(name)
-    local names = { [tostring(name):lower()] = true }
-    local peer = ns.Comms and ns.Comms.Peer(name)
-    for _, c in ipairs(type(peer) == "table" and type(peer.characters) == "table" and peer.characters or {}) do
-        names[tostring(c.name):lower()] = true
-    end
-    return names
-end
+-- Values and answers go to, and are taken from, the exact character the mail names: a hello's
+-- list of "my other characters" is anyone's word, so it never decides who may read or settle a
+-- mail (Codex review, 2026-11-07: a stranger listing Bob as their alt got Bob's values and could
+-- answer for him).
 
---- Send the values waiting for `name` or one of their characters, to `name` (who is online:
---- we just heard from them). Returns how many messages went.
+--- Send the messages waiting for `name`, to `name` (who is online: we just heard from them).
+--- Returns how many messages went.
 function Ledger.Flush(name)
     name = clean(name)
     if not name or not Ledger.On() or not ns.Comms or not ns.Comms.On() then return 0 end
     local outbox, sent = store().outbox, 0
-    for key in pairs(namesOf(name)) do
-        local waiting = outbox[key]
-        if type(waiting) == "table" then
-            for _, item in ipairs(waiting) do
-                for _, m in ipairs(type(item.messages) == "table" and item.messages or {}) do
-                    if ns.Comms.Whisper(name, m) then sent = sent + 1 end
-                end
+    local me = tostring(ns.PlayerName()):lower()
+    local waiting, keep = outbox[name:lower()], {}
+    for _, item in ipairs(type(waiting) == "table" and waiting or {}) do
+        -- The outbox is account-wide, but a message names its author (the V2 sender, the R2
+        -- recipient) and the other side takes it only from that character: it waits for them
+        -- (Codex review: a message sent by another character was rejected, then deleted).
+        local first = type(item.messages) == "table" and item.messages[1]
+        local author = item.by or (type(first) == "string" and first:match("^%a%d+|([^|]+)|")) or nil
+        if author and tostring(author):lower() ~= me then
+            keep[#keep + 1] = item
+        else
+            for _, m in ipairs(type(item.messages) == "table" and item.messages or {}) do
+                if ns.Comms.Whisper(name, m) then sent = sent + 1 end
             end
-            outbox[key] = nil
         end
     end
+    outbox[name:lower()] = #keep > 0 and keep or nil
     if sent > 0 then ns.Log.Add("ledger", "sent %d value message(s) to %s", sent, name) end
     return sent
 end
@@ -354,32 +476,117 @@ end
 function Ledger.Heard(name)
     name = clean(name)
     if not name then return end
-    heard[name:lower()] = true
+    heard[name:lower()] = { name = name, at = call(GetTime) or 0 }
     Ledger.Flush(name)
 end
 
-local function queueValues(entry)
-    if not ns.Comms or not ns.Comms.On() then return end
-    local messages = Ledger.EncodeValues(entry.char, entry.other, entry.at, entry.items)
-    if #messages == 0 then return end
-    local key = tostring(entry.other):lower()
+--- Hold `messages` for `name` and send them as soon as they are heard from: at once when that
+--- happened within HEARD_FRESH seconds.
+local function queueFor(name, at, messages)
+    if not ns.Comms or not ns.Comms.On() or #messages == 0 then return end
+    local key = tostring(name):lower()
     local outbox = store().outbox
     outbox[key] = tableOr(outbox[key])
-    table.insert(outbox[key], { at = entry.at, messages = messages })
-    for online in pairs(heard) do
-        if namesOf(online)[key] then return Ledger.Flush(online) end
+    table.insert(outbox[key], { at = at, messages = messages, by = ns.PlayerName() })
+    local h = heard[key]
+    if h and (call(GetTime) or 0) - h.at <= Ledger.HEARD_FRESH then return Ledger.Flush(h.name) end
+    ns.Comms.Ask() -- whoever is online answers with a hello, and the messages follow it
+end
+
+local function queueValues(entry)
+    queueFor(entry.other, entry.at, Ledger.EncodeValues(entry.char, entry.other, entry.at, entry.id, entry.items))
+end
+
+--- Pure: the answer messages for values a receiver settled differently: "R2|<receiver>|<mail's
+--- sender>|<mail id>|<itemID>:<count>:<copper>:<k>;..." (each { itemID, count, value, k }).
+function Ledger.EncodeAnswers(receiver, sender, id, items)
+    local head = string.format("R%d|%s|%s|%d|", ns.Comms.VERSION, tostring(receiver), tostring(sender), math.floor(id))
+    local messages, parts = {}, {}
+    for _, it in ipairs(items or {}) do
+        local part = string.format("%d:%d:%d:%d", it.itemID, it.count or 1, math.floor(it.value), it.k or 1)
+        if #parts > 0 and #head + #table.concat(parts, ";") + #part + 1 > ns.Comms.MAX_MESSAGE then
+            messages[#messages + 1] = head .. table.concat(parts, ";")
+            parts = {}
+        end
+        parts[#parts + 1] = part
     end
-    ns.Comms.Ask() -- whoever is online answers with a hello, and the values follow it
+    if #parts > 0 then messages[#messages + 1] = head .. table.concat(parts, ";") end
+    return messages
+end
+
+--- Pure: the body of an "R" message (after "R2|"), or nil: { receiver, from (the mail's sender),
+--- id, items = { { itemID, count, value, k } } }.
+function Ledger.DecodeAnswers(rest)
+    local receiver, from, id, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
+    receiver, from = goodNames(receiver, from)
+    if not receiver or #id > 10 then return nil end
+    local items = {}
+    for part in list:gmatch("[^;]+") do
+        local item, count, value, k = part:match("^(%d+):(%d+):(%d+):(%d+)$")
+        if not item or #k > 2 then return nil end
+        item, count, value, k = tonumber(item), tonumber(count), tonumber(value), tonumber(k)
+        if item < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER or k < 1 then return nil end
+        items[#items + 1] = { itemID = item, count = count, value = value, k = k }
+        if #items > Ledger.RECEIVE_SLOTS then return nil end
+    end
+    if #items == 0 then return nil end
+    return { receiver = receiver, from = from, id = tonumber(id), items = items }
+end
+
+--- An "R" message from `whisperer`: the value a receiver settled on for stacks of a mail one of
+--- this account's characters sent. That mail (its id, sender and recipient; counted mails only)
+--- and stack (the k-th of that item and count in it) take the value, once, when the receiver is
+--- the whisperer and the value is within PRICE_CAP times either way of our own; the balance moves
+--- by the difference. Returns how many stacks changed.
+function Ledger.HearAnswers(whisperer, msg)
+    whisperer = clean(whisperer)
+    if not whisperer or type(msg) ~= "table" or not Ledger.On() or not Ledger.IsOwn(msg.from) then return 0 end
+    if msg.receiver:lower() ~= whisperer:lower() then
+        ns.Log.Add("ledger", "answer from %s for %s dropped: not the recipient", whisperer, msg.receiver)
+        return 0
+    end
+    local entry
+    for _, e in ipairs(store().log) do
+        if e.dir == "sent" and e.counted and e.id == msg.id and tostring(e.other):lower() == msg.receiver:lower()
+            and tostring(e.char):lower() == msg.from:lower() then entry = e end
+    end
+    if not entry then return 0 end
+    local changed = 0
+    for _, a in ipairs(msg.items) do
+        local n, it = 0, nil
+        for _, x in ipairs(entry.items or {}) do
+            if x.itemID == a.itemID and x.count == a.count then
+                n = n + 1
+                if n == a.k then it = x end
+            end
+        end
+        if it and it.value and not it.agreed and a.value * Ledger.PRICE_CAP >= it.value
+            and a.value <= it.value * Ledger.PRICE_CAP then
+            local delta = a.value - it.value
+            it.mine, it.value, it.agreed, it.source = it.value, a.value, entry.other, "agreed"
+            local p = player(entry.other)
+            p.sent = math.max(0, (tonumber(p.sent) or 0) + delta)
+            changed = changed + 1
+        elseif it and it.value and not it.agreed then
+            ns.Log.Add("ledger", "answer from %s for %s ignored: %s against our %s", whisperer, tostring(it.name),
+                money(a.value), money(it.value))
+        end
+    end
+    if changed > 0 then
+        ns.Log.Add("ledger", "%s's values agreed for %d stack(s) of mail %d", msg.receiver, changed, msg.id)
+        changed_()
+    end
+    return changed
 end
 
 --- A "V" message from `sender`: the values of a mail sent to one of this account's characters.
---- `from` (the mail's sender) must be the whisperer or one of the characters their hello lists.
+--- `from` (the mail's sender) must be the whisperer.
 function Ledger.HearValues(sender, msg)
     sender = clean(sender)
     if not sender or type(msg) ~= "table" or not Ledger.On() then return nil end
     if not Ledger.IsOwn(msg.to) then return nil end
-    if not namesOf(sender)[msg.from:lower()] then
-        ns.Log.Add("ledger", "values from %s for %s's mail dropped: not their character", sender, msg.from)
+    if msg.from:lower() ~= sender:lower() then
+        ns.Log.Add("ledger", "values from %s for %s's mail dropped: not the sender", sender, msg.from)
         return nil
     end
     local at = now()
@@ -388,21 +595,25 @@ function Ledger.HearValues(sender, msg)
     local key = msg.from:lower()
     expect[key] = tableOr(expect[key])
     for _, it in ipairs(msg.items) do
-        table.insert(expect[key], { at = msg.at, to = msg.to, itemID = it.itemID, count = it.count, value = it.value })
+        table.insert(expect[key], { at = msg.at, to = msg.to, itemID = it.itemID, count = it.count, value = it.value,
+            age = it.age, id = msg.id, k = it.k })
     end
     while #expect[key] > Ledger.MAX_EXPECT do table.remove(expect[key], 1) end
     ns.Log.Add("ledger", "values from %s: %d item(s) mailed to %s", msg.from, #msg.items, msg.to)
     return msg
 end
 
---- The sender's value for `count` of `itemID` from `from`, used once (the oldest match), or nil.
-function Ledger.Claim(from, itemID, count)
+--- The sender's value for `count` of `itemID` that `from` mailed to `to` (the character taking
+--- it), used once (the oldest match), or nil: { value, age (their scan's age at send, or nil), at
+--- (when they sent it), to }.
+function Ledger.Claim(from, itemID, count, to)
     local list = store().expect[tostring(clean(from)):lower()]
     if type(list) ~= "table" then return nil end
     for i, e in ipairs(list) do
-        if e.itemID == itemID and e.count == count then
+        if e.itemID == itemID and e.count == count and tostring(e.to):lower() == tostring(clean(to)):lower() then
             table.remove(list, i)
-            return tonumber(e.value)
+            return tonumber(e.value) and { value = tonumber(e.value), age = tonumber(e.age), at = tonumber(e.at), to = e.to,
+                id = tonumber(e.id), k = tonumber(e.k) } or nil
         end
     end
     return nil
@@ -434,10 +645,10 @@ local function valued(items)
     local out = {}
     for _, it in ipairs(items or {}) do
         local link = it.link or (it.itemID and ("item:" .. it.itemID)) or nil
-        local unit = Ledger.UnitValue(link)
+        local unit, age = Ledger.UnitValue(link)
         out[#out + 1] = { itemID = tonumber(it.itemID), name = it.name or Ledger.NameOf(it.link) or ("item " .. tostring(it.itemID)),
             count = tonumber(it.count) or 1, value = unit and unit * (tonumber(it.count) or 1) or nil,
-            source = unit and "mine" or nil }
+            source = unit and "mine" or nil, age = unit and age or nil }
     end
     return out
 end
@@ -446,7 +657,10 @@ end
 --- money, cod }; `via` = "Mailworthy" (Mailer.lua) or "mail" (Blizzard's Send button).
 function Ledger.RecordSent(mail, via)
     if not Ledger.On() or type(mail) ~= "table" then return nil end
-    local entry = Ledger.Add({ dir = "sent", other = clean(mail.to) or tostring(mail.to), subject = mail.subject,
+    local other = clean(mail.to) or tostring(mail.to)
+    local s = store()
+    s.nextId = (tonumber(s.nextId) or 0) + 1 -- names the mail in values and answers; never reused
+    local entry = Ledger.Add({ id = s.nextId, dir = "sent", other = other, subject = mail.subject,
         items = valued(mail.items), money = tonumber(mail.money) or 0, cod = tonumber(mail.cod) or 0, via = via })
     if entry.counted then queueValues(entry) end
     return entry
@@ -540,12 +754,22 @@ local function commit(take)
     local h = take.h
     local items = {}
     if take.item then
-        local own = Ledger.UnitValue(take.item.link or ("item:" .. take.item.itemID))
-        own = own and own * take.item.count or nil
-        local claimed = not h.returned and Ledger.Claim(h.sender, take.item.itemID, take.item.count) or nil
-        local value, source = Ledger.Choose(claimed, own)
+        local link, count = take.item.link or ("item:" .. take.item.itemID), take.item.count
+        local unit, age = Ledger.UnitValue(link)
+        local value, source = unit and unit * count or nil, unit and "mine" or nil
+        local claim = not h.returned and Ledger.Claim(h.sender, take.item.itemID, count, ns.PlayerName()) or nil
+        if claim then -- their value and ours, each as it stood when the mail went
+            local daysAgo = Ledger.ScanDay(now()) - Ledger.ScanDay(claim.at or now())
+            local mine, mineAge = Ledger.PriceThen(unit and ns.Prices.Lookup(link), unit, daysAgo)
+            value, source, age = Ledger.Pick(claim.value, claim.age, mine and mine * count or nil, mineAge)
+            if value and value ~= claim.value and claim.id then -- tell the sender, so both logs match
+                queueFor(h.sender, now(), Ledger.EncodeAnswers(claim.to, h.sender, claim.id,
+                    { { itemID = take.item.itemID, count = count, value = value, k = claim.k } }))
+            end
+        end
         items[1] = { itemID = take.item.itemID, name = take.item.name or Ledger.NameOf(take.item.link)
-            or ("item " .. tostring(take.item.itemID)), count = take.item.count, value = value, source = source }
+            or ("item " .. tostring(take.item.itemID)), count = count, value = value, source = source,
+            age = value and age or nil }
     end
     local entry = Ledger.Add({ dir = "received", other = h.sender, subject = h.subject, items = items,
         money = take.money or 0, cod = h.cod, returned = h.returned or nil, system = h.system or nil, via = "mail" })
@@ -591,7 +815,14 @@ function Ledger.Pending() return #pendingTakes, pendingSend ~= nil end
 local function itemText(it)
     local value = it.value and money(it.value) or "no price"
     if it.source == "sender" then value = value .. ", sender's value"
-    elseif it.source == "capped" then value = value .. ", capped at " .. Ledger.PRICE_CAP .. "x my price" end
+    elseif it.source == "capped" then value = value .. ", capped at " .. Ledger.PRICE_CAP .. "x my price"
+    elseif it.source == "fresher" then value = value .. ", my price: my scan was more up to date"
+    elseif it.source == "agreed" then
+        value = value .. string.format(", agreed with %s (mine said %s)", tostring(it.agreed), money(it.mine or 0))
+    end
+    if it.value and tonumber(it.age) then
+        value = value .. string.format(", scan %d day%s old", it.age, it.age == 1 and "" or "s")
+    end
     return string.format("%dx %s (item %s, %s)", it.count or 1, tostring(it.name), tostring(it.itemID), value)
 end
 
@@ -667,7 +898,11 @@ function Ledger.Install()
     ns.Log.Add("ledger", "mail hooks installed")
 end
 
+ns.On("CHAT_MSG_ADDON", function(prefix)
+    if ns.Comms and prefix == ns.Comms.PREFIX then ownerIndex = nil end -- a hello may change the groups
+end)
 ns.On("PLAYER_LOGIN", function()
+    ownerIndex = nil
     if not Ledger.On() then return end
     Ledger.Prune()
     Ledger.Install()
