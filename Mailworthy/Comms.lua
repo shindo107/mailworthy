@@ -329,7 +329,7 @@ function Comms.Runs(name)
 end
 
 -- Windows that show marks redraw when the names behind them change (a new peer, a peer's
--- characters changed), once per burst of messages: never on every addon packet (Codex review).
+-- characters or professions changed), once per burst of messages: never on every addon packet (Codex review).
 Comms.MARK_DELAY = 1 -- seconds
 local markListeners, markPending = {}, false
 
@@ -346,12 +346,20 @@ local function notifyMarks()
     end
 end
 
--- Pure: the names a stored peer marks (the sender and the characters its hello listed), as text.
+-- Pure: what a stored peer puts on screen, as text: the names it marks (the sender and the
+-- characters its hello listed) with their professions, which decide where a binding delivers
+-- (Routes.Crafter: "delivered to <their crafter>"; Codex review). Skill ranks are left out.
 local function markNames(peer)
     if type(peer) ~= "table" then return "" end
-    local names = { tostring(peer.name):lower() }
+    local function entry(name, professions)
+        local ids = {}
+        for i, id in ipairs(type(professions) == "table" and professions or {}) do ids[i] = tostring(id) end
+        table.sort(ids)
+        return tostring(name):lower() .. "=" .. table.concat(ids, ",")
+    end
+    local names = { entry(peer.name, peer.professions) }
     for _, c in ipairs(type(peer.characters) == "table" and peer.characters or {}) do
-        if type(c) == "table" then names[#names + 1] = tostring(c.name):lower() end
+        if type(c) == "table" then names[#names + 1] = entry(c.name, c.professions) end
     end
     table.sort(names)
     return table.concat(names, ";")

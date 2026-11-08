@@ -256,6 +256,20 @@ describe("Mailworthy mark", function()
             assert.equal(1, redraws)
             assert.is_true(ns.Comms.Runs("Eve Alt"))
         end)
+
+        it("a hello that only moves a profession redraws: the binding row's crafter follows", function()
+            ns.Routes.Add(BOB, 165) -- Leatherworking: Alice Alt has it
+            ns.RoutesUI.Show()
+            WowStub.runTimers(ns.Comms.MARK_DELAY)
+            local function row() return ns.RoutesUI.Frame() and ns.Routes.Recipient(ns.Routes.Personal()[1]) end
+            assert.equal(ALICE, row())
+            local redraws = 0
+            ns.Comms.OnMarksChanged(function() redraws = redraws + 1 end)
+            hello(BOB, "H2|333,165|" .. ALICE .. "=165") -- Bob learned Leatherworking himself
+            WowStub.runTimers(ns.Comms.MARK_DELAY)
+            assert.equal(1, redraws)
+            assert.equal(BOB, row())
+        end)
     end)
 
     describe("ledger and settings", function()
