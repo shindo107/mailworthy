@@ -1,11 +1,20 @@
 name: ci
 
 on:
+  # main only: a PR branch's commits run through pull_request, so one run per push instead
+  # of two (push + pull_request). Tags run it through release.yml instead.
   push:
-    branches: ["**"] # tags run it through release.yml instead (once, not twice)
+    branches: [main]
   pull_request:
   # release.yml runs this whole workflow first: a tag publishes only if it passes.
   workflow_call:
+
+# A newer commit on a PR cancels that PR's older, still-queued or running CI. main and tags
+# (release.yml) get a group of their own per run (run_id): a shared group would still cancel
+# a waiting run when a third arrives, so every merge and every release keeps its result.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   # The shipping gate (spec/critical_path_spec.lua; AGENTS.md "Critical path"), its own
