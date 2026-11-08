@@ -629,10 +629,48 @@ function UI.Refresh(keepScan)
     ns.Nav.Revalidate()
 end
 
+--- Pure: the items of a fresh scan (`fresh`, its mail list) going somewhere the list on screen
+--- (`shown`) didn't say: an item the preview sent elsewhere, or a new one (bags changed) to a
+--- player the preview didn't name. The bank alt is always shown ("To: ..."). A binding's recipient
+--- can move between the preview and Send without the bags changing: a crafter's skill passes a
+--- material, or two bindings swap on "lowest skill first" (Codex review, 2026-11-07).
+function UI.Changed(shown, fresh, bankAlt)
+    local was, named = {}, { [tostring(bankAlt)] = true }
+    for _, it in ipairs(shown or {}) do
+        local to = tostring(it.result and it.result.to or bankAlt)
+        if was[it.itemID] == nil then was[it.itemID] = to end
+        named[to] = true
+    end
+    local changed = {}
+    for _, it in ipairs(fresh or {}) do
+        local to = tostring(it.result and it.result.to or bankAlt)
+        local before = was[it.itemID]
+        if (before ~= nil and before ~= to) or (before == nil and not named[to]) then
+            changed[#changed + 1] = { item = it, was = before, to = to }
+        end
+    end
+    return changed
+end
+
 function UI.Send()
     if not result then return end
     ns.lastCommand = "Mailworthy Send"
+    local shown = result.mail
     UI.Refresh() -- the freshest scan, so the mail list is what's in the bags now
+    -- AGENTS Safety: mail goes only to the recipients the player saw. If the fresh scan sends
+    -- anything elsewhere, nothing goes: the list now shows where, and a second press sends it.
+    local changed = UI.Changed(shown, result.mail, ns.Config.BankAlt())
+    if #changed > 0 then
+        local c = changed[1]
+        local name = tostring(c.item.link or ""):match("%[(.-)%]") or ("item " .. tostring(c.item.itemID))
+        local text = string.format("Not sent: %s now goes to %s%s. Check the list, then press Send again.", name,
+            firstName(c.to), c.was and (" instead of " .. firstName(c.was)) or "")
+        ns.Log.Add("mailer", "send held: %d item(s) changed recipient since the preview (%s to %s, was %s)", #changed,
+            name, c.to, tostring(c.was))
+        ns.Print(text)
+        totalNote:SetText("|cffff8040" .. text .. "|r")
+        return
+    end
     ns.Mailer.Start(result.mail, ns.Config.BankAlt())
     UI.Refresh(true)
 end

@@ -261,7 +261,10 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   acquire some minor pieces"): `Routes.Matches` checks the profession's own subclasses, not
   `Tiers.KEEP`. Two bindings taking one material (metal and stone: Blacksmithing and
   Engineering) go to the lower-skilled recipient (`Routes.Before`; operator: "Lowest skill
-  first"). The mailbox window's binding rows show the recipient's skill ("(guild, skill
+  first"). Send holds when the fresh scan at Send moves an item to another recipient than the
+  list showed (`MailWindow.Changed`: a skill heard after the preview can swap two bindings, or
+  pass a material); the list redraws and a second press sends (Codex review; critical path case).
+  The mailbox window's binding rows show the recipient's skill ("(guild, skill
   120)"), so a material past it going to the bank alt explains itself. Button labels fit
   their border (`Widgets.Fit` after every SetText: small font, then "...").
 - Popups beside their opener (operator, same day: the new popups "overlap the existing menus

@@ -260,6 +260,31 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
     end)
 
+    it("two bindings on one material: lowest skill first, and a recipient that changes after the preview holds Send", function()
+        -- operator, 2026-11-07: Blacksmithing and Engineering both take metal and stone, "Lowest skill
+        -- first". Codex review: a skill heard between the preview and Send must not move mail unseen.
+        local SMITH, ENGINEER = "Smith Anvil", "Jold Ark"
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = {
+            { name = SMITH, online = true, professions = { 164 }, ranks = { 60 } },
+            { name = ENGINEER, online = true, professions = { 202 }, ranks = { 100 } } } }
+        ns.Routes.Add(SMITH, 164)
+        ns.Routes.Add(ENGINEER, 202)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(SMITH, previewed(ns)[2770], "Copper Ore: the blacksmith (60) is lower than the engineer (100)")
+        WowStub.state.guild.members[1].ranks = { 110 } -- the roster updates; the window hasn't redrawn
+        _G.MailworthyMailSend:Click()
+        assert.is_false(ns.Mailer.Busy(), "nothing goes while a recipient differs from the list shown")
+        WowStub.runTimers()
+        assert.equal(0, #WowStub.state.sent)
+        assert.truthy(table.concat(WowStub.printed, "\n"):find("Not sent: Copper Ore now goes to Jold instead of Smith", 1, true))
+        local preview = previewed(ns)
+        assert.equal(ENGINEER, preview[2770], "the list now shows the engineer")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [ENGINEER] = true })
+    end)
+
     --- The guild master's template (Guild.lua) arrives over the guild channel: Enchanting to Bob.
     local function guildTemplate()
         local gm = "Guild Master"

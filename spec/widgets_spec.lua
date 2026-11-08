@@ -57,6 +57,21 @@ describe("widgets and labels", function()
         assert.equal("", ns.MailWindow.RouteTags(false, nil))
     end)
 
+    it("Send holds when a fresh scan sends an item somewhere the list didn't show (Codex review)", function()
+        local function mail(itemID, to) return { itemID = itemID, result = { to = to } } end
+        local changed = ns.MailWindow.Changed
+        assert.same({}, changed({ mail(1, "Smith"), mail(2) }, { mail(1, "Smith"), mail(2) }, "Bank"))
+        assert.same({}, changed({ mail(1, "Smith") }, { mail(1, "Smith"), mail(9) }, "Bank"), "new item, bank alt")
+        assert.same({}, changed({ mail(1, "Smith") }, { mail(9, "Smith") }, "Bank"), "new item, a shown friend")
+        assert.same({}, changed({ mail(1, "Smith"), mail(2) }, { mail(2) }, "Bank"), "an item gone: fewer mails")
+        local c = changed({ mail(1, "Smith") }, { mail(1, "Jold") }, "Bank")
+        assert.equal(1, #c)
+        assert.equal("Smith", c[1].was)
+        assert.equal("Jold", c[1].to)
+        assert.equal(1, #changed({ mail(1, "Smith") }, { mail(1) }, "Bank"), "a friend's item now to the bank alt")
+        assert.equal(1, #changed({ mail(1, "Smith") }, { mail(9, "Ann") }, "Bank"), "a new item to someone unseen")
+    end)
+
     it("the settings' Guild button says where the guild rules stand", function()
         local text = ns.SettingsUI.GuildButtonText
         assert.equal("Guild...", text(false, nil))
