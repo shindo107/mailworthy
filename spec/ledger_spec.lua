@@ -462,21 +462,54 @@ describe("mail ledger", function()
         assert.equal("Alt Person", ns.Ledger.Store().expect["bob surname"][1].to, "the alt's value still waits for it")
     end)
 
-    it("two mails to one player in the same second keep their real time; answers find the item's mail (Codex review)", function()
+    it("each mail to a player gets its own time, on its own scan day; answers find exactly that mail (Codex review)", function()
         sendByHand(BOB, ORE, 20)
-        sendByHand(BOB, ORE, 10)
+        sendByHand(BOB, ORE, 20)
+        WowStub.state.cod = 0
         local log = ns.Ledger.Store().log
-        assert.equal(log[1].at, log[2].at, "the real send time, never shifted (scan days depend on it)")
-        local function answer(count, value)
-            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", log[1].at, { { itemID = ORE.id, count = count, value = value } })
+        assert.are_not.equal(log[1].at, log[2].at, "the time names one mail")
+        assert.equal(ns.Ledger.ScanDay(log[1].at), ns.Ledger.ScanDay(log[2].at), "never moved to another scan day")
+        local function answer(at, value)
+            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", at, { { itemID = ORE.id, count = 20, value = value } })
             ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
         end
-        answer(10, 500)
+        answer(log[2].at, 900)
+        answer(log[2].at, 900) -- the same answer again settles nothing more
         assert.equal(1200, log[1].items[1].value)
-        assert.equal(500, log[2].items[1].value)
-        answer(20, 900)
-        assert.equal(900, log[1].items[1].value)
-        assert.equal(-1400, (ns.Ledger.Net(BOB)))
+        assert.equal(900, log[2].items[1].value)
+        assert.equal(-2100, (ns.Ledger.Net(BOB)))
+    end)
+
+    it("an answer never lands on a mail that doesn't count (COD), even in the same second (Codex review)", function()
+        WowStub.state.attached = { WowStub.item(ORE.id, ORE.name, { count = 20 }) }
+        WowStub.state.cod = 5000
+        ns.Fire("MAIL_SEND_INFO_UPDATE")
+        SendMail(BOB, "cod", "")
+        ns.Fire("MAIL_SEND_SUCCESS")
+        WowStub.state.cod = 0
+        sendByHand(BOB, ORE, 20)
+        local log = ns.Ledger.Store().log
+        assert.is_false(log[1].counted)
+        for _, at in ipairs({ log[1].at, log[2].at }) do
+            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", at, { { itemID = ORE.id, count = 20, value = 900 } })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+        end
+        assert.equal(1200, log[1].items[1].value, "the COD mail is untouched")
+        assert.equal(900, log[2].items[1].value)
+        assert.equal(-900, (ns.Ledger.Net(BOB)))
+    end)
+
+    it("groups: built once from the peers, pure", function()
+        local peers = {
+            ["anna aa"] = { name = "Anna Aa", characters = { { name = BOB } } },
+            ["bob surname"] = { name = BOB, characters = { { name = "Anna Aa" }, { name = "Carl Cc" } } },
+            ["carl cc"] = { name = "Carl Cc", characters = { { name = BOB } } },
+            ["mallory thief"] = { name = "Mallory Thief", characters = { { name = "Anna Aa" } } },
+        }
+        local g = ns.Ledger.Groups(peers)
+        assert.equal("Anna Aa", g["bob surname"])
+        assert.equal("Anna Aa", g["carl cc"])
+        assert.equal("Mallory Thief", g["mallory thief"], "a one-sided claim links nothing")
     end)
 
     it("queued messages go only from the character they name, whoever is logged in (Codex review)", function()

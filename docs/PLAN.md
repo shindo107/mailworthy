@@ -510,7 +510,8 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   mail (`canReply` false, GM, AH invoices), COD (a sale). A returned mail taken back undoes the
   "sent". Two Mailworthy peers count as one player only when each one's own hello lists the
   other (a hello is anyone's word); such links are followed through the whole group, named
-  after its alphabetically first name.
+  after its alphabetically first name (`Ledger.Groups`, built once from the peers and again
+  after the next Mailworthy message).
 - **Only your own side shows** (operator): the ledger window lists players you received more
   from than you sent back, with what they sent, and **Mark paid** (two presses: a trade or gold
   in person; logged); a chat line when you take a counted mail; the Mailworthy window's line at
@@ -541,10 +542,10 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   settles on a value other than the sender's (its scan was fresher, or the cap), it queues
   `R2|<recipient>|<mail's sender>|<the mail's time>|<itemID>:<count>:<copper>;...` for the
   sender, held in `outbox` like the values (WHISPER only, sent once the mail's sender character is
-  heard from, 30 days at most). The sender finds that mail in its log (sender, recipient, time;
-  mails sharing all three, sent in the same second, are told apart by the answered item and
-  count, the first still unsettled; times are never shifted, since scan days depend on them),
-  takes the value (`agreed`, the old one kept as `mine`) and moves
+  heard from, 30 days at most). The sender finds that mail in its log by sender, recipient and
+  time, counted mails only (each mail's time is unique per sender and recipient,
+  `Ledger.UniqueAt`: the send time or the nearest free second on the same Auctionator scan day,
+  so it never changes the day a price is taken from), takes the value (`agreed`, the old one kept as `mine`) and moves
   its balance by the difference; an answer under a third or over 3x its own value is ignored,
   and an item takes one answer. Until the answer arrives, the sender shows its own value.
   Still unmatched: a mail whose values never reached the receiver before it was taken (the

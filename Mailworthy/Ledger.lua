@@ -106,28 +106,48 @@ local function lists(peer, lower)
     return false
 end
 
+-- Lower-case name -> the name its group goes by, built once from the peers' hellos and again only
+-- after another Mailworthy message (Codex review: following links per record stalled the window
+-- with hundreds of peers).
+local ownerIndex
+
+--- Pure: the groups in `peers` (lower-case name -> { name, characters }): two names are linked
+--- when each one's own hello lists the other; linked names, followed through the whole group, go
+--- by the group's alphabetically first name. Returns lower-case name -> that name.
+function Ledger.Groups(peers)
+    local parent = {}
+    local function find(x)
+        while parent[x] and parent[x] ~= x do x = parent[x] end
+        return x
+    end
+    local names = {}
+    for _, peer in pairs(type(peers) == "table" and peers or {}) do
+        if type(peer) == "table" and peer.name then
+            local lower = tostring(peer.name):lower()
+            names[lower], parent[lower] = peer.name, parent[lower] or lower
+            for _, c in ipairs(type(peer.characters) == "table" and peer.characters or {}) do
+                local other = tostring(c.name):lower()
+                local back = peers[other]
+                if other ~= lower and type(back) == "table" and lists(back, lower) then
+                    names[other], parent[other] = back.name, parent[other] or other
+                    local a, b = find(lower), find(other)
+                    if a ~= b then if a < b then parent[b] = a else parent[a] = b end end
+                end
+            end
+        end
+    end
+    local index = {}
+    for lower in pairs(names) do index[lower] = names[find(lower)] end
+    return index
+end
+
 function Ledger.Owner(name)
     name = clean(name)
     if not name or not ns.Comms then return name end
     -- A hello is anyone's word: two names are one player only when each one's own hello lists the
-    -- other (a stranger claiming "Bob is my alt" never takes Bob's balance). Linked names form a
-    -- group, followed link by link, named after its alphabetically first name, so every member
-    -- gives the same answer (Codex review: Anna-Bob-Carl split when Anna didn't list Carl).
-    local peers, owner = ns.Comms.Peers(), name
-    local seen, queue = { [name:lower()] = true }, { name }
-    while #queue > 0 do
-        local current = table.remove(queue, 1)
-        local own = ns.Comms.Peer(current)
-        for _, peer in pairs(peers) do
-            local other = type(peer) == "table" and tostring(peer.name) or nil
-            if other and not seen[other:lower()] and lists(peer, current:lower()) and lists(own, other:lower()) then
-                seen[other:lower()] = true
-                queue[#queue + 1] = other
-                if other:lower() < owner:lower() then owner = other end
-            end
-        end
-    end
-    return owner
+    -- other (a stranger claiming "Bob is my alt" never takes Bob's balance); see Ledger.Groups.
+    ownerIndex = ownerIndex or Ledger.Groups(ns.Comms.Peers())
+    return ownerIndex[name:lower()] or name
 end
 
 --- This account's own value of one unit (copper): the price the decision rule uses (the last
@@ -499,12 +519,12 @@ function Ledger.HearAnswers(whisperer, msg)
         ns.Log.Add("ledger", "answer from %s for %s dropped: not the recipient", whisperer, msg.receiver)
         return 0
     end
-    -- The mail: sender, recipient and send time; several mails in one second share those, so each
-    -- answered item goes to the first of them with that item and count still unsettled (Codex
-    -- review: stacks that alike can't be told apart, and the balance comes out the same).
+    -- The mail: sender, recipient and send time (unique per mail: Ledger.UniqueAt; older entries
+    -- may share one, and then the first with that item and count still unsettled takes it); only
+    -- mails that count, since values and answers exist only for those.
     local mails = {}
     for _, e in ipairs(store().log) do
-        if e.dir == "sent" and e.at == msg.at and tostring(e.other):lower() == msg.receiver:lower()
+        if e.dir == "sent" and e.counted and e.at == msg.at and tostring(e.other):lower() == msg.receiver:lower()
             and tostring(e.char):lower() == msg.from:lower() then mails[#mails + 1] = e end
     end
     if #mails == 0 then return 0 end
@@ -613,12 +633,34 @@ local function valued(items)
     return out
 end
 
+--- The time that names a mail to `other` in values and answers: the send time, or the nearest
+--- second to it no earlier mail from this character to them already has, within the same
+--- Auctionator scan day (Codex review: the time must name one mail, and must never move a mail
+--- to another day, which picks the price it is compared with).
+function Ledger.UniqueAt(other, at)
+    local me, taken = tostring(ns.PlayerName()):lower(), {}
+    local log = store().log
+    for i = #log, math.max(1, #log - 200), -1 do
+        local e = log[i]
+        if e.dir == "sent" and tostring(e.char):lower() == me and tostring(e.other):lower() == tostring(other):lower() then
+            taken[tonumber(e.at) or 0] = true
+        end
+    end
+    local day = Ledger.ScanDay(at)
+    for k = 0, 600 do
+        for _, t in ipairs({ at - k, at + k }) do
+            if not taken[t] and Ledger.ScanDay(t) == day then return t end
+        end
+    end
+    return at
+end
+
 --- A mail that went (MAIL_SEND_SUCCESS): { to, subject, items = { { itemID, link, name, count } },
 --- money, cod }; `via` = "Mailworthy" (Mailer.lua) or "mail" (Blizzard's Send button).
 function Ledger.RecordSent(mail, via)
     if not Ledger.On() or type(mail) ~= "table" then return nil end
     local other = clean(mail.to) or tostring(mail.to)
-    local entry = Ledger.Add({ dir = "sent", other = other, subject = mail.subject,
+    local entry = Ledger.Add({ at = Ledger.UniqueAt(other, now()), dir = "sent", other = other, subject = mail.subject,
         items = valued(mail.items), money = tonumber(mail.money) or 0, cod = tonumber(mail.cod) or 0, via = via })
     if entry.counted then queueValues(entry) end
     return entry
@@ -856,7 +898,11 @@ function Ledger.Install()
     ns.Log.Add("ledger", "mail hooks installed")
 end
 
+ns.On("CHAT_MSG_ADDON", function(prefix)
+    if ns.Comms and prefix == ns.Comms.PREFIX then ownerIndex = nil end -- a hello may change the groups
+end)
 ns.On("PLAYER_LOGIN", function()
+    ownerIndex = nil
     if not Ledger.On() then return end
     Ledger.Prune()
     Ledger.Install()
