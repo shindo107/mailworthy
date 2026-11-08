@@ -109,15 +109,22 @@ end
 function Ledger.Owner(name)
     name = clean(name)
     if not name or not ns.Comms then return name end
-    local lower = name:lower()
-    local own, owner = ns.Comms.Peer(name), name
-    for _, peer in pairs(ns.Comms.Peers()) do
-        -- A hello is anyone's word: two names are one player only when each one's own hello lists
-        -- the other (a stranger claiming "Bob is my alt" never takes Bob's balance). The group is
-        -- named after its alphabetically first name, so every member gives the same answer.
-        if type(peer) == "table" and tostring(peer.name):lower() ~= lower and lists(peer, lower)
-            and lists(own, tostring(peer.name):lower()) and tostring(peer.name):lower() < owner:lower() then
-            owner = peer.name
+    -- A hello is anyone's word: two names are one player only when each one's own hello lists the
+    -- other (a stranger claiming "Bob is my alt" never takes Bob's balance). Linked names form a
+    -- group, followed link by link, named after its alphabetically first name, so every member
+    -- gives the same answer (Codex review: Anna-Bob-Carl split when Anna didn't list Carl).
+    local peers, owner = ns.Comms.Peers(), name
+    local seen, queue = { [name:lower()] = true }, { name }
+    while #queue > 0 do
+        local current = table.remove(queue, 1)
+        local own = ns.Comms.Peer(current)
+        for _, peer in pairs(peers) do
+            local other = type(peer) == "table" and tostring(peer.name) or nil
+            if other and not seen[other:lower()] and lists(peer, current:lower()) and lists(own, other:lower()) then
+                seen[other:lower()] = true
+                queue[#queue + 1] = other
+                if other:lower() < owner:lower() then owner = other end
+            end
         end
     end
     return owner
@@ -399,15 +406,23 @@ function Ledger.Flush(name)
     name = clean(name)
     if not name or not Ledger.On() or not ns.Comms or not ns.Comms.On() then return 0 end
     local outbox, sent = store().outbox, 0
-    local waiting = outbox[name:lower()]
-    if type(waiting) == "table" then
-        for _, item in ipairs(waiting) do
+    local me = tostring(ns.PlayerName()):lower()
+    local waiting, keep = outbox[name:lower()], {}
+    for _, item in ipairs(type(waiting) == "table" and waiting or {}) do
+        -- The outbox is account-wide, but a message names its author (the V2 sender, the R2
+        -- recipient) and the other side takes it only from that character: it waits for them
+        -- (Codex review: a message sent by another character was rejected, then deleted).
+        local first = type(item.messages) == "table" and item.messages[1]
+        local author = item.by or (type(first) == "string" and first:match("^%a%d+|([^|]+)|")) or nil
+        if author and tostring(author):lower() ~= me then
+            keep[#keep + 1] = item
+        else
             for _, m in ipairs(type(item.messages) == "table" and item.messages or {}) do
                 if ns.Comms.Whisper(name, m) then sent = sent + 1 end
             end
         end
-        outbox[name:lower()] = nil
     end
+    outbox[name:lower()] = #keep > 0 and keep or nil
     if sent > 0 then ns.Log.Add("ledger", "sent %d value message(s) to %s", sent, name) end
     return sent
 end
@@ -427,7 +442,7 @@ local function queueFor(name, at, messages)
     local key = tostring(name):lower()
     local outbox = store().outbox
     outbox[key] = tableOr(outbox[key])
-    table.insert(outbox[key], { at = at, messages = messages })
+    table.insert(outbox[key], { at = at, messages = messages, by = ns.PlayerName() })
     local h = heard[key]
     if h and (call(GetTime) or 0) - h.at <= Ledger.HEARD_FRESH then return Ledger.Flush(h.name) end
     ns.Comms.Ask() -- whoever is online answers with a hello, and the messages follow it
@@ -484,30 +499,36 @@ function Ledger.HearAnswers(whisperer, msg)
         ns.Log.Add("ledger", "answer from %s for %s dropped: not the recipient", whisperer, msg.receiver)
         return 0
     end
-    local entry
+    -- The mail: sender, recipient and send time; several mails in one second share those, so each
+    -- answered item goes to the first of them with that item and count still unsettled (Codex
+    -- review: stacks that alike can't be told apart, and the balance comes out the same).
+    local mails = {}
     for _, e in ipairs(store().log) do
         if e.dir == "sent" and e.at == msg.at and tostring(e.other):lower() == msg.receiver:lower()
-            and tostring(e.char):lower() == msg.from:lower() then entry = e end
+            and tostring(e.char):lower() == msg.from:lower() then mails[#mails + 1] = e end
     end
-    if not entry then return 0 end
+    if #mails == 0 then return 0 end
     local changed = 0
     for _, a in ipairs(msg.items) do
-        for _, it in ipairs(entry.items or {}) do
-            if it.itemID == a.itemID and it.count == a.count and not it.agreed and it.value then
-                if a.value * Ledger.PRICE_CAP >= it.value and a.value <= it.value * Ledger.PRICE_CAP then
-                    local delta = a.value - it.value
-                    it.mine, it.value, it.agreed, it.source = it.value, a.value, entry.other, "agreed"
-                    if entry.counted then
-                        local p = player(entry.other)
-                        p.sent = math.max(0, (tonumber(p.sent) or 0) + delta)
-                    end
-                    changed = changed + 1
-                else
-                    ns.Log.Add("ledger", "answer from %s for %s ignored: %s against our %s", whisperer, tostring(it.name),
-                        money(a.value), money(it.value))
+        local entry, it = nil, nil
+        for _, e in ipairs(mails) do
+            for _, x in ipairs(e.items or {}) do
+                if not it and x.itemID == a.itemID and x.count == a.count and not x.agreed and x.value then
+                    entry, it = e, x
                 end
-                break
             end
+        end
+        if it and a.value * Ledger.PRICE_CAP >= it.value and a.value <= it.value * Ledger.PRICE_CAP then
+            local delta = a.value - it.value
+            it.mine, it.value, it.agreed, it.source = it.value, a.value, entry.other, "agreed"
+            if entry.counted then
+                local p = player(entry.other)
+                p.sent = math.max(0, (tonumber(p.sent) or 0) + delta)
+            end
+            changed = changed + 1
+        elseif it then
+            ns.Log.Add("ledger", "answer from %s for %s ignored: %s against our %s", whisperer, tostring(it.name),
+                money(a.value), money(it.value))
         end
     end
     if changed > 0 then
@@ -596,18 +617,8 @@ end
 --- money, cod }; `via` = "Mailworthy" (Mailer.lua) or "mail" (Blizzard's Send button).
 function Ledger.RecordSent(mail, via)
     if not Ledger.On() or type(mail) ~= "table" then return nil end
-    local other, at = clean(mail.to) or tostring(mail.to), now()
-    -- The send time names the mail in values and answers, so it is unique per sender and
-    -- recipient: a second mail in the same second is stamped a second later (Codex review).
-    local log = store().log
-    for i = #log, math.max(1, #log - 50), -1 do
-        local e = log[i]
-        if e.dir == "sent" and tostring(e.other):lower() == other:lower() and tostring(e.char) == tostring(ns.PlayerName())
-            and (tonumber(e.at) or 0) >= at then
-            at = e.at + 1
-        end
-    end
-    local entry = Ledger.Add({ at = at, dir = "sent", other = other, subject = mail.subject,
+    local other = clean(mail.to) or tostring(mail.to)
+    local entry = Ledger.Add({ dir = "sent", other = other, subject = mail.subject,
         items = valued(mail.items), money = tonumber(mail.money) or 0, cod = tonumber(mail.cod) or 0, via = via })
     if entry.counted then queueValues(entry) end
     return entry

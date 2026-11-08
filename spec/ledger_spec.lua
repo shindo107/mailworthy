@@ -462,15 +462,55 @@ describe("mail ledger", function()
         assert.equal("Alt Person", ns.Ledger.Store().expect["bob surname"][1].to, "the alt's value still waits for it")
     end)
 
-    it("two mails to one player in the same second get different times, so answers find the right one (Codex review)", function()
+    it("two mails to one player in the same second keep their real time; answers find the item's mail (Codex review)", function()
         sendByHand(BOB, ORE, 20)
         sendByHand(BOB, ORE, 10)
         local log = ns.Ledger.Store().log
-        assert.equal(log[1].at + 1, log[2].at)
-        local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", log[1].at, { { itemID = ORE.id, count = 20, value = 900 } })
-        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+        assert.equal(log[1].at, log[2].at, "the real send time, never shifted (scan days depend on it)")
+        local function answer(count, value)
+            local m = ns.Ledger.EncodeAnswers(BOB, "Rettana Quilwrit", log[1].at, { { itemID = ORE.id, count = count, value = value } })
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m[1], "WHISPER", BOB)
+        end
+        answer(10, 500)
+        assert.equal(1200, log[1].items[1].value)
+        assert.equal(500, log[2].items[1].value)
+        answer(20, 900)
         assert.equal(900, log[1].items[1].value)
-        assert.equal(600, log[2].items[1].value)
+        assert.equal(-1400, (ns.Ledger.Net(BOB)))
+    end)
+
+    it("queued messages go only from the character they name, whoever is logged in (Codex review)", function()
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = { { name = BOB, online = true } } }
+        sendByHand(BOB, ORE, 20) -- Bob not heard yet: the values wait
+        assert.equal(1, #ns.Ledger.Store().outbox["bob surname"])
+        WowStub.state.name = "Alt Person" -- another character of this account logs in
+        local before = #WowStub.state.addonMessages
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB)
+        for i = before + 1, #WowStub.state.addonMessages do
+            assert.is_nil(WowStub.state.addonMessages[i].message:find("^V2"), "Bob would reject Rettana's values from Alt Person")
+        end
+        assert.equal(1, #ns.Ledger.Store().outbox["bob surname"], "kept for Rettana")
+        WowStub.state.name = "Rettana Quilwrit"
+        WowStub.state.now = WowStub.state.now + 120
+        ns.Fire("CHAT_MSG_ADDON", "Mailworthy", ns.Comms.Encode({}, {}), "GUILD", BOB)
+        local last = WowStub.state.addonMessages[#WowStub.state.addonMessages]
+        assert.equal("WHISPER", last.channel)
+        assert.truthy(last.message:find("^V2|Rettana Quilwrit|Bob Surname|"))
+        assert.is_nil(ns.Ledger.Store().outbox["bob surname"])
+    end)
+
+    it("a linked group of characters has one name, followed link by link (Codex review)", function()
+        hello("Anna Aa", { BOB })
+        hello(BOB, { "Anna Aa", "Carl Cc" })
+        hello("Carl Cc", { BOB }) -- Anna's hello doesn't list Carl
+        for _, name in ipairs({ "Anna Aa", BOB, "Carl Cc" }) do assert.equal("Anna Aa", ns.Ledger.Owner(name), name) end
+        for _, name in ipairs({ "Anna Aa", BOB, "Carl Cc" }) do
+            inboxMail(LINEN, 20, { sender = name, subject = "from " .. name })
+            take(LINEN.id)
+        end
+        local debts = ns.Ledger.Debts()
+        assert.equal(1, #debts)
+        assert.equal(3000, debts[1].net)
     end)
 
     it("scan days are Auctionator's: a mail sent before its day boundary and taken after is a day old (Codex review)", function()

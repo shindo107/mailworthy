@@ -509,7 +509,8 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   sent. Not counted: this account's characters (known characters and the bank alt), system
   mail (`canReply` false, GM, AH invoices), COD (a sale). A returned mail taken back undoes the
   "sent". Two Mailworthy peers count as one player only when each one's own hello lists the
-  other (a hello is anyone's word; named after the alphabetically first).
+  other (a hello is anyone's word); such links are followed through the whole group, named
+  after its alphabetically first name.
 - **Only your own side shows** (operator): the ledger window lists players you received more
   from than you sent back, with what they sent, and **Mark paid** (two presses: a trade or gold
   in person; logged); a chat line when you take a counted mail; the Mailworthy window's line at
@@ -541,8 +542,9 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   `R2|<recipient>|<mail's sender>|<the mail's time>|<itemID>:<count>:<copper>;...` for the
   sender, held in `outbox` like the values (WHISPER only, sent once the mail's sender character is
   heard from, 30 days at most). The sender finds that mail in its log (sender, recipient, time;
-  a second mail to the same player in the same second is stamped a second later, so the time
-  names one mail), takes the value (`agreed`, the old one kept as `mine`) and moves
+  mails sharing all three, sent in the same second, are told apart by the answered item and
+  count, the first still unsettled; times are never shifted, since scan days depend on them),
+  takes the value (`agreed`, the old one kept as `mine`) and moves
   its balance by the difference; an answer under a third or over 3x its own value is ignored,
   and an item takes one answer. Until the answer arrives, the sender shows its own value.
   Still unmatched: a mail whose values never reached the receiver before it was taken (the
@@ -550,7 +552,9 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
 - **Trust** (Codex review, 2026-11-07): a hello's "my other characters" list is never evidence for
   reading or settling a mail. Values go to, and answers come from, the exact character the mail
   names; a stranger listing Bob as their alt gets none of Bob's values, can't answer for him and
-  doesn't take his balance.
+  doesn't take his balance. The outbox is account-wide, but each message waits until the
+  character it names as its author is the one logged in (the other side takes it only from
+  them).
 - **Never seen by the players** (operator: "as long as these messages back and forth are all
   obscured by the player"): values and answers are addon messages, which no chat window shows,
   and whispers, so only the two players' clients get them. A whisper to an offline player would
