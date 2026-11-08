@@ -1,10 +1,11 @@
 -- CRITICAL PATH: the shipping gate. Every build must still mail, safely, the way a
 -- player does it: a mailbox visit with a realistic bag, the mouse (the Mailworthy button or
 -- the Send Mail tab alone) and the controller,
--- with and without Auctionator, with a binding (a profession's or a class's), with a guild
--- template, without a bank alt or with it skipped for the visit, with Return to sender (on a main
--- and on the bank alt itself), and on SavedVariables an older build left behind. CI runs this
--- file on its own before the rest, and a tag can't publish unless it passes.
+-- with and without Auctionator, with TradeSkillMaster alone and with both, with a binding (a
+-- profession's or a class's), with a guild template, without a bank alt or with it skipped for the
+-- visit, with Return to sender (on a main and on the bank alt itself), and on SavedVariables an
+-- older build left behind. CI runs this file on its own before the rest, and a tag can't publish
+-- unless it passes.
 --
 -- These tests check outcomes, not tuning: what was previewed is exactly what was sent,
 -- to exactly the recipients shown, and the AGENTS.md safety rules hold for every mail.
@@ -75,6 +76,25 @@ local function useAuctionator(prices)
         GetAuctionPriceByItemLink = function(_, l) return prices[l] end,
         GetAuctionAgeByItemLink = function() return 0 end,
     } } }
+end
+
+--- TradeSkillMaster's public API (TSM_API) with the same prices as its realm AuctionDB
+--- "DBMinBuyout"; raises on anything but a TSM item string, as TSM's own does.
+--- Returns the list of calls made.
+local function useTSM(prices)
+    local byID, calls = {}, {}
+    for l, v in pairs(prices) do byID["i:" .. l:match("item:(%d+)")] = v end
+    _G.TSM_API = {
+        ToItemString = function(l) return "i:" .. assert(l:match("item:(%d+)")) end,
+        IsCustomPriceValid = function(source) return source == "DBMinBuyout" or source == "DBMarket" end,
+        GetCustomPriceValue = function(source, itemString)
+            assert(type(itemString) == "string" and itemString:find("^i:%d+$"), "not a TSM item string")
+            calls[#calls + 1] = source
+            if source == "DBMinBuyout" and byID[itemString] then return byID[itemString] end
+            return nil, "No value was returned by the custom price for the specified item."
+        end,
+    }
+    return calls
 end
 
 local function mailbox()
@@ -155,7 +175,7 @@ describe("critical path: mailing", function()
     end)
     after_each(function()
         assertQuiet(ns)
-        _G.Auctionator = nil
+        _G.Auctionator, _G.TSM_API = nil, nil
     end)
 
     it("the .toc loads every addon file and only files that exist", function()
@@ -276,6 +296,54 @@ describe("critical path: mailing", function()
         WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 30 * 86400
         ns.MailWindow.Refresh()
         assert.is_nil(previewed(ns)[2318], "past launch day 13 it stays like anything unpriced")
+    end)
+
+    it("TradeSkillMaster alone: its prices count like Auctionator's, an unpriced item stays", function()
+        -- AGENTS.md Safety "with Auctionator" = with an auction price source (Prices.Source).
+        _G.Auctionator = nil
+        useTSM(prices)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.truthy(preview[6515], "a priced BoE green goes")
+        assert.is_nil(preview[858], "an unpriced potion stays")
+        assert.truthy(preview[2318], "an unpriced white trade good goes on a fresh realm")
+        assert.is_nil(preview[4865], "junk without a price stays")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("TradeSkillMaster alone: past launch day 13, or when its price call fails, unpriced items stay", function()
+        _G.Auctionator = nil
+        useTSM(prices)
+        local launchWeek = WowStub.state.serverTime
+        WowStub.state.serverTime = ns.Valuation.LAUNCH_EPOCH + 30 * 86400
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(previewed(ns)[2318], "past launch day 13 it stays like anything unpriced")
+        WowStub.state.serverTime = launchWeek
+        ns.MailWindow.Refresh()
+        assert.truthy(previewed(ns)[2318], "back in launch week it would go")
+        _G.TSM_API.GetCustomPriceValue = function() error("boom") end
+        ns.MailWindow.Refresh()
+        assert.same({}, previewed(ns), "a failing price call is never 'no price yet': nothing goes")
+    end)
+
+    it("Auctionator and TradeSkillMaster both installed: Auctionator's prices decide", function()
+        local tsmPrices = {}
+        for l in pairs(prices) do tsmPrices[l] = 1 end -- TSM would call everything worthless
+        tsmPrices[WowStub.link(858, "Lesser Healing Potion")] = 90000 -- and the potion a fortune
+        local calls = useTSM(tsmPrices)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.truthy(preview[6515], "Auctionator's price for the green")
+        assert.is_nil(preview[858], "unpriced in Auctionator: stays, whatever TSM says")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+        assert.same({}, calls, "TSM isn't asked")
     end)
 
     it("a binding: the friend gets their profession's materials, the bank alt the rest, nobody else", function()

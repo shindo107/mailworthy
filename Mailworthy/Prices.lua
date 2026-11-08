@@ -10,6 +10,16 @@
 -- (Auctionator 340/341, 2026-10-13): the API.v1 calls below exist and return
 -- prices after a scan (age 0, exact). Every call is guarded: a missing or failing
 -- call is "no price", never a guess.
+--
+-- TradeSkillMaster (optional, 2026-11-08, a CurseForge request) is the other auction price
+-- source: its public TSM_API (TSM 4.x Core/API.lua; TSM 4.15 ships a Forever build):
+-- TSM_API.ToItemString(link) -> "i:12345", TSM_API.GetCustomPriceValue(source, itemString)
+-- -> copper or nil, errorMessage (nil + message both for "no data" and for an invalid
+-- source, so TSM_API.IsCustomPriceValid(source) tells them apart). Sources read: this realm's
+-- AuctionDB "DBMinBuyout" (lowest buyout at TSM's last data) and "DBMarket" (its market
+-- value). Never region sources: the item sells on this realm's AH. Auctionator wins when both
+-- are installed (Prices.Source): its scans carry an age, exactness and a daily history that the
+-- decision rule uses, and TSM's public API has none of those.
 local _, ns = ...
 
 local Prices = {}
@@ -40,6 +50,78 @@ function Prices.Auctionator()
     api = type(api) == "table" and type(api.API) == "table" and api.API.v1
     return type(api) == "table" and type(api.GetAuctionPriceByItemLink) == "function" and api or nil
 end
+
+--- TradeSkillMaster's public API table (TSM_API with GetCustomPriceValue), or nil.
+function Prices.TSM()
+    local api = rawget(_G, "TSM_API")
+    return type(api) == "table" and type(api.GetCustomPriceValue) == "function" and api or nil
+end
+
+Prices.SOURCE_NAME = { Auctionator = "Auctionator", TSM = "TradeSkillMaster" }
+
+--- The auction price source in use: "Auctionator" (wins when both are installed), "TSM", or nil.
+--- Any source counts as "with Auctionator" in the AGENTS.md Safety rules: an item it has no
+--- price for stays in the bags; with none, only unlocked, tradeable white items are mailed.
+function Prices.Source()
+    if Prices.Auctionator() then return "Auctionator" end
+    if Prices.TSM() then return "TSM" end
+    return nil
+end
+
+--- What to call the source in the settings, `/mw scan` and `/mw report`: "Auctionator",
+--- "TradeSkillMaster", "Auctionator (TSM installed, not used)", or nil.
+function Prices.SourceText()
+    local source = Prices.Source()
+    if not source then return nil end
+    local text = Prices.SOURCE_NAME[source]
+    if source == "Auctionator" and Prices.TSM() then text = text .. " (TSM installed, not used)" end
+    return text
+end
+
+--- TSM's item string for a link ("i:12345", with its bonus / random parts when TSM keeps
+--- them); falls back to "i:<item ID>" read from the link when ToItemString can't say.
+function Prices.TSMItemString(link)
+    local api = Prices.TSM()
+    if not api or type(link) ~= "string" then return nil end
+    local s = call(api.ToItemString, link)
+    if type(s) == "string" and s:find("^[ip]:%d+") then return s end
+    local id = link:match("item:(%d+)") or link:match("^i:(%d+)")
+    return id and ("i:" .. id) or nil
+end
+
+local tsmValid = {} -- source -> true once IsCustomPriceValid said so (a "no" is asked again)
+
+--- One TSM price source for an item string: copper, or nil; second return true when the call
+--- failed (it raised, or TSM doesn't know the source), which is never "no price yet".
+local function tsmValue(api, source, itemString)
+    local ok, value = pcall(api.GetCustomPriceValue, source, itemString)
+    if not ok then return nil, true end
+    value = copper(value)
+    if value ~= nil then return math.floor(value + 0.5), false end
+    -- nil comes with a message both for "no data for this item" and for an unknown source:
+    -- only a source TSM calls valid makes it "no price yet"; anything else is a failed call.
+    if not tsmValid[source] then
+        local okValid, valid = try(api.IsCustomPriceValid, source)
+        tsmValid[source] = okValid and valid == true or nil
+    end
+    return nil, not tsmValid[source]
+end
+
+--- TSM's unit price for an item string: the lower of DBMinBuyout and DBMarket (the last data's
+--- lowest buyout, capped by the market value as Auctionator's last scan is capped by its median),
+--- or whichever one there is. Returns unit, failed, minBuyout, market.
+function Prices.TSMUnit(itemString)
+    local api = Prices.TSM()
+    if not api or not itemString then return nil, true end
+    local minBuyout, failedMin = tsmValue(api, "DBMinBuyout", itemString)
+    local market, failedMarket = tsmValue(api, "DBMarket", itemString)
+    local unit = minBuyout
+    if market ~= nil and (unit == nil or market < unit) then unit = market end
+    return unit, (unit == nil and (failedMin or failedMarket)) or false, minBuyout, market
+end
+
+--- Forget what IsCustomPriceValid said (specs; TSM loaded or changed later).
+function Prices.ResetTSM() tsmValid = {} end
 
 --- Siz DisenchantValue's API table (DisenchantValueAPI with GetValue), or nil.
 --- Detected by the API, not the addon folder name (unverified; README "Beta unknowns").
@@ -106,11 +188,14 @@ function Prices.History(link)
     return history
 end
 
---- Auctionator's price for a material by item ID (copper per unit), the call Disenchantry
---- uses for its material prices (GetAuctionPriceByItemID, else the link form).
+--- The auction price for a material by item ID (copper per unit): Auctionator's, the call
+--- Disenchantry uses for its material prices (GetAuctionPriceByItemID, else the link form);
+--- TradeSkillMaster's (Prices.TSMUnit) when it is the source.
 function Prices.MaterialPrice(itemID)
+    if not tonumber(itemID) then return nil end
+    if Prices.Source() == "TSM" then return (Prices.TSMUnit("i:" .. math.floor(tonumber(itemID)))) end
     local api = Prices.Auctionator()
-    if not api or not tonumber(itemID) then return nil end
+    if not api then return nil end
     if type(api.GetAuctionPriceByItemID) == "function" then
         return copper(call(api.GetAuctionPriceByItemID, Prices.CALLER, tonumber(itemID)))
     end
@@ -143,8 +228,12 @@ end
 --- { ah = copper per unit (last scan's minimum buyout), failed = true when that call errored, age = days since seen, exact = true / false /
 ---   nil (unknown), de = copper per item, deSource = "DisenchantValue" / "Disenchantry" / "tables" / "Auctionator"
 ---   (Prices.DisenchantValueFor), history = Prices.History(link),
----   available = units listed at the last scanned day }; any may be nil.
+---   available = units listed at the last scanned day, source = "Auctionator" / "TSM" }; any may be nil.
+--- With TradeSkillMaster as the source: ah = Prices.TSMUnit, with minBuyout and market beside
+--- it; age, exact and history are nil (its public API doesn't give them).
 function Prices.Lookup(link)
+    local source = Prices.Source()
+    if source == "TSM" then return Prices.LookupTSM(link) end
     local api = Prices.Auctionator()
     if not api then return nil end
     local exact = call(api.IsAuctionDataExactByItemLink, Prices.CALLER, link)
@@ -162,6 +251,22 @@ function Prices.Lookup(link)
         history = history,
         available = history and history[1].available or nil,
         source = "Auctionator",
+    }
+end
+
+--- Prices.Lookup with TradeSkillMaster as the source (nil without TSM).
+function Prices.LookupTSM(link)
+    if not Prices.TSM() then return nil end
+    local unit, failed, minBuyout, market = Prices.TSMUnit(Prices.TSMItemString(link))
+    local de, deSource = Prices.DisenchantValueFor(link)
+    return {
+        ah = unit,
+        failed = failed or nil, -- the price call itself failed: never "no price yet" (AGENTS safety)
+        minBuyout = minBuyout,
+        market = market,
+        de = de,
+        deSource = de ~= nil and deSource or nil,
+        source = "TSM",
     }
 end
 

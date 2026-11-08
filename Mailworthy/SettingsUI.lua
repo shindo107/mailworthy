@@ -414,8 +414,13 @@ local function fillMain(bankAlt, here, choices)
     guildButton:SetText(UI.GuildButtonText(ns.Guild.On() and ns.Guild.Mine() ~= nil, ns.Guild.On() and ns.Guild.Template()))
     minimapButton:SetText("Minimap button: " .. (ns.Config.MinimapShown() and "shown" or "hidden"))
     W.SetToggled(minimapButton, ns.Config.MinimapShown() == true)
-    pricesLine:SetText("Prices: " .. (ns.Prices.Auctionator() and "Auctionator"
-        or "none (install Auctionator; only white items are mailed)"))
+    pricesLine:SetText(UI.PricesText())
+end
+
+--- The main view's "Prices:" line: the auction source in use (Auctionator wins over
+--- TradeSkillMaster), or what installing one changes.
+function UI.PricesText()
+    return "Prices: " .. (ns.Prices.SourceText() or "none (install Auctionator or TSM; only white items are mailed)")
 end
 
 function UI.Refresh()
