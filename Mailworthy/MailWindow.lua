@@ -33,6 +33,7 @@ local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, stal
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
+local shownAlt -- the bank alt the list on screen was drawn for (UI.Send compares against it)
 local pages = { mail = 1, stay = 1 }
 
 UI.CHIPS = {
@@ -227,7 +228,7 @@ local function createRouteRows()
     friendsButton = W.Button(frame, "Friends...", 90, function() ns.RoutesUI.Show(frame) end, "MailworthyMailFriends")
     guildButton = W.Button(frame, "Guild rules: on", 130, function()
         if ns.Guild.SetUse(false) then
-            ns.Print("Guild rules off: your materials no longer follow the guild template. Turn them back on in Friends.")
+            ns.Print("Guild rules off: your materials no longer follow the guild template. Turn them back on with /mw guild.")
         end
         UI.Refresh()
     end, "MailworthyMailGuildRules")
@@ -255,6 +256,22 @@ local function createRouteRows()
     end
 end
 
+--- Pure: the last row when more bindings apply than show. Own bindings come first in the list,
+--- so when the first hidden one is a guild rule, all the hidden ones are: those are in the Guild
+--- window, not Friends (2026-11-07, Codex review).
+function UI.MoreText(n, guildOnly)
+    return string.format("|cffaaaaaa+ %d more: %s|r", n, guildOnly and "guild rules, /mw guild" or "press Friends...")
+end
+
+--- Pure: a binding row's grey tags: "(guild, skill 120)", "(skill 120)", "(guild)" or "". The skill
+--- shows why a material past it stays (2026-11-07: "i'm not sure hiphop is on linen anymore").
+function UI.RouteTags(guild, skill)
+    local tags = {}
+    if guild then tags[#tags + 1] = "guild" end
+    if skill then tags[#tags + 1] = "skill " .. tostring(skill) end
+    return #tags > 0 and (" |cff888888(" .. table.concat(tags, ", ") .. ")|r") or ""
+end
+
 --- Fill the binding rows; returns how many rows show (0: the block is hidden).
 local function fillRoutes()
     local list = ns.Routes.List()
@@ -263,7 +280,7 @@ local function fillRoutes()
         local r = list[i]
         row.key = r and r.key or nil
         if r and i == UI.ROUTE_ROWS and #list > UI.ROUTE_ROWS then
-            row.text:SetText(string.format("|cffaaaaaa+ %d more: press Friends...|r", #list - UI.ROUTE_ROWS + 1))
+            row.text:SetText(UI.MoreText(#list - UI.ROUTE_ROWS + 1, r.scope == "guild"))
             row.key = nil
             row.skip:Hide()
             row.remove:Hide()
@@ -272,7 +289,7 @@ local function fillRoutes()
             local skipped = ns.Routes.Skipped(r.key)
             row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. firstName(to) .. "|r"
                 .. (crafter and (" |cff888888(" .. firstName(r.to) .. "'s crafter)|r") or "")
-                .. (r.scope == "guild" and " |cff888888(guild)|r" or "")
+                .. UI.RouteTags(r.scope == "guild", ns.Routes.Skill(r))
                 .. (skipped and " |cff888888skipped this time|r" or ""))
             row.skip:SetText(skipped and "Undo skip" or "Skip once")
             row.skip:Show()
@@ -524,6 +541,7 @@ function UI.Refresh(keepScan)
     local pad = ns.MailButton.GamepadUI()
     title:SetText("Mailworthy  " .. (pad and ns.Gamepad.Glyph(ns.Gamepad.FACE_TOP) or ""))
     local bankAlt = ns.Config.BankAlt()
+    shownAlt = bankAlt
     local isBankAlt = ns.Config.IsBankAltHere()
     local t = result.totals
     local recipients = UI.Recipients(t, bankAlt, isBankAlt)
@@ -613,10 +631,55 @@ function UI.Refresh(keepScan)
     ns.Nav.Revalidate()
 end
 
+--- Pure: the items of a fresh scan (`fresh`, its mail list, for bank alt `freshAlt`) going
+--- somewhere the list on screen (`shown`, drawn for `previewAlt`) didn't say: an item the preview
+--- sent elsewhere, or a new one (bags changed) to a player the preview didn't name; the bank alt
+--- the list named is always shown ("To: ..."). Items are told apart by link (one item ID can be
+--- several items: a green's random suffix), and one item may go to several shown recipients.
+--- A binding's recipient can move between the preview and Send without the bags changing (a
+--- crafter's skill passes a material, two bindings swap on "lowest skill first"), and so can the
+--- bank alt (picked in Settings beside the list) (Codex review, 2026-11-07).
+function UI.Changed(shown, fresh, previewAlt, freshAlt)
+    if freshAlt == nil then freshAlt = previewAlt end
+    local function key(it) return it.link or it.itemID end
+    local was, named = {}, { [tostring(previewAlt)] = true }
+    for _, it in ipairs(shown or {}) do
+        local to = tostring(it.result and it.result.to or previewAlt)
+        local k = key(it)
+        was[k] = was[k] or {}
+        was[k][to] = true
+        named[to] = true
+    end
+    local changed = {}
+    for _, it in ipairs(fresh or {}) do
+        local to = tostring(it.result and it.result.to or freshAlt)
+        local before = was[key(it)]
+        if (before and not before[to]) or (not before and not named[to]) then
+            changed[#changed + 1] = { item = it, was = before and next(before) or nil, to = to }
+        end
+    end
+    return changed
+end
+
 function UI.Send()
     if not result then return end
     ns.lastCommand = "Mailworthy Send"
+    local shown, alt = result.mail, shownAlt
     UI.Refresh() -- the freshest scan, so the mail list is what's in the bags now
+    -- AGENTS Safety: mail goes only to the recipients the player saw. If the fresh scan sends
+    -- anything elsewhere, nothing goes: the list now shows where, and a second press sends it.
+    local changed = UI.Changed(shown, result.mail, alt, ns.Config.BankAlt())
+    if #changed > 0 then
+        local c = changed[1]
+        local name = tostring(c.item.link or ""):match("%[(.-)%]") or ("item " .. tostring(c.item.itemID))
+        local text = string.format("Not sent: %s now goes to %s%s. Check the list, then press Send again.", name,
+            firstName(c.to), c.was and (" instead of " .. firstName(c.was)) or "")
+        ns.Log.Add("mailer", "send held: %d item(s) changed recipient since the preview (%s to %s, was %s)", #changed,
+            name, c.to, tostring(c.was))
+        ns.Print(text)
+        totalNote:SetText("|cffff8040" .. text .. "|r")
+        return
+    end
     ns.Mailer.Start(result.mail, ns.Config.BankAlt())
     UI.Refresh(true)
 end

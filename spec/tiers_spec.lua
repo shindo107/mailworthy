@@ -75,8 +75,12 @@ describe("material tiers", function()
             assert.equal("your First Aid needs it", reason(255645, 15, 0), "Swollen Venom Sac: Potent Anti-Venom")
             assert.equal("your First Aid needs it", reason(1468, 7, 8), "Murloc Fin: Clever Poultice")
             assert.equal("your First Aid needs it", reason(7080, 7, 10), "Essence of Water: Powerful Poultice")
-            assert.is_true(ns.Routes.Matches({ profession = FIRST_AID }, { itemID = 3357, classID = 7, subclassID = 9 }),
-                "a First Aid binding takes Liferoot")
+            -- A binding takes primary materials only (operator, 2026-11-07: "only focus on the primary
+            -- materials ... they can ask or acquire some minor pieces"): First Aid's is cloth.
+            assert.is_false(ns.Routes.Matches({ profession = FIRST_AID }, { itemID = 3357, classID = 7, subclassID = 9 }),
+                "a First Aid binding leaves Liferoot to the normal rule")
+            assert.is_true(ns.Routes.Matches({ profession = FIRST_AID }, { itemID = 2592, classID = 7, subclassID = 5 }),
+                "a First Aid binding takes Wool Cloth")
         end)
 
         it("other professions: where the last recipe using it goes grey, through the parts it makes", function()

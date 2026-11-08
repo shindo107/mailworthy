@@ -87,7 +87,8 @@ end
 -- the auction house pays well for to the bank alt; soulbound gear never leaves (a hard keep).
 Routes.ENCHANTING = 333
 Routes.GEAR_QUALITIES = { [2] = true, [3] = true } -- uncommon (green), rare (blue)
-Routes.BINDING_MATS = { [333] = "dust, essences, shards, green and blue gear" } -- what a binding takes, when more
+-- What a binding takes, when it differs from the profession's own list (primary materials only).
+Routes.BINDING_MATS = { [333] = "dust, essences, shards, green and blue gear", [129] = "cloth" }
 
 --- The crafting professions a binding can name: { { id, name, mats }, ... } by name.
 function Routes.Professions()
@@ -113,17 +114,23 @@ function Routes.Key(profession, to)
     return tostring(profession) .. "|" .. tostring(to):lower()
 end
 
---- Pure: the item is a trade good the binding's profession uses, or, for Enchanting, a
---- green or blue weapon or armor piece to disenchant. A material the bound player's skill
---- (`route.skill`, Routes.Skill) is past (Tiers) doesn't match, unless `tiers` is false or
---- converting it still pays (Tiers.WorthConverting with `priceOf`: the friend converts it);
---- the second return is then true.
+--- Pure: the item is one of the binding's profession's primary materials: a trade good of its
+--- own subclasses (cloth for Tailoring, herbs for Alchemy), or, for Enchanting, a green or
+--- blue weapon or armor piece to disenchant. What a profession uses on the side (Tiers.KEEP:
+--- an engineer's Linen Cloth, a blacksmith's gems) isn't mailed to a binding (2026-11-07: "only
+--- focus on the primary materials ... they can ask or acquire some minor pieces"); it follows
+--- the normal rule. A material the bound player's skill (`route.skill`, Routes.Skill) is past
+--- (Tiers) doesn't match, unless `tiers` is false or converting it still pays
+--- (Tiers.WorthConverting with `priceOf`: the friend converts it); the second return is then true.
 function Routes.Matches(route, item, tiers, priceOf)
     if tonumber(route.profession) == Routes.ENCHANTING and Routes.GEAR_QUALITIES[tonumber(item.quality) or -1]
         and ns.Valuation.CanDisenchant(item) then
         return true
     end
-    if not ns.Valuation.Uses(ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1], item) then return false end
+    local p = ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1]
+    if not (p and item.classID == ns.Valuation.TRADE_GOODS and p.subclasses[item.subclassID] == true) then
+        return false
+    end
     if tiers ~= false and ns.Tiers.Outgrown(route.profession, item.itemID, route.skill)
         and not ns.Tiers.WorthConverting(route.profession, item.itemID, priceOf) then
         return false, true
@@ -202,30 +209,50 @@ end
 --- item, `routes` the active bindings (Routes.Active()). Returns the new verdict, or nil
 --- when no binding applies; a second return names the binding whose cap kept the item on
 --- the normal rule, a third the binding whose player's skill is past the material (Tiers).
+local GROUP = { character = 1, account = 2, guild = 3 }
+
+--- Pure: of two bindings that both take an item, `a` goes first: this character's, then the
+--- account's, then the guild's (this character's win, personal wins), then within one of those
+--- the recipient with the lower skill in their profession (`skill`, Routes.Active; operator,
+--- 2026-11-07, Blacksmithing and Engineering both taking metal and stone: "Lowest skill first",
+--- so both crafters keep levelling), a known skill before an unknown one; else the list's order.
+function Routes.Before(a, b)
+    local ga, gb = GROUP[a.scope] or 2, GROUP[b.scope] or 2
+    if ga ~= gb then return ga < gb end
+    local sa, sb = tonumber(a.skill), tonumber(b.skill)
+    if sa and sb then return sa < sb end
+    return sa ~= nil and sb == nil
+end
+
+--- Pure: divert an item to a binding. `verdict` is Valuation.Evaluate's result for the
+--- item, `routes` the active bindings (Routes.Active()). Returns the new verdict, or nil
+--- when no binding applies; a second return names the binding whose cap kept the item on
+--- the normal rule, a third the binding whose player's skill is past the material (Tiers).
+--- Several bindings taking the item (metal and stone: Blacksmithing and Engineering): the first
+--- by Routes.Before; its cap decides, as if it were the only one.
 function Routes.Divert(item, verdict, price, settings, routes)
     if verdict and verdict.action == "keep" and Routes.HARD_KEEPS[verdict.reason] then return nil end
-    local outgrown
-    for _, route in ipairs(routes or {}) do
-        local matches, past = Routes.Matches(route, item, settings and settings.tiers, settings and settings.priceOf)
-        if past then outgrown = outgrown or route end
-        if matches then
-            local unit
-            if type(price) == "table" and price.ah ~= nil
-                and (price.age == nil or price.age <= (settings and settings.maxAgeDays or math.huge)) then
-                unit = ns.Valuation.SmoothedPrice(price)
-            end
-            if route.cap and unit and unit >= route.cap then return nil, route end
-            local to, crafter = Routes.Recipient(route)
-            local n = item.count or 1
-            return {
-                action = "mail", route = Routes.ROUTE, to = to, crafter = crafter, key = route.key, what = Routes.What(route),
-                reason = Routes.What(route) .. " go to " .. tostring(to),
-                vendor = (item.vendor or 0) * n, postage = (settings and settings.postage or 30) * (item.stacks or 1),
-                ahUnit = unit,
-            }
-        end
+    local outgrown, route
+    for _, r in ipairs(routes or {}) do
+        local matches, past = Routes.Matches(r, item, settings and settings.tiers, settings and settings.priceOf)
+        if past then outgrown = outgrown or r end
+        if matches and (not route or Routes.Before(r, route)) then route = r end
     end
-    return nil, nil, outgrown
+    if not route then return nil, nil, outgrown end
+    local unit
+    if type(price) == "table" and price.ah ~= nil
+        and (price.age == nil or price.age <= (settings and settings.maxAgeDays or math.huge)) then
+        unit = ns.Valuation.SmoothedPrice(price)
+    end
+    if route.cap and unit and unit >= route.cap then return nil, route end
+    local to, crafter = Routes.Recipient(route)
+    local n = item.count or 1
+    return {
+        action = "mail", route = Routes.ROUTE, to = to, crafter = crafter, key = route.key, what = Routes.What(route),
+        reason = Routes.What(route) .. " go to " .. tostring(to),
+        vendor = (item.vendor or 0) * n, postage = (settings and settings.postage or 30) * (item.stacks or 1),
+        ahUnit = unit,
+    }
 end
 
 -- Saved bindings ----------------------------------------------------------------
@@ -243,13 +270,19 @@ local function withKeys(list, scope)
     return out
 end
 
+--- The player's own bindings (the friends window's): this character's, then the account's.
+function Routes.Personal()
+    local list = withKeys(charList(), "character")
+    for _, r in ipairs(withKeys(accountList(), "account")) do list[#list + 1] = r end
+    return list
+end
+
 --- Every binding that applies to this character: this character's first, then the
 --- account's for this realm + faction, then the guild template's rules while the player has
 --- them on (Guild.Rules: personal bindings and this character's professions come first).
 --- Each carries `scope` ("character" / "account" / "guild") and `key`.
 function Routes.List()
-    local list = withKeys(charList(), "character")
-    for _, r in ipairs(withKeys(accountList(), "account")) do list[#list + 1] = r end
+    local list = Routes.Personal()
     if ns.Guild then
         for _, r in ipairs(ns.Guild.Rules(list)) do list[#list + 1] = r end
     end
@@ -489,6 +522,7 @@ function Routes.CandidateText(c)
     if #profs > 0 then parts[#parts + 1] = table.concat(profs, ", ") end
     if c.online then parts[#parts + 1] = "online" end
     local where = {}
+    if c.sources.me then where[#where + 1] = "you" end
     for _, s in ipairs({ "party", "guild", "alt" }) do
         if c.sources[s] then where[#where + 1] = s == "alt" and "my character" or s end
     end
@@ -523,6 +557,20 @@ function Routes.Candidates()
         return a.name < b.name
     end)
     return list
+end
+
+--- This character as a candidate, for a guild template rule naming its author (2026-11-07: "I
+--- should be able to set routing to me in the guild template as well"): a binding to yourself
+--- means nothing, but the guild's other members (and this account's other characters) mail you.
+function Routes.Me()
+    local name = Routes.Clean(ns.PlayerName())
+    if not name then return nil end
+    local ids = {}
+    for _, p in ipairs(ns.Characters.Professions()) do
+        local id = tonumber(p.skillLine)
+        if Routes.ProfessionName(id) then ids[#ids + 1] = id end
+    end
+    return { name = name, sources = { me = true, guild = true }, professions = ids, professionSet = {}, online = true }
 end
 
 local lastRosterRequest = -math.huge

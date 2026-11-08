@@ -100,6 +100,7 @@ local HELP = {
         .. " (also: tags, lock glow, minimap button)",
     "/mw friends - send a profession's materials to a guild member, party member or one of your characters"
         .. " (bindings; the Mailworthy window shows them with Skip once)",
+    "/mw guild - your guild's template: turn the guild rules on or off; the guild master and officers edit it",
     "/mw locks - list this character's locked items",
     "/mw scan - what Mailworthy would mail and why (sends nothing)",
     "/mw ledger - what other players mailed you beyond what you sent back, and Export log (every mail sent"
@@ -128,6 +129,8 @@ function ns.HandleSlash(msg)
         ns.Locks.PrintList()
     elseif cmd == "friends" or cmd == "bindings" then
         ns.RoutesUI.Show()
+    elseif cmd == "guild" then
+        ns.RoutesUI.ShowGuild()
     elseif cmd == "scan" then
         ns.Bags.Scan()
     elseif cmd == "ledger" or cmd == "log" then

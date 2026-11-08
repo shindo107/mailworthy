@@ -52,6 +52,58 @@ describe("bindings", function()
             assert.is_false(ns.Routes.Matches({ to = BOB, profession = 186 }, { classID = 7, subclassID = 7 }), "Mining binds nothing")
         end)
 
+        it("takes primary materials only: Linen Cloth goes to the tailor's rule, never the engineer's", function()
+            -- 2026-11-07: Linen Cloth (Engineering uses it on the side) went to the guild's engineer;
+            -- the operator: "only focus on the primary materials ... they can ask or acquire some minor pieces"
+            local linen = { itemID = 2589, classID = 7, subclassID = 5, quality = 1, count = 22, stacks = 2, vendor = 1 }
+            local ENGINEERING = 202
+            assert.is_false(ns.Routes.Matches({ to = BOB, profession = ENGINEERING }, linen), "Linen is a side material")
+            assert.is_true(ns.Routes.Matches({ to = BOB, profession = ENGINEERING }, { itemID = 2770, classID = 7, subclassID = 7 }),
+                "Copper Ore: metal and stone")
+            assert.is_true(ns.Routes.Matches({ to = BOB, profession = TAILORING }, linen))
+            local D = ns.Valuation.DEFAULTS
+            local engineer = { to = "Jold Ark", profession = ENGINEERING, key = "e", cap = 50000 }
+            local tailor = { to = "Hiphoptobop", profession = TAILORING, key = "t", cap = 50000 }
+            assert.equal("Hiphoptobop", ns.Routes.Divert(linen, { action = "mail" }, nil, D, { engineer, tailor }).to,
+                "the engineer's rule comes first in the list and still doesn't take it")
+            assert.is_nil(ns.Routes.Divert(linen, { action = "mail" }, nil, D, { engineer }), "the normal rule decides")
+            local past = { to = "Hiphoptobop", profession = TAILORING, key = "t", cap = 50000, skill = 125 }
+            local v, _, outgrown = ns.Routes.Divert(linen, { action = "mail" }, nil, D, { engineer, past })
+            assert.is_nil(v, "a tailor past Linen (115) doesn't get it either: the bank alt does")
+            assert.equal(past, outgrown)
+        end)
+
+        it("metal and stone with a blacksmith's and an engineer's rule: lowest skill first", function()
+            -- operator, 2026-11-07: "Lowest skill first", so both crafters keep levelling
+            local bar = { itemID = 2840, classID = 7, subclassID = 7, quality = 1, count = 20, stacks = 1, vendor = 1 }
+            local D = ns.Valuation.DEFAULTS
+            local function to(routes) local v = ns.Routes.Divert(bar, { action = "mail" }, nil, D, routes); return v and v.to end
+            local function smith(skill, scope)
+                return { to = "Smith", profession = 164, key = "b", skill = skill, scope = scope or "guild" }
+            end
+            local function engineer(skill, scope)
+                return { to = "Jold Ark", profession = 202, key = "e", skill = skill, scope = scope or "guild" }
+            end
+            assert.equal("Jold Ark", to({ smith(150), engineer(60) }), "the engineer is lower")
+            assert.equal("Smith", to({ smith(60), engineer(150) }), "the blacksmith is lower")
+            assert.equal("Smith", to({ smith(90), engineer(90) }), "a tie keeps the list's order")
+            assert.equal("Jold Ark", to({ smith(nil), engineer(250) }), "a known skill before an unknown one")
+            assert.equal("Smith", to({ smith(nil), engineer(nil) }), "nothing known: the list's order")
+            assert.equal("Jold Ark", to({ smith(200), engineer(250) }), "past Copper Bar (185) the blacksmith's rule lets go")
+            assert.equal("Smith", to({ smith(150, "account"), engineer(10) }), "own bindings before the guild's")
+            assert.equal("Jold Ark", to({ smith(20, "account"), engineer(150, "character") }), "this character's first")
+            local capped = smith(150)
+            capped.cap = 100
+            local engineerCapFree = engineer(10)
+            local v = ns.Routes.Divert(bar, { action = "mail" }, { ah = 500, age = 0 }, D, { capped, engineerCapFree })
+            assert.equal("Jold Ark", v.to, "the lower skill's own cap decides")
+            local capRoute
+            engineerCapFree.cap = 100
+            v, capRoute = ns.Routes.Divert(bar, { action = "mail" }, { ah = 500, age = 0 }, D, { capped, engineerCapFree })
+            assert.is_nil(v, "over the chosen rule's cap: the bank alt")
+            assert.equal(engineerCapFree, capRoute)
+        end)
+
         it("an Enchanting binding also takes green and blue weapons and armor to disenchant", function()
             local route = { to = BOB, profession = ENCHANTING }
             assert.is_true(ns.Routes.Matches(route, { classID = 4, subclassID = 2, quality = 2 }), "green armor")

@@ -154,6 +154,8 @@ local function newWidget(kind, name)
         if key == "Hide" then return function() self.shown = false; runHooks("OnHide") end end
         if key == "IsShown" then return function() return self.shown end end
         if key == "SetText" then return function(_, t) self.text = t end end
+        if key == "SetPoint" then return function(_, ...) rawset(self, "point", { ... }) end end
+        if key == "ClearAllPoints" then return function() rawset(self, "point", nil) end end
         if key == "SetAttribute" then
             return function(_, k, v) rawset(self, "attributes", rawget(self, "attributes") or {}); self.attributes[k] = v end
         end
