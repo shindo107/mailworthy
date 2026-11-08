@@ -43,4 +43,5 @@ LedgerUI.lua
 MinimapButton.lua
 MailWindow.lua
 BankAlt.lua
+AuctionatorTags.lua
 Report.lua

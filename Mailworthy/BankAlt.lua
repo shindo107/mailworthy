@@ -172,9 +172,26 @@ function BankAlt.Decorate(button, bag, slot)
     t.text:Show()
 end
 
+--- The tag for an item shown outside the bags (Auctionator's Selling tab: AuctionatorTags.lua):
+--- by bag and slot when known, else by link; nil when there's none or tags don't show here.
+function BankAlt.TagAt(bag, slot, link)
+    if not BankAlt.Active() then return nil end
+    local c = current()
+    local item = (bag ~= nil and slot ~= nil and c.bySlot[bag .. ":" .. tostring(slot)]) or (link and c.byLink[link])
+    return item and item.verdict or nil
+end
+
+local redrawListeners = {}
+--- `fn()` after every redraw of the bag tags (AuctionatorTags redraws its own tags then).
+function BankAlt.OnRedraw(fn) redrawListeners[#redrawListeners + 1] = fn end
+
 local function redraw()
     BankAlt.Invalidate()
     ns.Border.RefreshAll()
+    for _, fn in ipairs(redrawListeners) do
+        local ok, err = pcall(fn)
+        if not ok then ns.Log.Add("bankalt", "redraw listener error: %s", tostring(err)) end
+    end
     if legend then
         local mode = ns.Features.On("bankAltTags") and BankAlt.Mode()
         legend:SetText(mode == "vendor" and "Mailworthy: |cffd0b070V|r sell to a vendor"

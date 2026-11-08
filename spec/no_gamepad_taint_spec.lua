@@ -78,4 +78,23 @@ describe("no writes into the controller UI", function()
         assert.equal(0, #InboxFrame.gamepadFooter.calls)
         assert.falsy(table.concat(MailworthyDB.log, "\n"):find("Mailworthy called", 1, true))
     end)
+
+    it("tags Auctionator's Selling tab buttons without touching them (AuctionatorTags.lua)", function()
+        local ns = loadAddon()
+        _G.Auctionator = { API = { v1 = { GetAuctionPriceByItemLink = function() return 174 end } } }
+        _G.AuctionatorGroupsViewItemMixin = { SetItemInfo = function() end }
+        ns.Fire("PLAYER_LOGIN")
+        ns.Config.SetBankAltHere() -- tags show on the bank alt
+        WowStub.setBag(0, 1, WowStub.item(2770, "Copper Ore", { count = 20, sell = 5 }))
+        ns.Fire("BAG_UPDATE_DELAYED")
+        -- an Auctionator item button (no Lua field may be written on it), created after login
+        local button = WowStub.itemButton(nil, nil)
+        WowStub.state.gamepadUI = true
+        _G.AuctionatorGroupsViewItemMixin.SetItemInfo(button, { itemLink = WowStub.link(2770, "Copper Ore"), itemCount = 20,
+            locations = { { GetBagAndSlot = function() return 0, 1 end } } })
+        assert.equal(1, ns.AuctionatorTags.Shown())
+        _G.Auctionator, _G.AuctionatorGroupsViewItemMixin = nil, nil
+        assert.falsy(table.concat(MailworthyDB.log, "\n"):find("Mailworthy called", 1, true))
+        assert.falsy(table.concat(MailworthyDB.log, "\n"):find("error", 1, true))
+    end)
 end)
