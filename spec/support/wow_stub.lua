@@ -187,7 +187,13 @@ local function newWidget(kind, name)
                 return p:IsVisible()
             end
         end
-        if key == "Click" then return function() if self.scripts.OnClick then self.scripts.OnClick(self) end end end
+        -- A disabled button ignores clicks, as in game.
+        if key == "Click" then
+            return function() if self.scripts.OnClick and rawget(self, "enabled") ~= false then self.scripts.OnClick(self) end end
+        end
+        if key == "Disable" then return function() rawset(self, "enabled", false) end end
+        if key == "Enable" then return function() rawset(self, "enabled", true) end end
+        if key == "IsEnabled" then return function() return rawget(self, "enabled") ~= false end end
         if key == "CreateFontString" or key == "CreateTexture" then
             return function() return newWidget(key == "CreateTexture" and "Texture" or "FontString") end
         end

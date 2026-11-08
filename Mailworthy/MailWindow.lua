@@ -5,6 +5,10 @@
 -- The window grows and shrinks to the rows it shows (UI.Layout); the X, Escape and
 -- the controller's Circle close it.
 --
+-- It opens by itself when the Send Mail tab shows (operator, 2026-11-08: "when you click send
+-- mail mailworthy should open"; the tab watcher sees the tab, switch autoOpen). Opened on the
+-- Inbox, Send is greyed out and says "Click Send Mail"; on Send Mail it is "Send to ...".
+--
 -- Mouse: click. Controller: Triangle at the mail window opens it, then the D-pad
 -- moves Mailworthy's own highlight, Cross presses, Circle closes (PadKey "window"
 -- set, Nav). Every row is a button: pressing an item locks it (it stays in the
@@ -636,17 +640,16 @@ function UI.Refresh(keepScan)
     if status then totalNote:SetText(status) end
     sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt, skipped))
     renderedInbox = UI.OnInbox()
-    if renderedInbox and not ns.Mailer.Busy() then
+    sendButton:Show()
+    if renderedInbox then
         -- Mail goes out from the Send Mail tab only, and we never switch tabs ourselves
-        -- (MailFrameTab_OnClick taints the controller UI). No Send button here at all
-        -- (operator, 2026-11-06: v0.16.1's secure "Open the Send Mail tab" button didn't show
-        -- in game; "if it ... actually switches to the send mail tab that's good but otherwise
-        -- just don't show it"): the note says where to go, and the list follows (the watcher).
-        sendButton:Hide()
-        totalNote:SetText("|cffffd100Mail goes out from the Send Mail tab: open it (the tab under the mail window) "
-            .. "and this list follows you there.|r")
+        -- (MailFrameTab_OnClick taints the controller UI). Send is greyed out here and names the
+        -- tab (operator, 2026-11-08: "the button should be greyed out with a 'click send mail'
+        -- text"); on Send Mail the watcher redraws it as "Send to ..." and the list follows.
+        if not ns.Mailer.Busy() then sendButton:SetText(UI.InboxSendText(pad)) end -- else "Sending..."
+        sendButton:Disable() -- busy or not: nothing is sent from the Inbox (Codex review)
     else
-        sendButton:Show()
+        sendButton:Enable()
     end
     legend:SetText(pad and W.Legend() or "")
     frame:SetHeight(UI.Layout(shown))
@@ -689,8 +692,13 @@ function UI.Changed(shown, fresh, previewAlt, freshAlt, stayed)
     return changed
 end
 
+--- Pure: the greyed-out Send button's text on the Inbox (the controller reaches Send Mail with R1).
+function UI.InboxSendText(pad)
+    return pad and "Send Mail tab: R1" or "Click Send Mail"
+end
+
 function UI.Send()
-    if not result then return end
+    if not result or UI.OnInbox() then return end
     ns.lastCommand = "Mailworthy Send"
     local shown, alt, stayed = result.mail, shownAlt, result.keep
     UI.Refresh() -- the freshest scan, so the mail list is what's in the bags now
@@ -767,6 +775,25 @@ function UI.CheckTab()
     return true
 end
 
+local sendWasVisible = false
+--- The watcher's third job: the Send Mail tab just showed and the window is closed: open it
+--- (operator, 2026-11-08). Once per showing: closed there, it stays closed until the tab shows
+--- again. Returns true when it opened the window.
+function UI.AutoOpen()
+    local send, mail = rawget(_G, "SendMailFrame"), rawget(_G, "MailFrame")
+    local visible = type(send) == "table" and send:IsVisible() == true and type(mail) == "table"
+    local opened = false
+    -- Not on the bank alt: its Mailworthy button opens the summary, not a list to send (Codex review).
+    if visible and not sendWasVisible and ns.Features.On("autoOpen") and not ns.Mailer.Busy()
+        and not ns.Config.IsBankAltHere() and not (frame and frame:IsVisible()) then
+        ns.Log.Add("ui", "Send Mail tab shown: window opened")
+        UI.Show("send")
+        opened = true
+    end
+    sendWasVisible = visible
+    return opened
+end
+
 --- Opened on the Inbox and the player moved to Send Mail: move the window there too.
 --- (Opened on Send Mail and back from the Inbox needs nothing: it was hidden with its tab.)
 function UI.FollowTab()
@@ -806,6 +833,7 @@ ns.On("PLAYER_LOGIN", function()
         if elapsed < 0.2 then return end
         elapsed = 0
         local ok, err = pcall(UI.FollowTab)
+        if ok then ok, err = pcall(UI.AutoOpen) end
         if ok then ok, err = pcall(UI.CheckTab) end
         if not ok then ns.Log.Add("ui", "tab watcher error: %s", tostring(err)) end
     end)
@@ -820,6 +848,8 @@ ns.On("PLAYER_LOGIN", function()
     local friends = ns.RoutesUI.Frame()
     if friends then friends:HookScript("OnHide", refreshIfShown) end
 end)
+-- A mailbox closed and reopened on Send Mail between two watcher ticks still opens the window.
+ns.On("MAIL_CLOSED", function() sendWasVisible = false end)
 ns.On("BAG_UPDATE_DELAYED", function()
     if not ns.Mailer.Busy() then refreshIfShown() end
 end)

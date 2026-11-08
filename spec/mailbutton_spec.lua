@@ -53,6 +53,7 @@ describe("mail button", function()
         ns.MailButton.Activate("Triangle")
         assert.is_false(ns.MailWindow.Frame():IsShown())
         assert.truthy(WowStub.printed[#WowStub.printed]:find("Send Mail tab (R1)", 1, true))
+        assert.truthy(WowStub.printed[#WowStub.printed]:find("Mailworthy opens there", 1, true), "R1 alone opens it now")
     end)
 
     it("shows the Triangle symbol only with the controller UI", function()
