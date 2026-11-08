@@ -255,6 +255,13 @@ local function createRouteRows()
     end
 end
 
+--- Pure: the last row when more bindings apply than show. Own bindings come first in the list,
+--- so when the first hidden one is a guild rule, all the hidden ones are: those are in the Guild
+--- window, not Friends (2026-11-07, Codex review).
+function UI.MoreText(n, guildOnly)
+    return string.format("|cffaaaaaa+ %d more: %s|r", n, guildOnly and "guild rules, /mw guild" or "press Friends...")
+end
+
 --- Pure: a binding row's grey tags: "(guild, skill 120)", "(skill 120)", "(guild)" or "". The skill
 --- shows why a material past it stays (2026-11-07: "i'm not sure hiphop is on linen anymore").
 function UI.RouteTags(guild, skill)
@@ -272,7 +279,7 @@ local function fillRoutes()
         local r = list[i]
         row.key = r and r.key or nil
         if r and i == UI.ROUTE_ROWS and #list > UI.ROUTE_ROWS then
-            row.text:SetText(string.format("|cffaaaaaa+ %d more: press Friends...|r", #list - UI.ROUTE_ROWS + 1))
+            row.text:SetText(UI.MoreText(#list - UI.ROUTE_ROWS + 1, r.scope == "guild"))
             row.key = nil
             row.skip:Hide()
             row.remove:Hide()

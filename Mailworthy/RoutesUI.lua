@@ -44,6 +44,8 @@ local view = "list"
 local target = "me" -- what the add view makes: "me" (a binding) or "guild" (a template rule)
 
 function UI.Frame() return frame end
+--- The line under the step label (the picked player, or the guild view's help).
+function UI.ChosenLabel() return chosenLabel end
 function UI.Picked() return picked end
 --- "list" (the bindings), "add" (step 1: a player; step 2, once picked: the profession) or
 --- "guild" (the guild template: on / off, its rules; the editor for the guild master and officers).
@@ -496,6 +498,7 @@ function UI.Refresh()
         at(hint, 28, y - 14)
         hint:SetWidth(WIDTH - 56)
     else
+        at(chosenLabel, 28, LIST_TOP - 2) -- the guild view moves it under its template line
         if picked then
             for _, b in ipairs(candidateRows) do b:Hide() end
             y = fillProfessions()
