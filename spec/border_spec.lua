@@ -155,6 +155,26 @@ describe("locked-item glow", function()
         assert.is_true(shown(combined.Items[3]), "a button after the hole still glows")
     end)
 
+    -- rl-companion's BugGrabber data (2026-11-07): RefreshAll ran 37 times in one session from
+    -- Auctionator's scan alone, bags open or not. A closed frame is redrawn when it opens
+    -- (Forever: GenerateFrame -> Update -> UpdateItems, which the hook follows).
+    it("skips closed bag frames, and draws them when they open", function()
+        MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
+        local reads = 0
+        combined.IsShown = function() return false end
+        for _, b in ipairs(combined.Items) do
+            local getID = b.GetID
+            rawset(b, "GetID", function(self) reads = reads + 1 return getID(self) end)
+        end
+        ns.Border.RefreshAll()
+        assert.equal(0, reads, "a closed frame's slots aren't read")
+        assert.is_false(shown(combined.Items[2]))
+        combined.IsShown = function() return true end
+        combined:UpdateItems() -- the game opens the bags
+        assert.is_true(shown(combined.Items[2]), "drawn once it opens")
+        assert.is_true(reads > 0)
+    end)
+
     it("covers the individual bag frames too", function()
         local bag = ContainerFrameContainer.ContainerFrames[1]
         bag.Items = { WowStub.itemButton(1, 1) }

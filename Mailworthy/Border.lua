@@ -241,8 +241,23 @@ function Border.InstallBaganator()
     return true
 end
 
+--- Whether a container frame is closed: nothing on it to redraw. Opening one redraws it anyway:
+--- ContainerFrame_GenerateFrame -> Update -> AddItemsForRefresh -> UpdateItems (Forever's
+--- ContainerFrame.lua), which our hook follows.
+local function closed(frame)
+    if type(frame.IsShown) ~= "function" then return false end
+    local ok, shown = pcall(frame.IsShown, frame)
+    return ok and shown == false
+end
+
+--- Redraw every open bag frame. Closed ones are skipped: on the bank alt each redraw re-reads
+--- every slot and its tags re-evaluate the bags, and it runs at every bag update and every
+--- Auctionator database update during a scan (BugGrabber via rl-companion, 2026-11-07: 37 calls
+--- from Auctionator's incremental scan in one session).
 function Border.RefreshAll()
-    for _, frame in ipairs(frames) do Border.RefreshFrame(frame) end
+    for _, frame in ipairs(frames) do
+        if not closed(frame) then Border.RefreshFrame(frame) end
+    end
     local api = baganatorReady and baganatorAPI()
     if api and type(api.RequestItemButtonsRefresh) == "function" then pcall(api.RequestItemButtonsRefresh) end
 end

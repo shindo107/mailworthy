@@ -111,9 +111,10 @@ function PadKey.Check()
         active = want
         PadKey.stats.sets[want] = (PadKey.stats.sets[want] or 0) + 1
         ns.Log.Add("pad", "%s bindings on", want)
-        if NAVIGATES[want] then ns.Nav.Reset() end
+        if NAVIGATES[want] then ns.Nav.Follow(true) end
     end
     if not active then return end -- nothing wanted and nothing bound (most of the time)
+    if NAVIGATES[active] then ns.Nav.Follow() end
     for key, buttonName in pairs(PadKey.SETS[active]) do
         local expected = "CLICK " .. buttonName .. ":LeftButton"
         local okAction, action = pcall(GetBindingAction, key, true)
@@ -163,13 +164,17 @@ function PadKey.Create()
         local ok, err = pcall(PadKey.Check)
         if not ok then ns.Log.Add("pad", "check error: %s", tostring(err)) end
     end)
+    -- The watcher stops ticking while the interface is hidden (Alt+Z, a cinematic hides UIParent),
+    -- so it can no longer see focus go: let go now, or Cross (jump) and the D-pad stay ours.
+    watcher:SetScript("OnHide", function() clear("interface hidden") end)
     padButton("MailworthyPadTriangle", function() ns.MailButton.Activate("Triangle") end)
     padButton("MailworthyPadCross", function() ns.Nav.Press() end)
     padButton("MailworthyPadCircle", function()
         local closed = ns.Nav.CloseTop()
         ns.Log.Add("pad", "Circle closed %s", closed and tostring(closed:GetName()) or "nothing")
-        -- Back in the window below (the Mailworthy window under the settings): start at its top-left.
-        if ns.Nav.Root() then ns.Nav.Reset() end
+        -- Back in the window below (the Mailworthy window under the settings): on the button
+        -- that opened the closed one, else its top-left.
+        ns.Nav.Follow()
     end)
     for _, dir in ipairs({ "Up", "Down", "Left", "Right" }) do
         padButton("MailworthyPad" .. dir, function() ns.Nav.Move(dir:lower()) end)

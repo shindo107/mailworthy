@@ -37,4 +37,20 @@ describe("core", function()
         SlashCmdList.MAILWORTHY("")
         assert.equal(0, WowStub.focusCalls)
     end)
+
+    -- rl-companion reads the log from the SavedVariables file: lines from 01:32 and 15:25 could
+    -- be one day or two (2026-11-08), so each line carries its date now.
+    it("dates every log line and keeps the newest MAX lines", function()
+        local ns = loadAddon()
+        ns.Log.Add("test", "first %d", 1)
+        assert.truthy(ns.Log.Lines()[1]:match("^%d%d%-%d%d %d%d:%d%d:%d%d .- %[test%] first 1$"), ns.Log.Lines()[1])
+        for i = 2, ns.Log.MAX + ns.Log.SLACK do ns.Log.Add("test", "line %d", i) end
+        assert.equal(ns.Log.MAX + ns.Log.SLACK, #MailworthyDB.log, "trimmed in one go, not one shift per line")
+        ns.Log.Add("test", "one more")
+        assert.equal(ns.Log.MAX, #MailworthyDB.log)
+        assert.truthy(MailworthyDB.log[ns.Log.MAX]:find("one more", 1, true), "newest last")
+        assert.truthy(MailworthyDB.log[1]:find("line " .. (ns.Log.SLACK + 2), 1, true), "oldest went")
+        ns.Log.Add("test", "again")
+        assert.equal(ns.Log.MAX, #ns.Log.Lines(), "what /mw report prints stays at MAX")
+    end)
 end)

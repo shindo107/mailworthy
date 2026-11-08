@@ -108,3 +108,78 @@ describe("controller bindings", function()
         assert.equal(1, ns.PadKey.stats.presses)
     end)
 end)
+
+describe("controller highlight across windows", function()
+    local ns, watcher
+    local function tick() watcher.scripts.OnUpdate(watcher, 0.2) end
+    local function press(button)
+        ns.Nav.Select(button)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        tick()
+    end
+
+    before_each(function()
+        ns = loadAddon()
+        _G.Minimap = WowStub.newWidget("Frame", "Minimap")
+        WowStub.state.gamepadUI = true
+        ns.Fire("PLAYER_LOGIN")
+        ns.Config.SetBankAlt("Roknua Themicrulah")
+        watcher = _G.MailworthyPadWatcher
+        MailFrame:Show()
+        SendMailFrame:Show()
+        WowStub.state.activeFrame = MailFrame
+        tick()
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadTriangle:Click()
+        tick()
+    end)
+
+    after_each(function()
+        _G.Minimap = nil
+        for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("error", 1, true), line) end
+    end)
+
+    -- Before: the highlight stayed on the window below and the first D-pad press only moved it.
+    it("moves to the window opened on top, and back to the opener's button when it closes", function()
+        local mailHighlight = _G.MailworthyMailWindowNavHighlight
+        press(_G.MailworthyMailSettings)
+        assert.equal(MailworthySettingsFrame, ns.Nav.Root())
+        assert.is_true(ns.Nav.Current():IsVisible())
+        local onSettings = false
+        for _, c in ipairs(ns.Nav.Candidates()) do onSettings = onSettings or c.button == ns.Nav.Current() end
+        assert.is_true(onSettings, "on a settings button at once, before any D-pad press")
+        assert.is_true(_G.MailworthySettingsFrameNavHighlight:IsShown())
+        assert.is_false(mailHighlight:IsShown(), "no highlight left on the window below")
+        MailworthySettingsFrame:Hide() -- closed by mouse or Escape: no press of ours
+        tick()
+        assert.equal(_G.MailworthyMailSettings, ns.Nav.Current(), "back on the button that opened it")
+        assert.is_true(mailHighlight:IsShown())
+        press(_G.MailworthyMailSettings)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCircle:Click()
+        assert.equal(_G.MailworthyMailSettings, ns.Nav.Current(), "Circle returns there too")
+    end)
+
+    it("a window shown again starts at its top-left button", function()
+        press(_G.MailworthyMailSettings)
+        MailworthySettingsFrame:Hide()
+        tick()
+        ns.MailWindow.Frame():Hide()
+        tick()
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadTriangle:Click()
+        tick()
+        local top = ns.Nav.TopLeft(ns.Nav.Candidates())
+        assert.equal(top.button, ns.Nav.Current())
+    end)
+
+    it("lets go of Cross and the D-pad when the interface is hidden (Alt+Z), then takes them back", function()
+        assert.equal("CLICK MailworthyPadCross:LeftButton", WowStub.state.bindings.PAD1)
+        watcher.scripts.OnHide(watcher)
+        assert.is_nil(WowStub.state.bindings.PAD1, "Cross jumps again")
+        assert.is_nil(WowStub.state.bindings.PADDUP)
+        tick()
+        assert.equal("CLICK MailworthyPadCross:LeftButton", WowStub.state.bindings.PAD1, "shown again: back")
+    end)
+end)

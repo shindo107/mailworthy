@@ -45,8 +45,15 @@ Comms.HELLO_DELAY = 8      -- seconds after login (the guild roster and group ar
 Comms.THROTTLE = 10        -- seconds between hellos
 Comms.ASK_THROTTLE = 30    -- seconds between asks
 Comms.MAX_NAME = 48
+-- A player in both our guild and our group sends every message on GUILD and PARTY; the copy
+-- that arrives within this many seconds is dropped (rl-companion log, 2026-11-08: every hello
+-- was heard, stored and logged twice).
+Comms.DUPLICATE_WINDOW = 5
 
 local lastHello, lastAsk, pendingHello = -math.huge, -math.huge, false
+local recent, recentCount = {}, 0 -- "sender\ntext" -> GetTime() it was last heard (Comms.Duplicate)
+local groupSeen = {}              -- lower-case name -> true: the online group members at the last roster change
+Comms.stats = { heard = 0, copies = 0, hellos = 0, rosterQuiet = 0 }
 local announcedSteps -- "129:1,197:2": the tier steps (Tiers.Step) last told to peers
 
 --- Pure: the tier steps of a professions list, as text to compare ("129:1,197:2").
@@ -228,16 +235,24 @@ local function channels()
     return list
 end
 
+-- A send result that means "sent": SendAddonMessage returns nothing on older clients, true, or
+-- Enum.SendAddonMessageResult.Success (0).
+local function sentOk(ok, result)
+    return ok and (result == nil or result == true or result == 0)
+end
+
+-- Send `message` on the guild and group channels. Returns whether any send went out and the
+-- channels with their result ("GUILD, PARTY", or "GUILD, PARTY error 3" for one that failed).
 local function send(message)
     local chat = rawget(_G, "C_ChatInfo")
-    if type(chat) ~= "table" then return false end
-    local sent = false
+    if type(chat) ~= "table" then return false, "no C_ChatInfo" end
+    local sent, parts = false, {}
     for _, channel in ipairs(channels()) do
         local ok, result = pcall(chat.SendAddonMessage, Comms.PREFIX, message, channel)
         sent = sent or ok
-        ns.Log.Add("comms", "%s on %s: %s", message:sub(1, 2), channel, ok and tostring(result) or ("error " .. tostring(result)))
+        parts[#parts + 1] = sentOk(ok, result) and channel or (channel .. " error " .. tostring(result))
     end
-    return sent
+    return sent, #parts > 0 and table.concat(parts, ", ") or "no guild or group"
 end
 
 --- Send one message to the guild only (Guild.lua's template and asks).
@@ -261,7 +276,8 @@ function Comms.Whisper(target, message)
     return ok
 end
 
---- Say hello to the guild and group (throttled; the next tick sends a hello that was throttled).
+--- Say hello to the guild and group (throttled; a hello the throttle held back goes out at the
+--- next mailbox). One log line per hello, whatever the number of channels and messages.
 function Comms.Announce(reason)
     if not Comms.On() then return false end
     if now() - lastHello < Comms.THROTTLE then
@@ -269,15 +285,21 @@ function Comms.Announce(reason)
         return false
     end
     lastHello, pendingHello = now(), false
-    ns.Log.Add("comms", "hello (%s)", tostring(reason))
     local professions = ns.Characters.Professions()
-    local sent = send(Comms.Encode(professions, ns.Characters.Mailable()))
+    local sent, where = send(Comms.Encode(professions, ns.Characters.Mailable()))
+    local kinds = { "H2" }
     if sent then
         send(Comms.EncodeSkills(professions, ns.Characters.Mailable()))
+        kinds[#kinds + 1] = "S2"
         announcedSteps = Comms.Steps(professions)
+        Comms.stats.hellos = Comms.stats.hellos + 1
     end
     local fresh = ns.Stale and ns.Stale.Message()
-    if sent and fresh then send(fresh) end
+    if sent and fresh then
+        send(fresh)
+        kinds[#kinds + 1] = fresh:sub(1, 2)
+    end
+    ns.Log.Add("comms", "hello (%s): %s on %s", tostring(reason), table.concat(kinds, " "), where)
     return sent
 end
 
@@ -285,7 +307,27 @@ end
 function Comms.Ask()
     if not Comms.On() or now() - lastAsk < Comms.ASK_THROTTLE then return false end
     lastAsk = now()
-    return send(string.format("A%d", Comms.VERSION))
+    local sent, where = send(string.format("A%d", Comms.VERSION))
+    ns.Log.Add("comms", "ask (A2) on %s", where)
+    return sent
+end
+
+--- Whether `text` from `name` is a copy of one heard less than DUPLICATE_WINDOW seconds ago
+--- (the same message on GUILD and PARTY). Whispers are never copies. Records the first one.
+function Comms.Duplicate(name, text, channel, at)
+    if channel == "WHISPER" then return false end
+    local key = tostring(name):lower() .. "\n" .. tostring(text)
+    local last = recent[key]
+    if last and at - last < Comms.DUPLICATE_WINDOW then return true end
+    if not last then recentCount = recentCount + 1 end
+    recent[key] = at
+    if recentCount > 64 then -- forget what is past the window (a busy guild sends many kinds)
+        recentCount = 0
+        for k, t in pairs(recent) do
+            if at - t >= Comms.DUPLICATE_WINDOW then recent[k] = nil else recentCount = recentCount + 1 end
+        end
+    end
+    return false
 end
 
 --- Peers heard from on this realm + faction: lower-case name -> { name, professions, characters, version, at }.
@@ -304,6 +346,11 @@ function Comms.Hear(sender, text, channel)
     local name = ns.Routes.Clean(sender)
     if not msg or not name or #name > Comms.MAX_NAME or name:find("%c") then return nil end
     if name:lower() == tostring(ns.PlayerName()):lower() then return nil end
+    if Comms.Duplicate(name, text, channel, now()) then
+        Comms.stats.copies = Comms.stats.copies + 1
+        return nil
+    end
+    Comms.stats.heard = Comms.stats.heard + 1
     if msg.kind == "values" then
         if channel ~= "WHISPER" or not ns.Ledger then return nil end
         local values = ns.Ledger.HearValues(name, msg.values)
@@ -417,6 +464,10 @@ function Comms.ReportLines()
             #others > 0 and table.concat(others, ", ") or "none", date("%b %d", peer.at or 0))
     end
     table.sort(lines)
+    local st = Comms.stats
+    table.insert(lines, 1, string.format("comms this session: %d heard, %d copies dropped (guild + group), "
+        .. "%d hello(s) sent, %d group change(s) with no one new (no hello)", st.heard, st.copies, st.hellos,
+        st.rosterQuiet))
     return lines
 end
 
@@ -442,8 +493,38 @@ ns.On("PLAYER_LOGIN", function()
     end
 end)
 
+--- The group's online members other than this character (lower-case names), from the units.
+local function groupMembers()
+    local members = {}
+    local n = tonumber((call(GetNumGroupMembers))) or 0
+    local raid = call(IsInRaid) == true
+    local me = tostring(ns.PlayerName()):lower()
+    for i = 1, n do
+        local unit = raid and ("raid" .. i) or ("party" .. i)
+        local name = ns.Routes.Clean(call(GetUnitName, unit, true) or call(UnitName, unit))
+        if name and name:lower() ~= me and call(UnitIsConnected, unit) ~= false then members[name:lower()] = true end
+    end
+    return members
+end
+
+--- Pure: how many of `members` (lower-case name -> true) are not in `before`.
+function Comms.Joined(before, members)
+    local n = 0
+    for name in pairs(members) do
+        if not before[name] then n = n + 1 end
+    end
+    return n
+end
+
+-- A hello when someone new is in the group (joined, or came online): they haven't heard it. The
+-- game fires GROUP_ROSTER_UPDATE for much more (leader, loot, subgroups, levels): rl-companion's
+-- log showed a guildmate's hellos every 20-40 s from it, each one three messages to the guild.
 ns.On("GROUP_ROSTER_UPDATE", function()
-    if tonumber((call(GetNumGroupMembers))) and tonumber((call(GetNumGroupMembers))) > 0 then Comms.Announce("group") end
+    local members = groupMembers()
+    local joined = Comms.Joined(groupSeen, members)
+    groupSeen = members
+    if joined > 0 then return Comms.Announce("group") end
+    if next(members) ~= nil then Comms.stats.rosterQuiet = Comms.stats.rosterQuiet + 1 end
 end)
 
 -- A hello the throttle held back goes out at the next mailbox (a natural moment to be known),

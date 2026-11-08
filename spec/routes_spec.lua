@@ -488,11 +488,52 @@ describe("bindings", function()
             assert.equal("H2|333|Alt Mine=165", sent[1].message, "the other faction's character can't be mailed")
             assert.equal("Mailworthy", sent[1].prefix)
             assert.equal("S2|333:1|", sent[3].message, "Alt Mine's skill isn't known: left out")
-            ns.Fire("GROUP_ROSTER_UPDATE")
+            ns.Fire("GROUP_ROSTER_UPDATE") -- Pal Member is new to this roster check
             assert.equal(4, #sent, "throttled: 10 s between hellos")
             WowStub.state.now = WowStub.state.now + 11
             ns.Fire("GROUP_ROSTER_UPDATE")
-            assert.equal(8, #sent)
+            assert.equal(4, #sent, "no one new in the group: no hello (loot, leader, level changes fire it too)")
+            table.insert(WowStub.state.group.members, { name = "New Friend" })
+            ns.Fire("GROUP_ROSTER_UPDATE")
+            assert.equal(8, #sent, "someone joined: they get a hello")
+            WowStub.state.now = WowStub.state.now + 11
+            WowStub.state.group.members[2].online = false
+            ns.Fire("GROUP_ROSTER_UPDATE")
+            assert.equal(8, #sent, "someone went offline: nothing to say")
+            WowStub.state.group.members[2].online = true
+            ns.Fire("GROUP_ROSTER_UPDATE")
+            assert.equal(12, #sent, "back online: they missed the hellos meanwhile")
+            local report = table.concat(ns.Comms.ReportLines(), "\n")
+            assert.truthy(report:find("3 hello(s) sent, 2 group change(s) with no one new", 1, true), report)
+            local logged = 0
+            for _, line in ipairs(ns.Log.Lines()) do
+                if line:find("[comms] hello (", 1, true) then logged = logged + 1 end
+                assert.is_nil(line:find("H2 on GUILD", 1, true), "one line per hello, not one per message")
+            end
+            assert.equal(3, logged)
+            assert.truthy(table.concat(ns.Log.Lines(), "\n"):find("hello (login): H2 S2 on GUILD, PARTY", 1, true))
+        end)
+
+        -- rl-companion's log (2026-11-08): a guildmate in our group was heard twice for each
+        -- message (GUILD and PARTY), stored twice, logged twice.
+        it("drops the copy of a message heard on a second channel; whispers and later repeats count", function()
+            WowStub.state.guild = { clubId = 3, members = {} }
+            local hello = "H2|333|"
+            assert.truthy(ns.Comms.Hear(BOB, hello, "GUILD"))
+            assert.is_nil(ns.Comms.Hear(BOB, hello, "PARTY"), "the PARTY copy")
+            assert.is_nil(ns.Comms.Hear("Bob Surname-Classic Beta PvP", hello, "PARTY"), "with a realm suffix too")
+            assert.truthy(ns.Comms.Hear("Alice Other", hello, "PARTY"), "another sender")
+            assert.truthy(ns.Comms.Hear(BOB, "H2|333,197|", "PARTY"), "a different message")
+            WowStub.state.now = WowStub.state.now + ns.Comms.DUPLICATE_WINDOW
+            assert.truthy(ns.Comms.Hear(BOB, hello, "GUILD"), "a later hello is news (online again)")
+            assert.is_false(ns.Comms.Duplicate(BOB, "M2|x", "WHISPER", WowStub.state.now))
+            assert.is_false(ns.Comms.Duplicate(BOB, "M2|x", "WHISPER", WowStub.state.now), "whispers are never copies")
+            local heard = 0
+            for _, line in ipairs(ns.Log.Lines()) do
+                if line:find("hello from Bob Surname", 1, true) then heard = heard + 1 end
+            end
+            assert.equal(3, heard)
+            assert.equal(2, ns.Comms.stats.copies)
         end)
 
         it("remembers who said hello, answers an ask, drops junk, and forgets after 60 days", function()
