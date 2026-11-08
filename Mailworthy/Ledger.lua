@@ -367,20 +367,25 @@ end
 
 -- Values between Mailworthys --------------------------------------------------------------
 
---- Pure: the value messages for one sent mail: "V2|<from>|<to>|<at>|<itemID>:<count>:<copper>[:<scan
---- age in days>];..." split to fit Comms.MAX_MESSAGE; priced items only. (v0.25.0 sent no age, and
---- reads these as before: its pattern skips the fourth number.)
-function Ledger.EncodeValues(from, to, at, items)
-    local head = string.format("V%d|%s|%s|%d|", ns.Comms.VERSION, tostring(from), tostring(to), math.floor(at))
-    local messages, parts = {}, {}
+--- Pure: the value messages for one sent mail: "M2|<from>|<to>|<send time>|<mail id>|<itemID>:<count>:
+--- <copper>:<scan age in days, or empty>:<k>;..." split to fit Comms.MAX_MESSAGE; priced items
+--- only. The mail id (Ledger.RecordSent's account counter, never reused) names the mail and k the
+--- stack among the mail's stacks of that item and count, so an answer names exactly one stack
+--- (Codex review: send times and "the next unsettled stack" were not unique).
+function Ledger.EncodeValues(from, to, at, id, items)
+    local head = string.format("M%d|%s|%s|%d|%d|", ns.Comms.VERSION, tostring(from), tostring(to), math.floor(at),
+        math.floor(id))
+    local messages, parts, seen = {}, {}, {}
     local function flush()
         if #parts > 0 then messages[#messages + 1] = head .. table.concat(parts, ";") end
         parts = {}
     end
     for _, it in ipairs(items or {}) do
+        local key = tostring(it.itemID) .. ":" .. tostring(it.count or 1)
+        seen[key] = (seen[key] or 0) + 1
         if it.value and it.itemID then
-            local part = string.format("%d:%d:%d", it.itemID, it.count or 1, math.floor(it.value))
-                .. (tonumber(it.age) and (":" .. math.floor(it.age)) or "")
+            local part = string.format("%d:%d:%d:%s:%d", it.itemID, it.count or 1, math.floor(it.value),
+                tonumber(it.age) and tostring(math.floor(it.age)) or "", seen[key])
             if #head + #table.concat(parts, ";") + #part + 1 > ns.Comms.MAX_MESSAGE then flush() end
             parts[#parts + 1] = part
         end
@@ -389,23 +394,43 @@ function Ledger.EncodeValues(from, to, at, items)
     return messages
 end
 
---- Pure: the body of a "V" message (after "V2|"), or nil: { from, to, at, items = { { itemID,
---- count, value, age (nil when not sent) } } }. Every field is checked; anything odd drops it.
-function Ledger.DecodeValues(rest)
-    local from, to, at, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
-    from, to = from and clean(from), to and clean(to)
-    if not from or not to or #from > ns.Comms.MAX_NAME or #to > ns.Comms.MAX_NAME or #at > 12 then return nil end
+local function goodNames(a, b)
+    a, b = a and clean(a), b and clean(b)
+    if not a or not b or #a > ns.Comms.MAX_NAME or #b > ns.Comms.MAX_NAME then return nil end
+    return a, b
+end
+
+--- Pure: the body of an "M" message (after "M2|"), or of v0.25.0's "V" message ("V2|<from>|<to>|
+--- <time>|<itemID>:<count>:<copper>[:<age>];...", no mail id: its values are used, with no
+--- answer), or nil: { from, to, at, id, items = { { itemID, count, value, age, k } } }. Every field
+--- is checked; anything odd drops the message.
+function Ledger.DecodeValues(rest, kind)
+    local from, to, at, id, list
+    if kind == "V" then
+        from, to, at, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
+    else
+        from, to, at, id, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|(%d+)|([%d:;]+)$")
+        if not id or #id > 10 then return nil end
+    end
+    from, to = goodNames(from, to)
+    if not from or #at > 12 then return nil end
     local items = {}
     for part in list:gmatch("[^;]+") do
-        local id, count, value, age = part:match("^(%d+):(%d+):(%d+):?(%d*)$")
-        if not id or #age > 3 then return nil end
-        id, count, value, age = tonumber(id), tonumber(count), tonumber(value), tonumber(age)
-        if id < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER then return nil end
-        items[#items + 1] = { itemID = id, count = count, value = value, age = age }
+        local item, count, value, age, k
+        if kind == "V" then
+            item, count, value, age = part:match("^(%d+):(%d+):(%d+):?(%d*)$")
+        else
+            item, count, value, age, k = part:match("^(%d+):(%d+):(%d+):(%d*):(%d+)$")
+            if not k or #k > 2 then return nil end
+        end
+        if not item or #age > 3 then return nil end
+        item, count, value, age = tonumber(item), tonumber(count), tonumber(value), tonumber(age)
+        if item < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER then return nil end
+        items[#items + 1] = { itemID = item, count = count, value = value, age = age, k = tonumber(k) }
         if #items > Ledger.RECEIVE_SLOTS then return nil end
     end
     if #items == 0 then return nil end
-    return { from = from, to = to, at = tonumber(at), items = items }
+    return { from = from, to = to, at = tonumber(at), id = tonumber(id), items = items }
 end
 
 -- lower-case name -> { name, at = GetTime() } of the last message heard from them. A whisper to
@@ -469,16 +494,16 @@ local function queueFor(name, at, messages)
 end
 
 local function queueValues(entry)
-    queueFor(entry.other, entry.at, Ledger.EncodeValues(entry.char, entry.other, entry.at, entry.items))
+    queueFor(entry.other, entry.at, Ledger.EncodeValues(entry.char, entry.other, entry.at, entry.id, entry.items))
 end
 
 --- Pure: the answer messages for values a receiver settled differently: "R2|<receiver>|<mail's
---- sender>|<mail's time>|<itemID>:<count>:<copper>;..." (each { itemID, count, value }).
-function Ledger.EncodeAnswers(receiver, sender, at, items)
-    local head = string.format("R%d|%s|%s|%d|", ns.Comms.VERSION, tostring(receiver), tostring(sender), math.floor(at))
+--- sender>|<mail id>|<itemID>:<count>:<copper>:<k>;..." (each { itemID, count, value, k }).
+function Ledger.EncodeAnswers(receiver, sender, id, items)
+    local head = string.format("R%d|%s|%s|%d|", ns.Comms.VERSION, tostring(receiver), tostring(sender), math.floor(id))
     local messages, parts = {}, {}
     for _, it in ipairs(items or {}) do
-        local part = string.format("%d:%d:%d", it.itemID, it.count or 1, math.floor(it.value))
+        local part = string.format("%d:%d:%d:%d", it.itemID, it.count or 1, math.floor(it.value), it.k or 1)
         if #parts > 0 and #head + #table.concat(parts, ";") + #part + 1 > ns.Comms.MAX_MESSAGE then
             messages[#messages + 1] = head .. table.concat(parts, ";")
             parts = {}
@@ -490,28 +515,29 @@ function Ledger.EncodeAnswers(receiver, sender, at, items)
 end
 
 --- Pure: the body of an "R" message (after "R2|"), or nil: { receiver, from (the mail's sender),
---- at, items = { { itemID, count, value } } }.
+--- id, items = { { itemID, count, value, k } } }.
 function Ledger.DecodeAnswers(rest)
-    local receiver, from, at, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
-    receiver, from = receiver and clean(receiver), from and clean(from)
-    if not receiver or not from or #receiver > ns.Comms.MAX_NAME or #from > ns.Comms.MAX_NAME or #at > 12 then return nil end
+    local receiver, from, id, list = tostring(rest):match("^([^|]+)|([^|]+)|(%d+)|([%d:;]+)$")
+    receiver, from = goodNames(receiver, from)
+    if not receiver or #id > 10 then return nil end
     local items = {}
     for part in list:gmatch("[^;]+") do
-        local id, count, value = part:match("^(%d+):(%d+):(%d+)$")
-        if not id then return nil end
-        id, count, value = tonumber(id), tonumber(count), tonumber(value)
-        if id < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER then return nil end
-        items[#items + 1] = { itemID = id, count = count, value = value }
+        local item, count, value, k = part:match("^(%d+):(%d+):(%d+):(%d+)$")
+        if not item or #k > 2 then return nil end
+        item, count, value, k = tonumber(item), tonumber(count), tonumber(value), tonumber(k)
+        if item < 1 or count < 1 or count > Ledger.MAX_COUNT or value > Ledger.MAX_COPPER or k < 1 then return nil end
+        items[#items + 1] = { itemID = item, count = count, value = value, k = k }
         if #items > Ledger.RECEIVE_SLOTS then return nil end
     end
     if #items == 0 then return nil end
-    return { receiver = receiver, from = from, at = tonumber(at), items = items }
+    return { receiver = receiver, from = from, id = tonumber(id), items = items }
 end
 
---- An "R" message from `whisperer`: the value a receiver settled on for a mail one of this
---- account's characters sent. The mail's entry in the log and the balance take it, when the
---- receiver is the whisperer and the value is within PRICE_CAP times
---- either way of our own. Returns how many items changed.
+--- An "R" message from `whisperer`: the value a receiver settled on for stacks of a mail one of
+--- this account's characters sent. That mail (its id, sender and recipient; counted mails only)
+--- and stack (the k-th of that item and count in it) take the value, once, when the receiver is
+--- the whisperer and the value is within PRICE_CAP times either way of our own; the balance moves
+--- by the difference. Returns how many stacks changed.
 function Ledger.HearAnswers(whisperer, msg)
     whisperer = clean(whisperer)
     if not whisperer or type(msg) ~= "table" or not Ledger.On() or not Ledger.IsOwn(msg.from) then return 0 end
@@ -519,41 +545,35 @@ function Ledger.HearAnswers(whisperer, msg)
         ns.Log.Add("ledger", "answer from %s for %s dropped: not the recipient", whisperer, msg.receiver)
         return 0
     end
-    -- The mail: sender, recipient and send time (unique per mail: Ledger.UniqueAt; older entries
-    -- may share one, and then the first with that item and count still unsettled takes it); only
-    -- mails that count, since values and answers exist only for those.
-    local mails = {}
+    local entry
     for _, e in ipairs(store().log) do
-        if e.dir == "sent" and e.counted and e.at == msg.at and tostring(e.other):lower() == msg.receiver:lower()
-            and tostring(e.char):lower() == msg.from:lower() then mails[#mails + 1] = e end
+        if e.dir == "sent" and e.counted and e.id == msg.id and tostring(e.other):lower() == msg.receiver:lower()
+            and tostring(e.char):lower() == msg.from:lower() then entry = e end
     end
-    if #mails == 0 then return 0 end
+    if not entry then return 0 end
     local changed = 0
     for _, a in ipairs(msg.items) do
-        local entry, it = nil, nil
-        for _, e in ipairs(mails) do
-            for _, x in ipairs(e.items or {}) do
-                if not it and x.itemID == a.itemID and x.count == a.count and not x.agreed and x.value then
-                    entry, it = e, x
-                end
+        local n, it = 0, nil
+        for _, x in ipairs(entry.items or {}) do
+            if x.itemID == a.itemID and x.count == a.count then
+                n = n + 1
+                if n == a.k then it = x end
             end
         end
-        if it and a.value * Ledger.PRICE_CAP >= it.value and a.value <= it.value * Ledger.PRICE_CAP then
+        if it and it.value and not it.agreed and a.value * Ledger.PRICE_CAP >= it.value
+            and a.value <= it.value * Ledger.PRICE_CAP then
             local delta = a.value - it.value
             it.mine, it.value, it.agreed, it.source = it.value, a.value, entry.other, "agreed"
-            if entry.counted then
-                local p = player(entry.other)
-                p.sent = math.max(0, (tonumber(p.sent) or 0) + delta)
-            end
+            local p = player(entry.other)
+            p.sent = math.max(0, (tonumber(p.sent) or 0) + delta)
             changed = changed + 1
-        elseif it then
+        elseif it and it.value and not it.agreed then
             ns.Log.Add("ledger", "answer from %s for %s ignored: %s against our %s", whisperer, tostring(it.name),
                 money(a.value), money(it.value))
         end
     end
     if changed > 0 then
-        ns.Log.Add("ledger", "%s's values agreed for %d item(s) of the mail of %s", msg.receiver, changed,
-            date("%Y-%m-%d %H:%M", msg.at))
+        ns.Log.Add("ledger", "%s's values agreed for %d stack(s) of mail %d", msg.receiver, changed, msg.id)
         changed_()
     end
     return changed
@@ -576,7 +596,7 @@ function Ledger.HearValues(sender, msg)
     expect[key] = tableOr(expect[key])
     for _, it in ipairs(msg.items) do
         table.insert(expect[key], { at = msg.at, to = msg.to, itemID = it.itemID, count = it.count, value = it.value,
-            age = it.age })
+            age = it.age, id = msg.id, k = it.k })
     end
     while #expect[key] > Ledger.MAX_EXPECT do table.remove(expect[key], 1) end
     ns.Log.Add("ledger", "values from %s: %d item(s) mailed to %s", msg.from, #msg.items, msg.to)
@@ -592,8 +612,8 @@ function Ledger.Claim(from, itemID, count, to)
     for i, e in ipairs(list) do
         if e.itemID == itemID and e.count == count and tostring(e.to):lower() == tostring(clean(to)):lower() then
             table.remove(list, i)
-            return tonumber(e.value) and { value = tonumber(e.value), age = tonumber(e.age), at = tonumber(e.at), to = e.to }
-                or nil
+            return tonumber(e.value) and { value = tonumber(e.value), age = tonumber(e.age), at = tonumber(e.at), to = e.to,
+                id = tonumber(e.id), k = tonumber(e.k) } or nil
         end
     end
     return nil
@@ -633,34 +653,14 @@ local function valued(items)
     return out
 end
 
---- The time that names a mail to `other` in values and answers: the send time, or the nearest
---- second to it no earlier mail from this character to them already has, within the same
---- Auctionator scan day (Codex review: the time must name one mail, and must never move a mail
---- to another day, which picks the price it is compared with).
-function Ledger.UniqueAt(other, at)
-    local me, taken = tostring(ns.PlayerName()):lower(), {}
-    local log = store().log
-    for i = #log, math.max(1, #log - 200), -1 do
-        local e = log[i]
-        if e.dir == "sent" and tostring(e.char):lower() == me and tostring(e.other):lower() == tostring(other):lower() then
-            taken[tonumber(e.at) or 0] = true
-        end
-    end
-    local day = Ledger.ScanDay(at)
-    for k = 0, 600 do
-        for _, t in ipairs({ at - k, at + k }) do
-            if not taken[t] and Ledger.ScanDay(t) == day then return t end
-        end
-    end
-    return at
-end
-
 --- A mail that went (MAIL_SEND_SUCCESS): { to, subject, items = { { itemID, link, name, count } },
 --- money, cod }; `via` = "Mailworthy" (Mailer.lua) or "mail" (Blizzard's Send button).
 function Ledger.RecordSent(mail, via)
     if not Ledger.On() or type(mail) ~= "table" then return nil end
     local other = clean(mail.to) or tostring(mail.to)
-    local entry = Ledger.Add({ at = Ledger.UniqueAt(other, now()), dir = "sent", other = other, subject = mail.subject,
+    local s = store()
+    s.nextId = (tonumber(s.nextId) or 0) + 1 -- names the mail in values and answers; never reused
+    local entry = Ledger.Add({ id = s.nextId, dir = "sent", other = other, subject = mail.subject,
         items = valued(mail.items), money = tonumber(mail.money) or 0, cod = tonumber(mail.cod) or 0, via = via })
     if entry.counted then queueValues(entry) end
     return entry
@@ -762,9 +762,9 @@ local function commit(take)
             local daysAgo = Ledger.ScanDay(now()) - Ledger.ScanDay(claim.at or now())
             local mine, mineAge = Ledger.PriceThen(unit and ns.Prices.Lookup(link), unit, daysAgo)
             value, source, age = Ledger.Pick(claim.value, claim.age, mine and mine * count or nil, mineAge)
-            if value and value ~= claim.value and claim.at then -- tell the sender, so both logs match
-                queueFor(h.sender, now(), Ledger.EncodeAnswers(claim.to, h.sender, claim.at,
-                    { { itemID = take.item.itemID, count = count, value = value } }))
+            if value and value ~= claim.value and claim.id then -- tell the sender, so both logs match
+                queueFor(h.sender, now(), Ledger.EncodeAnswers(claim.to, h.sender, claim.id,
+                    { { itemID = take.item.itemID, count = count, value = value, k = claim.k } }))
             end
         end
         items[1] = { itemID = take.item.itemID, name = take.item.name or Ledger.NameOf(take.item.link)

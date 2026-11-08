@@ -520,8 +520,8 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
 - **Values, captured at the time of send** (operator, asked "if both players have mailworthy
   can the apps communicate?"): what you send is valued with your own prices when it goes
   (`Valuation.SmoothedPrice`, the decision rule's price). After a counted send, the item values
-  go to the recipient's Mailworthy: `V2|<mail's sender>|<recipient>|<server time>|<itemID>:
-  <count>:<copper>;...`, WHISPER only, and only to a player just heard from (any Mailworthy
+  go to the recipient's Mailworthy: `M2|<mail's sender>|<recipient>|<send time>|<mail id>|
+  <itemID>:<count>:<copper>:<scan age>:<k>;...`, WHISPER only, and only to a player just heard from (any Mailworthy
   message: they're online; else `Comms.Ask` prompts hellos, and the values wait up to 30 days in
   `outbox`), to the recipient's own character, never another one their hello claims. The receiver
   keeps them in `expect` (31 days) when the recipient is one of its own characters and the
@@ -530,8 +530,9 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   a debt).
   Otherwise its own price when taken. No price: listed by count, not in gold.
 - **The more up-to-date scan wins** (operator, 2026-11-07: "we should trust the more up to date
-  value at time of send"): each value carries its Auctionator scan's age in days
-  (`<itemID>:<count>:<copper>:<age>`; v0.25.0 sent none and still reads the new form). On
+  value at time of send"): each value carries its Auctionator scan's age in days (v0.25.0's
+  `V2` values carry none; they are still read, used as the sender's and never answered, and
+  v0.25.0 drops `M2`, using its own price). On
   receipt, the receiver's own price as it stood the day the mail went (days counted as
   Auctionator counts them, `Ledger.ScanDay`: floor((local time - SCAN_DAY_0) / 86400); `PriceThen`: its
   last scan when that was already in, else that day in Auctionator's history, its lowest price
@@ -540,14 +541,16 @@ encourage players to pay back who sent them materials." And: "I dont ever want t
   export shows each value's source and scan age.
 - **Answer back** (operator, same day, so both players see the same value): when the receiver
   settles on a value other than the sender's (its scan was fresher, or the cap), it queues
-  `R2|<recipient>|<mail's sender>|<the mail's time>|<itemID>:<count>:<copper>;...` for the
-  sender, held in `outbox` like the values (WHISPER only, sent once the mail's sender character is
-  heard from, 30 days at most). The sender finds that mail in its log by sender, recipient and
-  time, counted mails only (each mail's time is unique per sender and recipient,
-  `Ledger.UniqueAt`: the send time or the nearest free second on the same Auctionator scan day,
-  so it never changes the day a price is taken from), takes the value (`agreed`, the old one kept as `mine`) and moves
-  its balance by the difference; an answer under a third or over 3x its own value is ignored,
-  and an item takes one answer. Until the answer arrives, the sender shows its own value.
+  `R2|<recipient>|<mail's sender>|<mail id>|<itemID>:<count>:<copper>:<k>;...` for the sender,
+  held in `outbox` like the values (WHISPER only, sent once the mail's sender character is heard
+  from, 30 days at most). **The mail id** is an account counter (`ledger[realm|faction].nextId`),
+  never reused even when the log is pruned, and **k** numbers a stack among the mail's stacks of
+  that item and count (unpriced ones too), so an answer names one stack of one mail (Codex
+  review, 2026-11-07: send times and "the next unsettled stack" were not unique; send times stay
+  real, so scan days are never moved). The sender finds that mail (id, sender, recipient,
+  counted mails only) and stack, takes the value (`agreed`, the old one kept as `mine`) and
+  moves its balance by the difference; an answer under a third or over 3x its own value is
+  ignored, and a stack takes one answer. Until the answer arrives, the sender shows its own value.
   Still unmatched: a mail whose values never reached the receiver before it was taken (the
   receiver then used its own price and has nothing to answer to).
 - **Trust** (Codex review, 2026-11-07): a hello's "my other characters" list is never evidence for
