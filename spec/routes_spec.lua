@@ -514,6 +514,28 @@ describe("bindings", function()
             assert.truthy(table.concat(ns.Log.Lines(), "\n"):find("hello (login): H2 S2 on GUILD, PARTY", 1, true))
         end)
 
+        -- Codex review: a send the game rejects (an error code, no throw) is no hello, and a
+        -- failed skills message still shows in the one log line.
+        it("counts only hellos that went out, and logs a failed message in the hello's line", function()
+            WowStub.state.guild = { clubId = 3, members = {} }
+            local chat, real = C_ChatInfo, C_ChatInfo.SendAddonMessage
+            chat.SendAddonMessage = function() return 3 end
+            assert.is_false(ns.Comms.Announce("test"))
+            assert.equal(0, ns.Comms.stats.hellos)
+            assert.truthy(table.concat(ns.Log.Lines(), "\n"):find("hello (test): H2 on GUILD error 3", 1, true))
+            chat.SendAddonMessage = function(_, message) return message:sub(1, 1) == "S" and 3 or 0 end
+            WowStub.state.now = WowStub.state.now + 11
+            assert.is_true(ns.Comms.Announce("again"))
+            assert.equal(1, ns.Comms.stats.hellos)
+            chat.SendAddonMessage = real
+            assert.truthy(table.concat(ns.Log.Lines(), "\n"):find("hello (again): H2 on GUILD; S2 on GUILD error 3", 1, true),
+                table.concat(ns.Log.Lines(), "\n"))
+            assert.equal("H2 S2 on GUILD, PARTY", ns.Comms.ResultText({ { "H2", "GUILD, PARTY" }, { "S2", "GUILD, PARTY" } }))
+            for i = #MailworthyDB.log, 1, -1 do -- the errors above were the point; after_each allows none
+                if MailworthyDB.log[i]:find("error 3", 1, true) then table.remove(MailworthyDB.log, i) end
+            end
+        end)
+
         -- rl-companion's log (2026-11-08): a guildmate in our group was heard twice for each
         -- message (GUILD and PARTY), stored twice, logged twice.
         it("drops the copy of a message heard on a second channel; whispers and later repeats count", function()

@@ -241,7 +241,7 @@ local function sentOk(ok, result)
     return ok and (result == nil or result == true or result == 0)
 end
 
--- Send `message` on the guild and group channels. Returns whether any send went out and the
+-- Send `message` on the guild and group channels. Returns whether any channel took it and the
 -- channels with their result ("GUILD, PARTY", or "GUILD, PARTY error 3" for one that failed).
 local function send(message)
     local chat = rawget(_G, "C_ChatInfo")
@@ -249,7 +249,7 @@ local function send(message)
     local sent, parts = false, {}
     for _, channel in ipairs(channels()) do
         local ok, result = pcall(chat.SendAddonMessage, Comms.PREFIX, message, channel)
-        sent = sent or ok
+        sent = sent or sentOk(ok, result) -- a rejected send (error code, no throw) didn't go out
         parts[#parts + 1] = sentOk(ok, result) and channel or (channel .. " error " .. tostring(result))
     end
     return sent, #parts > 0 and table.concat(parts, ", ") or "no guild or group"
@@ -287,20 +287,35 @@ function Comms.Announce(reason)
     lastHello, pendingHello = now(), false
     local professions = ns.Characters.Professions()
     local sent, where = send(Comms.Encode(professions, ns.Characters.Mailable()))
-    local kinds = { "H2" }
+    local results = { { "H2", where } }
     if sent then
-        send(Comms.EncodeSkills(professions, ns.Characters.Mailable()))
-        kinds[#kinds + 1] = "S2"
+        local _, skillsWhere = send(Comms.EncodeSkills(professions, ns.Characters.Mailable()))
+        results[#results + 1] = { "S2", skillsWhere }
         announcedSteps = Comms.Steps(professions)
         Comms.stats.hellos = Comms.stats.hellos + 1
     end
     local fresh = ns.Stale and ns.Stale.Message()
     if sent and fresh then
-        send(fresh)
-        kinds[#kinds + 1] = fresh:sub(1, 2)
+        local _, freshWhere = send(fresh)
+        results[#results + 1] = { fresh:sub(1, 2), freshWhere }
     end
-    ns.Log.Add("comms", "hello (%s): %s on %s", tostring(reason), table.concat(kinds, " "), where)
+    ns.Log.Add("comms", "hello (%s): %s", tostring(reason), Comms.ResultText(results))
     return sent
+end
+
+--- Pure: { { kind, where }, ... } as one log text: "H2 S2 F2 on GUILD, PARTY" when every message
+--- went the same way, else each with its own ("H2 on GUILD; S2 on GUILD error 3"), so a failed
+--- send still shows in the one line.
+function Comms.ResultText(results)
+    local kinds, same = {}, true
+    for i, r in ipairs(results) do
+        kinds[i] = r[1]
+        same = same and r[2] == results[1][2]
+    end
+    if same and #results > 0 then return table.concat(kinds, " ") .. " on " .. tostring(results[1][2]) end
+    local parts = {}
+    for i, r in ipairs(results) do parts[i] = r[1] .. " on " .. tostring(r[2]) end
+    return table.concat(parts, "; ")
 end
 
 --- Ask other Mailworthys to say hello (the friends window, throttled).
