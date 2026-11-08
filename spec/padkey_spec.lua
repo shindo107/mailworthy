@@ -159,6 +159,8 @@ describe("controller highlight across windows", function()
         WowStub.state.now = WowStub.state.now + 1
         _G.MailworthyPadCircle:Click()
         assert.equal(_G.MailworthyMailSettings, ns.Nav.Current(), "Circle returns there too")
+        local follows, returns = ns.PadKey.Report():match("highlight followed (%d+) window change%(s%), (%d+) back to the")
+        assert.truthy(tonumber(follows) >= 3 and tonumber(returns) >= 2, ns.PadKey.Report())
     end)
 
     it("a window shown again starts at its top-left button", function()

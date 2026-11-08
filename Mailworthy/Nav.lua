@@ -25,6 +25,7 @@ local roots, highlights, current = {}, {}, nil
 -- The window the highlight was last placed for (Nav.Follow) and, per window, the button it was
 -- on there, so coming back to a window (the one above it closed) returns to that button.
 local lastRoot, remembered = nil, setmetatable({}, { __mode = "k" })
+Nav.stats = { follows = 0, returns = 0 } -- /mw report: window changes the highlight followed
 
 --- The window the controller drives: the most recently shown visible one.
 function Nav.Root()
@@ -149,7 +150,10 @@ function Nav.Resume()
     lastRoot = root
     if not root then return Nav.Select(nil) end
     local back = remembered[root]
-    if back and back:IsVisible() and entryFor(back, Nav.Candidates()) then return Nav.Select(back) end
+    if back and back:IsVisible() and entryFor(back, Nav.Candidates()) then
+        Nav.stats.returns = Nav.stats.returns + 1
+        return Nav.Select(back)
+    end
     return Nav.Reset()
 end
 
@@ -160,7 +164,10 @@ end
 --- the highlight stayed on the window below and the first D-pad press only moved it over.
 function Nav.Follow(force)
     local root = Nav.Root()
-    if force or root ~= lastRoot then return Nav.Resume() end
+    if force or root ~= lastRoot then
+        if root ~= lastRoot and root then Nav.stats.follows = Nav.stats.follows + 1 end
+        return Nav.Resume()
+    end
     if root and not (current and current:IsVisible()) then return Nav.Resume() end
 end
 
