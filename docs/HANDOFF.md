@@ -63,7 +63,7 @@ must never break the game.
 | `MailButton.lua` | "Mailworthy" button under the mail window on both tabs (children of InboxFrame / SendMailFrame, created at login); `Activate` toggles the window; controller on the Inbox gets an "R1 first" hint (we never switch tabs) |
 | `Nav.lua` | Mailworthy's **own** controller navigation for its window: nearest button within 45 degrees, top-left start, gold highlight |
 | `PadKey.lua` | Mailworthy's **own override bindings** (watcher every 0.1 s, re-apply when replaced, clear on focus loss and at `PLAYER_REGEN_DISABLED`): set `mail` (Triangle), `window` (Triangle, D-pad, Cross, Circle), `bags` (L3 lock) |
-| `Prices.lua` | Auctionator adapter (`Lookup`: AH price per unit, age in days, exact, disenchant; nil without Auctionator), disenchant value from Siz DisenchantValue (`DisenchantValueOf`: `DisenchantValueAPI.GetValue(link)`, else Auctionator's call; `deSource`), vendor price (`GetItemInfo` 11th return), class ID, `DisenchantAddon()` / `DisenchantAddonInstalled()` (Siz DisenchantValue by its API table, Disenchantry by `DisenchantryDB`) |
+| `Prices.lua` | Auctionator adapter (`Lookup`: AH price per unit, age in days, exact, disenchant; nil without a price source), TradeSkillMaster adapter (`Source()`: "Auctionator" wins, else "TSM", else nil; `LookupTSM`: `TSM_API.GetCustomPriceValue` DBMinBuyout capped by DBMarket, no age / history; `SourceText()` for settings and `/mw report`), disenchant value from Siz DisenchantValue (`DisenchantValueOf`: `DisenchantValueAPI.GetValue(link)`, else Auctionator's call; `deSource`), vendor price (`GetItemInfo` 11th return), class ID, `DisenchantAddon()` / `DisenchantAddonInstalled()` (Siz DisenchantValue by its API table, Disenchantry by `DisenchantryDB`) |
 | `Disenchant.lua` | era disenchant tables ported from Disenchantry 1.1.5 (MIT; original-era rows only, Forever's ilvl 21-30 weapon essence quirk) and the pure expected value (chance x average quantity x material price, nil when a material has no price); `Value(itemFacts)` prices materials through `Prices.MaterialPrice` |
 | `Valuation.lua` | **pure** decision rule: settings (defaults + saved, disenchant follows the disenchant addon, `keepProfessionMats` on), profession materials (`PROFESSION_MATS` by skill line ID x trade-goods subclass, `NeededBy`, `CraftingProfessions`; `settings.professions` filled by `Bags.Evaluate` from `Characters.Professions()`), deposit, thresholds, keep reasons, no-Auctionator rule, `Money` formatting |
 | `Quests.lua` | items an active quest asks for (`Quests.For(link)` -> quest title): quest log objectives of type "item" (`C_QuestLog`, Vanilla calls as fallback), matched by item name; cache dropped on `QUEST_LOG_UPDATE`; switch `questNeeds`. `Valuation` keeps them ("a quest needs it", a hard keep in `Routes.HARD_KEEPS`) |
@@ -316,10 +316,20 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   `Valuation.GATHERED_MATS` (Mining 186 = metal & stone, Herbalism 182 = herbs, Skinning 393 =
   leather, Fishing 356 = meat and fish subclass) brings in skips the "your X needs it" keep and
   is valued like anything else. Mining covers bars too (one subclass; smelting is Mining's).
-- Optional deps: `.pkgmeta` `optional-dependencies` auctionator, siz-disenchantvalue and (since
+- TradeSkillMaster as a price source (CurseForge user Warki7, 2026-11-08: "possible to use this with
+  TradeSkillMaster?"): `Prices.Source()`; Auctionator wins when both are installed (no new setting:
+  its scans carry the age, exactness and history decision rule v2 uses; TSM's public API gives none).
+  TSM counts as "with Auctionator" in AGENTS.md Safety: an item it has no price for stays, a failed
+  call (a raise, or a source `IsCustomPriceValid` rejects) never counts as "no price yet", and the
+  launch-week white trade goods exception applies the same way. Unit price = the lower of
+  `DBMinBuyout` and `DBMarket` (this realm's AuctionDB; never region data). With TSM alone there is
+  no price age, so no "price too old" keep and no stale nudge. Critical path: TSM alone, TSM with a
+  failing call, and both installed (TSM never asked). Not changed: `BankAlt.lua` / `MailWindow.lua`
+  texts that say "Auctionator" for the no-source case (other sessions were editing them).
+- Optional deps: `.pkgmeta` `optional-dependencies` auctionator, tradeskill-master (2026-11-08), siz-disenchantvalue and (since
   2026-10-26, the project being back) disenchantry: a slug that disappears fails the CurseForge
   upload with error 1018 (v0.8.0 and v0.9.0 did on disenchantry in October 2026), so if a tag's
-  release run fails on it, drop the slug and re-tag; `## OptionalDeps: Auctionator,
+  release run fails on it, drop the slug and re-tag; `## OptionalDeps: Auctionator, TradeSkillMaster,
   DisenchantValue, Disenchantry`.
 - Disenchantry as a first-class disenchant source (operator, 2026-10-26: "support that as a first
   class enchanting market addon"): it has no API (its 1.1.5 zip was read; everything is in its

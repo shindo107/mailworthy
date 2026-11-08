@@ -110,10 +110,13 @@ function Bags.Evaluate(settings)
     -- What the profession window last showed still in use past the table (TierCheck): kept.
     if settings.tiers then ns.TierCheck.Annotate(settings.professions) end
     -- Auction unit prices by item ID, for the leather conversions (Tiers.WorthConverting).
-    if settings.priceOf == nil and ns.Prices.Auctionator() then settings.priceOf = ns.Prices.MaterialPrice end
-    local priced = ns.Prices.Auctionator() ~= nil
+    -- Priced = an auction price source (Auctionator, else TradeSkillMaster: Prices.Source); without
+    -- one only white items go (AGENTS.md Safety "without Auctionator").
+    local source = ns.Prices.Source()
+    if settings.priceOf == nil and source then settings.priceOf = ns.Prices.MaterialPrice end
+    local priced = source ~= nil
     local routes = settings.routes or ns.Routes.Active()
-    local result = { settings = settings, priced = priced, routes = routes, mail = {}, keep = {}, unmailable = {},
+    local result = { settings = settings, priced = priced, source = source, routes = routes, mail = {}, keep = {}, unmailable = {},
         totals = { items = 0, stacks = 0, mails = 0, gain = 0, postage = 0, routed = 0, recipients = {}, byRecipient = {} } }
     local stacksTo = {}
     -- Class bindings (Routes, Classes.lua) need each item's class line: read only when there's one.
@@ -325,7 +328,8 @@ function Bags.Report(result)
         string.format("Mailworthy %s scan at %s (sends nothing)", ns.VERSION, date("%Y-%m-%d %H:%M")),
         "bank alt: " .. tostring(ns.Config.BankAlt() or "none (its share stays in the bags; /mw settings)")
             .. (bankAltSkipped and ", skipped this visit" or ""),
-        "prices: " .. (result.priced and "Auctionator" or "none (no Auctionator: mailing common items)")
+        "prices: " .. (result.priced and (ns.Prices.SOURCE_NAME[result.source] or "Auctionator")
+            or "none (no Auctionator or TradeSkillMaster: mailing common items)")
             .. ((result.priced and (s.serverDay or math.huge) < ns.Valuation.FRESH_REALM_DAYS)
                 and " (fresh realm: unpriced white trade goods are mailed)" or ""),
         string.format("settings: %dh listing (deposit x%d), AH cut %d%%, postage %s per stack, "
@@ -366,7 +370,7 @@ function Bags.Scan()
     local result = Bags.Evaluate()
     local t = result.totals
     ns.Log.Add("scan", "%d to mail (%d stacks, %d mails, gain %s), %d kept, prices %s", #result.mail, t.stacks,
-        t.mails, money(t.gain), #result.keep, result.priced and "Auctionator" or "none")
+        t.mails, money(t.gain), #result.keep, result.priced and tostring(result.source) or "none")
     ns.Print(string.format("would mail %d items (%d stacks, %d mail(s)), %s more than vendoring; keeps %d. Details in the window.",
         t.items, t.stacks, t.mails, money(t.gain), #result.keep))
     ns.Report.Show(Bags.Report(result), "Mailworthy scan (sends nothing)")

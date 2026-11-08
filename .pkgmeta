@@ -5,15 +5,17 @@ package-as: Mailworthy
 move-folders:
   Mailworthy/Mailworthy: Mailworthy
 
-# CurseForge relations (slugs), set by the packager on upload: Auctionator
-# provides auction prices, Siz DisenchantValue and Disenchantry disenchant
-# values. Every slug here must exist on CurseForge or the upload is refused
-# ("Invalid slug in project relations", error 1018): the disenchantry project
+# CurseForge relations (slugs), set by the packager on upload: Auctionator and
+# TradeSkillMaster (slug from its project page URL) provide auction prices, Siz
+# DisenchantValue and Disenchantry disenchant values. Every slug here must exist
+# on CurseForge or the upload is refused ("Invalid slug in project relations",
+# error 1018): the disenchantry project
 # (1704637) vanished in October 2026 and failed v0.8.0 and v0.9.0, and is back
 # since 2026-10-22. If a tag's CurseForge upload fails on it, drop it here and
 # re-tag.
 optional-dependencies:
   - auctionator
+  - tradeskill-master
   - siz-disenchantvalue
   - disenchantry
 

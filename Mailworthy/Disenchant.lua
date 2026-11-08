@@ -99,10 +99,10 @@ function Disenchant.ExpectedValue(outcomes, priceOf)
 end
 
 --- The expected disenchant value of an item in the bags (copper), from the tables and
---- Auctionator's material prices; nil without Auctionator, for an item the tables don't
---- cover, or while a material has no price.
+--- the auction source's material prices (Auctionator, else TradeSkillMaster); nil without one,
+--- for an item the tables don't cover, or while a material has no price.
 function Disenchant.Value(item)
     local outcomes = Disenchant.Outcomes(item)
-    if not outcomes or not ns.Prices.Auctionator() then return nil end
+    if not outcomes or not ns.Prices.Source() then return nil end
     return Disenchant.ExpectedValue(outcomes, ns.Prices.MaterialPrice)
 end
