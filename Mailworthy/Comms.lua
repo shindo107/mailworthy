@@ -25,6 +25,8 @@
 --   R2|<recipient>|<mail's sender>|<mail id>|<itemID>:<count>:<copper>:<k>;...   (Ledger.lua: the value the
 --       recipient settled on when it differs from the M2 one, so the sender's log matches; WHISPER only,
 --       held until the sender is heard from)
+--   U2|<this build's release: v0.31.0>   (Version.lua: right after a hello, release builds only;
+--       fields after the version are left out; v0.30.0 and older drop it)
 --
 -- What arrives is data from other players, never instructions: names are
 -- cleaned and length-checked, professions must be crafting skill lines
@@ -171,7 +173,8 @@ end
 --- Pure: a message from another Mailworthy, or nil. { kind = "hello", version, professions =
 --- { ids }, characters = { { name, professions = { ids } }, ... } }, { kind = "ask", version }
 --- or { kind = "fresh", version, day } (a scan day: Stale.lua), or { kind = "skills", version,
---- skills = { [id] = rank }, characters = { { name, skills } } } (the material tiers).
+--- skills = { [id] = rank }, characters = { { name, skills } } } (the material tiers), or
+--- { kind = "release", version, release = "v0.31.0" } (Version.lua).
 function Comms.Decode(text)
     if type(text) ~= "string" or #text > Comms.MAX_MESSAGE then return nil end
     local kind, version, rest = text:match("^(%a)(%d+)|?(.*)$")
@@ -203,6 +206,11 @@ function Comms.Decode(text)
     if kind == "R" then
         local answers = ns.Ledger and ns.Ledger.DecodeAnswers(rest)
         return answers and { kind = "answers", version = tonumber(version), answers = answers } or nil
+    end
+    if kind == "U" then
+        local release = text:match("^U%d+|([^|]*)") -- the separator is required: "U2v0.31.0" is junk
+        return ns.Version and ns.Version.Parse(release) and { kind = "release", version = tonumber(version), release = release }
+            or nil
     end
     if kind == "F" then
         local day = rest:match("^(%d+)$")
@@ -299,6 +307,11 @@ function Comms.Announce(reason)
         local _, freshWhere = send(fresh)
         results[#results + 1] = { fresh:sub(1, 2), freshWhere }
     end
+    local release = ns.Version and ns.Version.Message() -- nil on a dev build
+    if sent and release then
+        local _, releaseWhere = send(release)
+        results[#results + 1] = { release:sub(1, 2), releaseWhere }
+    end
     ns.Log.Add("comms", "hello (%s): %s", tostring(reason), Comms.ResultText(results))
     return sent
 end
@@ -345,7 +358,8 @@ function Comms.Duplicate(name, text, channel, at)
     return false
 end
 
---- Peers heard from on this realm + faction: lower-case name -> { name, professions, characters, version, at }.
+--- Peers heard from on this realm + faction: lower-case name -> { name, professions, characters, version (the
+--- wire format, 2), at, skills, release (the Mailworthy release they run, Version.lua) }.
 function Comms.Peers()
     return store()
 end
@@ -471,6 +485,9 @@ function Comms.Hear(sender, text, channel)
     if msg.kind == "fresh" then
         return ns.Stale and ns.Stale.Hear(name, msg.day) or nil
     end
+    if msg.kind == "release" then
+        return ns.Version and ns.Version.Hear(name, msg.release) or nil
+    end
     if msg.kind == "template" or msg.kind == "templateAsk" then
         return ns.Guild and ns.Guild.Hear(name, msg, channel) or nil
     end
@@ -504,7 +521,7 @@ function Comms.Hear(sender, text, channel)
         if c.name:lower() ~= name:lower() then characters[#characters + 1] = c end
     end
     local peer = { name = name, professions = msg.professions, characters = characters, version = msg.version, at = serverTime(),
-        skills = type(old) == "table" and old.skills or nil }
+        skills = type(old) == "table" and old.skills or nil, release = type(old) == "table" and old.release or nil }
     store()[name:lower()] = peer
     marksChanged(old, peer)
     ns.Log.Add("comms", "hello from %s: professions %s, %d other character(s)", name,

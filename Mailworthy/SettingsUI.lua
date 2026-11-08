@@ -22,9 +22,9 @@ local UI = {}
 ns.SettingsUI = UI
 
 UI.MAX_CHOICES = 6
-local WIDTH, MAIN_HEIGHT, ROW = 420, 522, 26
+local WIDTH, MAIN_HEIGHT, ROW, VERSION_ROW = 420, 522, 26, 20
 
-local frame, nameBox, nameHint, current, emptyHint, legend, pricesLine, changeButton
+local frame, nameBox, nameHint, current, emptyHint, legend, pricesLine, versionLine, changeButton
 local choiceRows = {}
 local amountLabel, pctLabel, disenchantButton, minimapButton, tagsButton, glowButton, matsButton, hereButton, friendsButton
 local gatherButton, guildButton
@@ -40,6 +40,8 @@ local money = function(c) return ns.Valuation.Money(c) end
 function UI.Frame() return frame end
 --- The footer (the Mailworthy mark's key, the controller legend), for specs.
 function UI.Footer() return legend and legend:GetText() end
+--- The "a newer Mailworthy is out" line ("" when there's none), for specs.
+function UI.VersionLine() return versionLine and versionLine:GetText() end
 --- "main" (the settings) or "pick" (choosing the bank alt).
 function UI.View() return view end
 
@@ -299,6 +301,11 @@ local function createBagsAndMore()
     pricesLine:SetPoint("TOPLEFT", 28, -472)
     pricesLine:SetWidth(270)
     pricesLine:SetJustifyH("LEFT")
+    -- A newer Mailworthy is out (Version.lua): under the Prices line; the window grows to fit it.
+    versionLine = add(mainWidgets, W.Label(frame, "GameFontHighlightSmall"))
+    versionLine:SetPoint("TOPLEFT", 28, -490)
+    versionLine:SetWidth(WIDTH - 56)
+    versionLine:SetJustifyH("LEFT")
     add(mainWidgets, W.Button(frame, "Done", 100, function() frame:Hide() end, "MailworthySettingsDone"))
         :SetPoint("TOPRIGHT", -24, -466)
 end
@@ -422,6 +429,7 @@ local function fillMain(bankAlt, here, choices)
     minimapButton:SetText("Minimap button: " .. (ns.Config.MinimapShown() and "shown" or "hidden"))
     W.SetToggled(minimapButton, ns.Config.MinimapShown() == true)
     pricesLine:SetText(UI.PricesText())
+    versionLine:SetText(ns.Version.Text() or "")
     return marked
 end
 
@@ -444,7 +452,7 @@ function UI.Refresh()
         frame:SetHeight(layoutPicker(shown))
     else
         hideChoices()
-        frame:SetHeight(MAIN_HEIGHT)
+        frame:SetHeight(MAIN_HEIGHT + (ns.Version.Text() and VERSION_ROW or 0))
     end
     legend:SetText(W.Footer(ns.MailButton.GamepadUI(), (view == "pick" and markedPick) or (view ~= "pick" and markedMain)))
     ns.Nav.Revalidate()
@@ -469,5 +477,8 @@ end
 ns.On("PLAYER_LOGIN", function() UI.Create() end)
 -- A new Mailworthy user can be a name on screen (Comms.Mark): redraw.
 ns.Comms.OnMarksChanged(function()
+    if frame and frame:IsShown() then UI.Refresh() end
+end)
+ns.Version.OnChanged(function()
     if frame and frame:IsShown() then UI.Refresh() end
 end)

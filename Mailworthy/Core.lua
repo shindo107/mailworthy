@@ -29,7 +29,7 @@ ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
     tiers = true, tierCheck = true, guildTemplate = true, ledger = true, questNeeds = true, autoOpen = true,
-    returnToSender = true, bankAltMail = true, peerMark = true,
+    returnToSender = true, bankAltMail = true, peerMark = true, versionNotice = true,
     baganatorTags = true, bagnonTags = true, arkInventoryTags = true, betterBagsTags = true, auctionatorTags = true,
 } }
 
@@ -110,7 +110,8 @@ local HELP = {
         .. " and received)",
     "/mw summary - on your bank alt (or without one): what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
-        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail|peerMark"
+        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail"
+        .. "|peerMark|versionNotice"
         .. "|baganatorTags|bagnonTags|arkInventoryTags|betterBagsTags|auctionatorTags> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",

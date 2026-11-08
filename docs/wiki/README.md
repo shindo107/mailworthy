@@ -7,4 +7,7 @@ over the wiki's, commit, push, then empty this folder in a follow-up.
 
 Last published: the v0.30.0 pages (wiki commit `26871b6`, 2026-11-08): every page brought up to
 date with v0.25-v0.30, plus the new Price Sources, Return to Sender, Mail Ledger and Bag Addons
-pages (PR #70). Nothing is waiting here now.
+pages (PR #70).
+
+Waiting here (copied whole from wiki `26871b6`): Mailworthy-Talks-to-Mailworthy.md and
+Commands-and-Troubleshooting.md, for the update nudge (`versionNotice`).
