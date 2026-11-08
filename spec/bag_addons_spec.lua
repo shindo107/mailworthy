@@ -553,6 +553,33 @@ describe("bag addons: BetterBags", function()
         assert.equal(1, #bb.messages["bags/Draw/Bank/Done"], "the bank's draw too")
     end)
 
+    it("clears the glow on hidden buttons too: the bags may reopen without a draw", function()
+        local item, decoration = {}, addonButton()
+        bb.draw(item, decoration, 0, 1, COPPER)
+        MailworthyCharDB.lockedItems[COPPER] = { link = "Copper Ore" }
+        openWindow(ns)
+        assert.is_true(glowing(ns, decoration))
+        rawset(decoration, "hidden", true) -- the player closes the bags
+        ns.MailWindow.Frame():Hide() -- then the Mailworthy window
+        rawset(decoration, "hidden", nil) -- BetterBags reopens without drawing (nothing changed)
+        assert.is_false(glowing(ns, decoration), "no glow left from before")
+    end)
+
+    it("moves the legend when BetterBags swaps its backpack frame (classic / Next design)", function()
+        bb.draw({}, addonButton(), 0, 1, COPPER)
+        local first = ns.Report.Build()
+        assert.truthy(first:find("legend shown under its bags", 1, true))
+        local created = 0
+        local newFrame = WowStub.newWidget("Frame", "BetterBagsNextBackpack")
+        rawset(newFrame, "CreateFontString", function()
+            created = created + 1
+            return WowStub.newWidget("FontString")
+        end)
+        _G.LibStub("AceAddon-3.0"):GetAddon("BetterBags").Bags.Backpack = { frame = newFrame }
+        ns.BankAlt.Redraw()
+        assert.equal(1, created, "a legend under the new frame")
+    end)
+
     it("draws nothing on a guild bank tab (its bagid is a tab, not a container)", function()
         local decoration = addonButton()
         bb.draw({}, decoration, 0, 1, COPPER, { kind = 2 })

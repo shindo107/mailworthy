@@ -75,11 +75,8 @@ function BagAddons.On(key)
     return ns.Features.On(BagAddons.FEATURE[key]) and (ns.Features.On("slotBorder") or ns.Features.On("bankAltTags"))
 end
 
-local function visible(region)
-    if type(region) ~= "table" or type(region.IsVisible) ~= "function" then return false end
-    local ok, shown = pcall(region.IsVisible, region)
-    return ok and shown == true
-end
+-- Redraws go over every button seen, shown or not: a bag can be shown again without a draw
+-- (BetterBags reopens without one; Codex review), and a hidden button must not keep a glow.
 
 local function count(t)
     local n = 0
@@ -99,8 +96,19 @@ local function makeLegend(host)
     return fs
 end
 
+local legendHosts = {} -- key -> the frame its legend sits under
+
+--- The legend under `host`; a new one when the addon swapped its bag frame (BetterBags' design
+--- switch replaces its backpack), the old one emptied.
 local function legendUnder(key, host)
-    legends[key] = legends[key] or makeLegend(host)
+    if legends[key] and legendHosts[key] ~= host and type(host) == "table" and type(host.CreateFontString) == "function" then
+        pcall(legends[key].SetText, legends[key], "")
+        legends[key] = nil
+    end
+    if not legends[key] then
+        legends[key] = makeLegend(host)
+        legendHosts[key] = legends[key] and host or nil
+    end
     return legends[key]
 end
 
@@ -202,7 +210,7 @@ end
 
 local function redrawBaganator(wanted)
     for button in pairs(seen.baganator) do
-        if visible(button) then
+        do
             local shownID = baganatorShown(button)
             local ok, err
             if shownID == false then
@@ -292,7 +300,7 @@ end
 
 local function redrawBagnon(wanted)
     for button in pairs(seen.bagnon) do
-        if visible(button) then
+        do
             local ok, err = pcall(drawBagnon, button, wanted)
             if not ok then logError("bagnon", err) end
         end
@@ -370,7 +378,7 @@ end
 
 local function redrawArk(wanted)
     for frame, at in pairs(seen.arkInventory) do
-        if visible(frame) then
+        do
             local ok, err = pcall(drawArk, frame, at[1], at[2], at[3], wanted)
             if not ok then logError("arkInventory", err) end
         end
@@ -412,7 +420,6 @@ local function betterBagsEvents()
 end
 
 local function betterBagsLegend()
-    if legends.betterBags then return legends.betterBags end
     local addon = betterBagsAddon()
     local ok, frame = pcall(function() return addon.Bags.Backpack.frame end)
     if not ok then return nil end
@@ -456,7 +463,7 @@ end
 
 local function redrawBetterBags(wanted)
     for decoration, item in pairs(seen.betterBags) do
-        if visible(decoration) then
+        do
             local ok, err = pcall(drawBetterBags, item, decoration, wanted)
             if not ok then logError("betterBags", err) end
         end
