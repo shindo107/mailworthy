@@ -320,6 +320,28 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
     end)
 
+    it("a stale price (older than 7 days) goes to the bank alt like no price; a hard keep with one still stays", function()
+        -- operator, 2026-11-08: "Stale prices go too" (rule changed on purpose; was: it stays)
+        local green = WowStub.link(6515, "Spellbinder Robes")
+        local stale = { [green] = true, [WowStub.link(2775, "Silver Ore")] = true, [WowStub.link(5022, "Bundle of Letters")] = true }
+        Auctionator.API.v1.GetAuctionAgeByItemLink = function(_, l) return stale[l] and 9 or 0 end
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[6515], "the green with a 9-day-old price goes to the bank alt")
+        assert.is_nil(preview[2775], "locked, stale: stays")
+        assert.is_nil(preview[5022], "a quest item, stale: stays")
+        for _, it in ipairs(ns.MailWindow.Result().mail) do
+            if it.itemID == 6515 then
+                assert.equal("noprice", it.result.route)
+                assert.is_nil(it.result.gain, "the old price isn't used")
+            end
+        end
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
     it("with Auctionator but no bank alt (or skipped): an unpriced item stays, as the rest of its share", function()
         MailworthyDB.bankAlts = {}
         WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
@@ -357,22 +379,45 @@ describe("critical path: mailing", function()
         ns.MailWindow.Refresh()
         preview = previewed(ns)
         assert.equal(SMITH, preview[7978], "under the cap: the friend")
+        -- Codex review: a failed price call mails nothing, a stale price over the cap doesn't reach the friend
+        local broken = WowStub.item(7980, "Plans: Broken Lookup", { quality = 2, sell = 450, class = 9, subclass = 4 })
+        local old = WowStub.item(7981, "Plans: Old Price", { quality = 3, sell = 450, class = 9, subclass = 4 })
+        WowStub.setBag(2, 4, broken)
+        WowStub.setBag(2, 3, old)
+        prices[old.hyperlink] = 90000
+        local v1 = Auctionator.API.v1
+        local lookup = v1.GetAuctionPriceByItemLink
+        v1.GetAuctionPriceByItemLink = function(c, l)
+            if l == broken.hyperlink then error("boom") end
+            return lookup(c, l)
+        end
+        v1.GetAuctionAgeByItemLink = function(_, l) return l == old.hyperlink and 9 or 0 end
+        ns.MailWindow.Refresh()
+        preview = previewed(ns)
+        assert.is_nil(preview[7980], "the price call failed: it stays, binding or not")
+        assert.equal(BANK_ALT, preview[7981], "a 9g price 9 days old still caps it: the bank alt, not the friend")
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [SMITH] = true })
     end)
 
-    it("a class binding never takes an unpriced item: it goes to the bank alt", function()
+    it("a class binding never takes an unpriced item, even one worth disenchanting: it goes to the bank alt", function()
         WowStub.setBag(0, 13, WowStub.item(211234, "Scroll: VOCE WELL", { sell = 15, class = 0 }))
         WowStub.state.itemClasses[211234] = "Mage"
+        -- Codex review: a disenchant value alone (route "de") isn't an auction price
+        WowStub.setBag(0, 14, WowStub.item(211235, "Mage Robe", { quality = 2, sell = 100, class = 4, level = 20 }))
+        WowStub.state.itemClasses[211235] = "Mage"
+        _G.DisenchantValueAPI = { GetValue = function(l) return l:find("Mage Robe", 1, true) and 5000 or nil end }
         ns.Routes.Add(BOB, "MAGE")
         mailbox()
         _G.MailworthyMailButton:Click()
         local preview = previewed(ns)
         assert.equal(BANK_ALT, preview[211234])
+        assert.equal(BANK_ALT, preview[211235], "disenchant pays, no auction price: the bank alt")
         _G.MailworthyMailSend:Click()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+        _G.DisenchantValueAPI = nil
     end)
 
     it("without a price source a staple trade good goes whatever its quality; other non-white items stay", function()

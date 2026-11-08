@@ -349,18 +349,23 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
 - No auction price yet = to the bank alt (operator, 2026-11-08, a screenshot of "Plans: Iridescent
   Hammer" tagged "[Keep] Stays in your bags: no auction price yet": "going to the bank alt on no data
   is better than holding on the main"). `Valuation.Unpriced`: with a price source and no auction
-  price, route `noprice` (chip "No price", `/mw scan` "NO PRICE", no gain); grey junk, a failed
-  call and a stale price stay; unpriced gear too (`UNPRICED_GEAR`, asked); class bindings never take
-  it (`Routes.PriceKeep`). Staple trade goods (`Valuation.STAPLES`, ~110 Classic IDs, one table) are
+  price, route `noprice` (chip "No price", `/mw scan` "NO PRICE", no gain); a price past the age limit
+  counts as none ("auction price too old (N days)"); grey junk and a failed call stay; unpriced gear
+  too (`UNPRICED_GEAR`). Operator's answers the same day: no price source = "Whites + staples +
+  recipes", "Yes, gear goes too", "Stale prices go too" (the stale nudge now says old-priced items go
+  to the bank alt). Class bindings never take an item without a current auction price, whatever
+  its route (`Routes.Divert`; a disenchant value alone isn't one: Codex review). A failed price
+  call reaches no binding either (Codex review; materials included). Staple trade goods (`Valuation.STAPLES`, ~110 Classic IDs, one table) are
   "always mail" as a common item when unpriced (Bank on top), and without any price source whatever
   their quality. Recipes: `Valuation.RecipeProfession` (class 9, `Enum.ItemRecipeSubclass`) makes a
   recipe part of its profession's binding (`Routes.Matches`; reason "Blacksmithing recipe goes to
-  Bob"; mailed with the materials, same subject); the cap applies to a priced recipe. Replaces the
+  Bob"; mailed with the materials, same subject); the cap applies to a priced recipe, a stale
+  price included (Codex review: a 9g plan 9 days old doesn't reach the friend under a 5g cap). Replaces the
   launch-days 0-13 white trade goods exception (`FreshRealmDefault`, `FRESH_REALM_DAYS` removed).
   AGENTS.md Safety rewritten; critical path: unpriced to the bank alt (hard keeps and junk stay, no
   bank alt = stays), recipes to the binding / the bank alt / over the cap, class binding never takes
   an unpriced item, staples without a price source; the old "unpriced stays" assertions changed on
-  purpose. Not changed: a stale price still stays (the stale nudge asks for a scan).
+  purpose, each with a comment saying what it was.
 - Optional deps: `.pkgmeta` `optional-dependencies` auctionator, tradeskill-master (2026-11-08), siz-disenchantvalue and (since
   2026-10-26, the project being back) disenchantry: a slug that disappears fails the CurseForge
   upload with error 1018 (v0.8.0 and v0.9.0 did on disenchantry in October 2026), so if a tag's

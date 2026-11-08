@@ -268,20 +268,31 @@ end
 --- by Routes.Before; its cap decides, as if it were the only one.
 function Routes.Divert(item, verdict, price, settings, routes)
     if verdict and verdict.action == "keep" and Routes.HARD_KEEPS[verdict.reason] then return nil end
-    local outgrown, route
-    for _, r in ipairs(routes or {}) do
-        local matches, past = Routes.Matches(r, item, settings and settings.tiers, settings and settings.priceOf)
-        if r.class and Routes.PriceKeep(verdict) then matches = false end
-        if past then outgrown = outgrown or r end
-        if matches and (not route or Routes.Before(r, route)) then route = r end
-    end
-    if not route then return nil, nil, outgrown end
-    local unit
+    -- A failed price call mails nothing, to a binding neither (AGENTS safety; Codex review, 2026-11-08).
+    if type(price) == "table" and price.failed then return nil end
+    local unit -- the current auction price (none past the age limit)
     if type(price) == "table" and price.ah ~= nil
         and (price.age == nil or price.age <= (settings and settings.maxAgeDays or math.huge)) then
         unit = ns.Valuation.SmoothedPrice(price)
     end
-    if route.cap and unit and unit >= route.cap then return nil, route end
+    -- The price the cap is checked against: the current one; for a recipe an old one too, so a recipe
+    -- the auction house paid well for isn't given away on a stale price (Codex review, 2026-11-08).
+    local capUnit = unit
+    if capUnit == nil and ns.Valuation.RecipeProfession(item) and type(price) == "table" and price.ah ~= nil then
+        capUnit = ns.Valuation.SmoothedPrice(price)
+    end
+    local outgrown, route
+    for _, r in ipairs(routes or {}) do
+        local matches, past = Routes.Matches(r, item, settings and settings.tiers, settings and settings.priceOf)
+        -- A class binding needs a current auction price when there's a price source (the cap is checked
+        -- against it): an item without one goes to the bank alt, whatever its route (a disenchant
+        -- value alone isn't one; Codex review, 2026-11-08).
+        if r.class and (Routes.PriceKeep(verdict) or (type(price) == "table" and unit == nil)) then matches = false end
+        if past then outgrown = outgrown or r end
+        if matches and (not route or Routes.Before(r, route)) then route = r end
+    end
+    if not route then return nil, nil, outgrown end
+    if route.cap and capUnit and capUnit >= route.cap then return nil, route end
     local to, crafter = Routes.Recipient(route)
     local n = item.count or 1
     return {

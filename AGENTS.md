@@ -27,13 +27,14 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   above its price cap the normal rule applies and the item goes to the bank alt.
 - Re-check each slot right before attaching it; skip anything that changed.
 - Without Auctionator (no price source), the only items mailed are unlocked, tradeable white
-  (common) items and the staple trade goods (`Valuation.STAPLES`, whatever their quality).
-  With Auctionator (or TSM), an item without an auction price goes to the **bank alt**,
-  never to a class binding (operator, 2026-11-08: "going to the bank alt on no data is
-  better than holding on the main"; replaces "an item without a price stays in the bags"
-  and its launch-days 0-13 exception for white trade goods). Grey junk stays, an item whose
-  price call failed stays, an item past the price age limit stays, and the hard keeps above
-  come first.
+  (common) items and the staple trade goods (`Valuation.STAPLES`, whatever their quality)
+  (operator, 2026-11-08: "Whites + staples + recipes"; recipes only to their profession's
+  binding). With Auctionator (or TSM), an item without an auction price, or whose only price
+  is past the age limit, goes to the **bank alt**, never to a class binding (operator,
+  2026-11-08: "going to the bank alt on no data is better than holding on the main";
+  "Yes, gear goes too"; "Stale prices go too"; replaces "an item without a price stays in
+  the bags" and its launch-days 0-13 exception for white trade goods). Grey junk stays, an
+  item whose price call failed stays, and the hard keeps above come first.
   A profession binding mails its materials and its profession's recipes to the bound player
   whatever their price (operator, 2026-11-08: "keep as is"; recipes: "recipes should go to
   their respective profession mappings"), under its price cap when there is a price; a class

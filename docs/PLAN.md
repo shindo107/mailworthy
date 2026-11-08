@@ -181,12 +181,13 @@ minimums) with the deposit counted lost.
 **No auction price yet (operator, 2026-11-08):** "going to the bank alt on no data is
 better than holding on the main". With Auctionator (or TSM) installed but no auction price
 for an item, it is mailed to the bank alt to wait there for one (route `noprice`, chip "No
-price", reason "no auction price yet"; no gain is shown, none is made up). Grey junk stays
-for the vendor; a failed price call stays (never "no price yet"); a price past the age limit
-stays; the hard keeps and the profession keep come first; without a bank alt (or with it
+price", reason "no auction price yet"; no gain is shown, none is made up). A price past the
+age limit counts as none: the item goes the same way, reason "auction price too old (8 days)"
+(operator, same day: "Stale prices go too"). Grey junk stays for the vendor; a failed price
+call stays (never "no price yet"); the hard keeps and the profession keep come first; without a bank alt (or with it
 skipped) it stays like the rest of the bank alt's share. An item whose disenchant value alone
 doesn't pay goes the same way (the auction house may still pay). Unpriced green and blue
-gear goes too (`Valuation.UNPRICED_GEAR`). A class binding never takes an unpriced item
+gear goes too (`Valuation.UNPRICED_GEAR`; operator: "Yes, gear goes too"). A class binding never takes an unpriced item
 (`Routes.PriceKeep`: the cap can't be checked). Replaces the launch-days 0-13 exception for
 white trade goods (research 4.2, 2026-10-20).
 
@@ -197,7 +198,7 @@ mailed as a **common item** ("always mail", no invented copper value: a fixed pr
 guess shown as a gain, and would go stale as the realm's market forms), so the Bank verdict
 still applies on top (late-demand goods before the first raids are B). Without any price
 source they are mailed too, whatever their quality (essences, shards and elemental essences
-are green or blue).
+are green or blue; operator, same day, for the no-price-source case: "Whites + staples + recipes").
 
 **Recipes (operator, 2026-11-08):** "recipes should go to their respective profession
 mappings or default to the bank alt if no AH data is found". A recipe (item class 9) is one
@@ -238,10 +239,9 @@ reason) when any of these hold:
 - it's a profession tool (fishing poles, Mining Pick, Blacksmith Hammer, Skinning
   Knife, Flint and Tinder, Arclight Spanner, enchanting rods): the v0.2.0 scan put
   a Fishing Pole on the mail list;
-- it is grey junk with no price, or its price call failed (with Auctionator installed an
-  item with no price otherwise goes to the bank alt since 2026-11-08; without Auctionator at
-  all, the common-items rule above applies);
-- its price is older than the age limit;
+- it is grey junk with no price (or only an old one), or its price call failed (with Auctionator
+  installed an item with no price, or one past the age limit, otherwise goes to the bank alt
+  since 2026-11-08; without Auctionator at all, the common-items rule above applies);
 - the player is the bank alt, or no bank alt is set, or the bank alt is skipped for this
   mailbox visit (Skip once beside its "To:" line): its share stays, bindings still go.
 

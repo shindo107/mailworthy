@@ -507,8 +507,7 @@ evaluate = function(item, price, settings)
         r.deNet = math.floor(price.de * n) - postage
     end
     if r.ahNet == nil and r.deNet == nil then
-        if stale then return keep(string.format("price too old (%d days)", price.age), r) end
-        return Valuation.Unpriced(item, price, vendor, postage, settings)
+        return Valuation.Unpriced(item, price, vendor, postage, settings, stale and price.age or nil)
     end
 
     local best, route = r.ahNet, "ah"
@@ -518,24 +517,29 @@ evaluate = function(item, price, settings)
     if r.gain >= r.threshold then
         return mail(route, route == "ah" and "auction house" or "disenchant", r, item, settings)
     end
-    -- Disenchanting alone doesn't pay, and the auction house has no price yet: it may still sell
-    -- there, so it goes like any unpriced item.
-    if price.ah == nil and not stale then return Valuation.Unpriced(item, price, vendor, postage, settings) end
+    -- Disenchanting alone doesn't pay, and the auction house has no (current) price: it may still
+    -- sell there, so it goes like any unpriced item.
+    if price.ah == nil or stale then
+        return Valuation.Unpriced(item, price, vendor, postage, settings, stale and price.age or nil)
+    end
     return keep("not worth it", r)
 end
 
---- Pure: the verdict for an item the price source has no auction price for (not a stale one):
---- a failed price call keeps it (never "no price yet"), grey junk stays for the vendor, a staple
+--- Pure: the verdict for an item the price source has no auction price for, or only one older
+--- than the age limit (`staleDays`: its age; operator, 2026-11-08: "Stale prices go too"): a
+--- failed price call keeps it (never "no price yet"), grey junk stays for the vendor, a staple
 --- trade good is mailed as a common item (Bank on top, BankReason), anything else goes to the bank
 --- alt to wait for a price (route NO_PRICE). Unpriced gear only while UNPRICED_GEAR is on.
-function Valuation.Unpriced(item, price, vendor, postage, settings)
+function Valuation.Unpriced(item, price, vendor, postage, settings, staleDays)
     if type(price) == "table" and price.failed then return keep("no price", { vendor = vendor, failed = true }) end
     if (item.quality or 0) == 0 then return keep("junk (no price data)", { vendor = vendor }) end
+    local old = staleDays and string.format("auction price too old (%d days)", staleDays) or nil
     if Valuation.IsStaple(item) then
-        return mail("common", "staple trade good (no price yet)", { vendor = vendor, postage = postage }, item, settings)
+        return mail("common", staleDays and string.format("staple trade good (price %d days old)", staleDays)
+            or "staple trade good (no price yet)", { vendor = vendor, postage = postage }, item, settings)
     end
     if not Valuation.UNPRICED_GEAR and Valuation.CanDisenchant(item) then return keep("no price", { vendor = vendor }) end
-    return mail(Valuation.NO_PRICE, "no auction price yet", { vendor = vendor, postage = postage }, item, settings)
+    return mail(Valuation.NO_PRICE, old or "no auction price yet", { vendor = vendor, postage = postage }, item, settings)
 end
 
 --- "1g 2s 3c", "-45c", "0c".

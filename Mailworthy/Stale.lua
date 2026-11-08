@@ -1,7 +1,7 @@
 -- Stale auction prices: a nudge at the mailbox when this character's Auctionator
 -- prices are over NUDGE_DAYS (3) old (operator, 2026-11-06: "set that threshold to 3
 -- days"; they stop counting for verdicts past Valuation's maxAgeDays, 7, and the
--- nudge then says those items stay in the bags), louder when another
+-- nudge then says those items go to the bank alt, operator 2026-11-08), louder when another
 -- Mailworthy user nearby has scanned recently (operator, 2026-11-06: "8 of them
 -- have scanned the AH but 2 haven't scanned in a week ... the 2 get a signal next
 -- time they look at the mailbox button").
@@ -166,11 +166,11 @@ function Stale.Text(nudge)
     if nudge.level == "peer" then
         return string.format("|cffff8040Your auction prices are %s; %s scanned %s.|r Run an Auctionator scan at the "
             .. "auction house%s", ageText(nudge.age), firstName(nudge.peer), agoText(nudge.peerAgo),
-            nudge.ignored and ": until then, items with old prices stay in your bags." or " for up-to-date verdicts.")
+            nudge.ignored and ": until then, items with old prices go to your bank alt." or " for up-to-date verdicts.")
     end
     if nudge.ignored then
-        return string.format("|cffaaaaaaYour auction prices are %s: items with old prices stay in your bags until an "
-            .. "Auctionator scan.|r", ageText(nudge.age))
+        return string.format("|cffaaaaaaYour auction prices are %s: items with old prices go to your bank alt "
+            .. "until an Auctionator scan.|r", ageText(nudge.age))
     end
     return string.format("|cffaaaaaaYour auction prices are %s: an Auctionator scan keeps the verdicts up to date.|r",
         ageText(nudge.age))
