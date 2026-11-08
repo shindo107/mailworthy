@@ -82,6 +82,16 @@ describe("widgets and labels", function()
         assert.equal("Staying", c2[1].was)
         assert.equal(1, #changed(list, { green("[Raider Shortsword of the Tiger]", "Bob"),
             green("[Raider Shortsword of the Monkey]", "Bob") }, "Bank"))
+        -- Codex review, 2026-11-08: Return to sender splits one item by stacks; restacked between the
+        -- preview and Send, the same two recipients would get other amounts.
+        local function cloth(n, to) return { itemID = 2592, link = "[Wool Cloth]", count = n, result = { to = to } } end
+        local shownSplit = { cloth(20, "Bob"), cloth(10) }
+        assert.same({}, changed(shownSplit, { cloth(20, "Bob"), cloth(10) }, "Bank"))
+        local c3 = changed(shownSplit, { cloth(15, "Bob"), cloth(15) }, "Bank")
+        assert.equal(2, #c3)
+        assert.equal("Bob", c3[1].to)
+        assert.equal(15, c3[1].count)
+        assert.equal(20, c3[1].wasCount)
     end)
 
     it("the settings' Guild button says where the guild rules stand", function()

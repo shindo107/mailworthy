@@ -156,6 +156,33 @@ describe("return to sender", function()
             end
         end)
 
+        it("stacks moved between the preview and Send: nothing goes until the list shows the new split", function()
+            -- Codex review, 2026-11-08: 20 to Bob and 10 to the bank alt on screen, 15 + 15 in the bags
+            take(BOB, WOOL, 20)
+            local wool = function(n) return WowStub.item(WOOL[1], WOOL[2], { count = n, sell = 33, class = 7, subclass = 5 }) end
+            WowStub.setBag(0, 2, wool(10))
+            ns.MailWindow.Show("send")
+            _G.MailworthyMailReturn:Click()
+            WowStub.setBag(0, 1, wool(15))
+            WowStub.setBag(0, 2, wool(15)) -- no BAG_UPDATE_DELAYED yet: the list still says 20 / 10
+            _G.MailworthyMailSend:Click()
+            WowStub.runTimers()
+            assert.equal(0, #WowStub.state.sent, "nothing goes while the amounts differ from the list")
+            assert.truthy(WowStub.printed[#WowStub.printed]:find("Not sent: Wool Cloth to %a+ is now x15 %(the list said x%d+%)"),
+                table.concat(WowStub.printed, "\n"))
+            _G.MailworthyMailSend:Click() -- the list now shows the new split
+            for _ = 1, 10 do
+                WowStub.runTimers()
+                if not ns.Mailer.Busy() then break end
+                ns.Fire("MAIL_SEND_SUCCESS")
+            end
+            local delivered = {}
+            for i, mail in ipairs(WowStub.state.sent) do
+                for _, it in ipairs(WowStub.state.sentItems[i]) do delivered[mail.name] = (delivered[mail.name] or 0) + it.count end
+            end
+            assert.same({ [BOB] = 15, ["Roknua Themicrulah"] = 15 }, delivered)
+        end)
+
         it("nothing received: says so, and the list is the usual one", function()
             ns.MailWindow.Show("send")
             _G.MailworthyMailReturn:Click()

@@ -737,9 +737,13 @@ end
 --- bank alt (picked in Settings beside the list) (Codex review, 2026-11-07).
 --- `stayed` (the list's Staying items): one of those now in the mail is a change too (a quest
 --- abandoned after the preview; Codex review, 2026-11-08), whoever it goes to.
+--- How many of an item each recipient gets counts too (Codex review, 2026-11-08): Return to sender
+--- splits one item between its sender and the usual recipient by stacks, so stacks moved between
+--- the preview and Send would change who gets how many; such an entry has `count` / `wasCount`.
 function UI.Changed(shown, fresh, previewAlt, freshAlt, stayed)
     if freshAlt == nil then freshAlt = previewAlt end
     local function key(it) return it.link or it.itemID end
+    local function count(it) return tonumber(it.count) or 0 end
     local kept = {}
     for _, it in ipairs(stayed or {}) do kept[key(it)] = true end
     local was, named = {}, { [tostring(previewAlt)] = true }
@@ -747,17 +751,32 @@ function UI.Changed(shown, fresh, previewAlt, freshAlt, stayed)
         local to = tostring(it.result and it.result.to or previewAlt)
         local k = key(it)
         was[k] = was[k] or {}
-        was[k][to] = true
+        was[k][to] = (was[k][to] or 0) + count(it)
         named[to] = true
     end
-    local changed = {}
+    local changed, now, order = {}, {}, {}
     for _, it in ipairs(fresh or {}) do
         local to = tostring(it.result and it.result.to or freshAlt)
-        local before = was[key(it)]
-        if kept[key(it)] and not before then
+        local k = key(it)
+        local before = was[k]
+        if kept[k] and not before then
             changed[#changed + 1] = { item = it, was = "Staying", to = to }
         elseif (before and not before[to]) or (not before and not named[to]) then
             changed[#changed + 1] = { item = it, was = before and next(before) or nil, to = to }
+        elseif before then
+            now[k] = now[k] or {}
+            if not now[k][to] then
+                now[k][to] = { item = it, count = 0 }
+                order[#order + 1] = { k, to }
+            end
+            now[k][to].count = now[k][to].count + count(it)
+        end
+    end
+    for _, o in ipairs(order) do
+        local k, to = o[1], o[2]
+        local n = now[k][to]
+        if n.count ~= was[k][to] then
+            changed[#changed + 1] = { item = n.item, was = to, to = to, count = n.count, wasCount = was[k][to] }
         end
     end
     return changed
@@ -779,9 +798,11 @@ function UI.Send()
     if #changed > 0 then
         local c = changed[1]
         local name = tostring(c.item.link or ""):match("%[(.-)%]") or ("item " .. tostring(c.item.itemID))
-        local text = string.format("Not sent: %s now goes to %s%s. Check the list, then press Send again.", name,
-            firstName(c.to), c.was == "Staying" and " instead of staying in your bags"
-                or c.was and (" instead of " .. firstName(c.was)) or "")
+        local text = c.wasCount and string.format("Not sent: %s to %s is now x%d (the list said x%d). "
+                .. "Check the list, then press Send again.", name, firstName(c.to), c.count, c.wasCount)
+            or string.format("Not sent: %s now goes to %s%s. Check the list, then press Send again.", name,
+                firstName(c.to), c.was == "Staying" and " instead of staying in your bags"
+                    or c.was and (" instead of " .. firstName(c.was)) or "")
         ns.Log.Add("mailer", "send held: %d item(s) changed recipient since the preview (%s to %s, was %s)", #changed,
             name, c.to, tostring(c.was))
         ns.Print(text)
