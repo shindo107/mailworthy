@@ -4,7 +4,7 @@
 -- with and without Auctionator, with TradeSkillMaster alone and with both, items with no auction
 -- price yet (to the bank alt), with a binding (a profession's or a class's, recipes to their
 -- profession's), with a guild template (its mail tagged in the log and counted for the guild
--- contributions, nobody else's), without a bank alt or with it skipped for the visit, with
+-- contributions, nobody else's, never mail to the player's own characters), without a bank alt or with it skipped for the visit, with
 -- Return to sender (on a main and on the bank alt itself), and on SavedVariables an older build
 -- left behind (an early alpha's, and v0.30.0's guild template with a full mail log). CI runs this
 -- file on its own before the rest, and a tag can't publish unless it passes.
@@ -685,6 +685,40 @@ describe("critical path: mailing", function()
         deliver(ns)
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true, ["Cara Friend"] = true })
         assertGuildCounted({ [BOB] = true })
+    end)
+
+    -- Raid Ledger can't tell which characters share an account, so Mailworthy leaves mail to the
+    -- player's own characters out of the counts (operator, 2026-11-08), even when that alt is the
+    -- guild's profession master. It is still mailed (the rule is on and shown) and still tagged.
+    it("a guild rule naming one of the player's own characters: mailed as shown, never counted", function()
+        local ALT = "Alty Alterson"
+        MailworthyDB.characters["Alty Alterson|Classic Beta PvP|Alliance"] = { name = ALT,
+            realm = "Classic Beta PvP", faction = "Alliance", class = "MAGE", level = 10 }
+        local gm = "Guild Master"
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = {
+            { name = gm, rank = 0, online = true }, { name = ALT, rank = 3 }, { name = BOB, rank = 3, online = true } } }
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        for _, m in ipairs(ns.Guild.Encode(WowStub.state.serverTime - 60, gm, { { profession = ENCHANTING, to = ALT } })) do
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m, "GUILD", BOB)
+        end
+        ns.Guild.SetUse(true)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(ALT, preview[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [ALT] = true })
+        local tagged = false
+        for _, e in ipairs(ns.Ledger.Store().log) do
+            if e.dir == "sent" and e.other == ALT then tagged = e.scope == "guild" end
+        end
+        assert.is_true(tagged, "the mail to the alt is still logged as a guild rule's")
+        assert.is_nil(MailworthyDB.guildGiven["Classic Beta PvP|Alliance|Bank Of Azeroth"], "mail to an own alt was counted")
+        local export = MailworthyAPI.v1.GetGuildExport()
+        assert.is_nil(export.givers, "an own alt's mail reached the export")
+        assert.same({ { professionSkillLineId = ENCHANTING, recipientName = ALT } }, export.template.rules)
     end)
 
     it("a guild template turned off in one press: only the bank alt gets mail", function()

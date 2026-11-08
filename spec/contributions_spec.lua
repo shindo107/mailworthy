@@ -256,6 +256,47 @@ describe("guild contributions", function()
             end
         end
 
+        -- Raid Ledger's golden fixture `char-mailworthy` (packages/contract/ledgerlink/v1/fixtures, branch
+        -- feat/rok-2148-guild-contributions): the same state in Mailworthy's tables gives the same block.
+        it("matches Raid Ledger's char-mailworthy fixture for the same state", function()
+            local fixture = {
+                generatedAt = 1789999940,
+                template = { rev = 1789568000, author = "Member1", rules = {
+                    { professionSkillLineId = 333, recipientName = "Member2" },
+                    { professionSkillLineId = 171, recipientName = "Member3" },
+                    { professionSkillLineId = 164, recipientName = "Ana Forever" } } },
+                peers = {
+                    { name = "Member1", lastSeenAt = 1789996340 }, { name = "Member2", lastSeenAt = 1789992740 },
+                    { name = "Member3", lastSeenAt = 1789989140 }, { name = "Member4", lastSeenAt = 1789985540 } },
+                givers = {
+                    { characterName = "Ana Forever", itemsAllTime = 140, countingSince = 1782224000, days = {
+                        { day = 20686, items = 20 }, { day = 20688, items = 12 }, { day = 20717, items = 8 } } },
+                    { characterName = "Anabelle Forever", itemsAllTime = 20, countingSince = 1789136000, days = {
+                        { day = 20715, items = 20 } } } },
+            }
+            local peers, roster = {}, { ["ana forever"] = true }
+            for i = 4, 1, -1 do -- stored by name, in no order; one more Mailworthy user outside the guild
+                local p = fixture.peers[i]
+                peers[p.name:lower()] = { name = p.name, professions = {}, characters = {}, version = 2, at = p.lastSeenAt }
+                roster[p.name:lower()] = true
+            end
+            peers["stranger"] = { name = "Stran Ger", at = 1789999000 }
+            local e = ns.Contributions.Build({
+                now = 1789999940,
+                template = { rev = 1789568000, from = "Member1", at = 1789568000, use = true, via = "Member2", rules = {
+                    { profession = 333, to = "Member2", cap = 50000 }, { profession = 171, to = "Member3" },
+                    { profession = 164, to = "Ana Forever", cap = 10000 } } },
+                peers = peers, roster = roster,
+                givers = {
+                    ["anabelle forever"] = { name = "Anabelle Forever", total = 20, since = 1789136000, days = { [20715] = 20 } },
+                    ["ana forever"] = { name = "Ana Forever", total = 140, since = 1782224000,
+                        days = { [20717] = 8, [20686] = 20, [20688] = 12, [20682] = 5 } }, -- 20682: out of the 35 days
+                },
+            })
+            assertContract(e)
+            assert.same(fixture, e)
+        end)
+
         it("nil outside a guild, or with nothing known", function()
             WowStub.state.guild = nil
             assert.is_nil(MailworthyAPI.v1.GetGuildExport())
