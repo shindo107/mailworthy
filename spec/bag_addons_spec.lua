@@ -94,17 +94,16 @@ end
 -- Baganator ------------------------------------------------------------------------------------------
 
 local function stubBaganator()
-    local reg = { refreshes = 0, callbacks = {} }
+    local reg = { refreshes = 0, callbacks = {}, active = true }
     _G.Baganator = {
         API = {
             RegisterCornerWidget = function(label, id, onUpdate, onInit, position)
                 reg.widget = { label = label, id = id, onUpdate = onUpdate, onInit = onInit, position = position }
             end,
             RequestItemButtonsRefresh = function() reg.refreshes = reg.refreshes + 1 end,
-            RegisterRegion = function(label, id, view, position, region)
-                assert(region.SetParent and region.ClearAllPoints and region.SetPoint and region.GetWidth)
-                reg.region = { label = label, id = id, view = view, position = position, region = region }
-            end,
+            -- Baganator calls SetFrameLevel on its button-row regions: a font string there breaks it.
+            RegisterRegion = function() reg.region = true end,
+            IsCornerWidgetActive = function(id) return id == "mailworthy_lock" and reg.active end,
         },
         CallbackRegistry = {
             RegisterCallback = function(_, event, fn, owner) reg.callbacks[event] = { fn = fn, owner = owner } end,
@@ -113,11 +112,28 @@ local function stubBaganator()
     return reg
 end
 
+-- Baganator's backpack frame (a frame group per character) and the bag frame a live button sits in.
+local backpack = WowStub.newWidget("Frame", "Baganator_SingleViewBackpackViewFrameRettana")
+backpack.shown = true
+rawset(backpack, "CreateFontString", function()
+    local fs = WowStub.newWidget("FontString")
+    rawset(backpack, "mwLegend", fs) -- the spec's own record of what was created on the stub frame
+    return fs
+end)
+local bagFrame = WowStub.newWidget("Frame")
+bagFrame.parent = backpack
+
 --- A live Baganator button (ContainerFrameItemButtonTemplate: GetBagID / GetID), reassignable.
 local function baganatorLive(bag, slot)
     local at = { bag = bag, slot = slot }
-    local b = addonButton({ GetBagID = function() return at.bag end, GetID = function() return at.slot end })
+    local b = addonButton({ GetBagID = function() return at.bag end, GetID = function() return at.slot end,
+        GetParent = function() return bagFrame end })
     return b, at
+end
+
+--- Our legend under Baganator's backpack frame (a font string created on it), or nil.
+local function baganatorLegend()
+    return rawget(backpack, "mwLegend")
 end
 
 --- Baganator shows an item on a button: onInit once per button, then onUpdate with its details.
@@ -135,15 +151,32 @@ describe("bag addons: Baganator", function()
     end)
     after_each(function() noErrors(ns) cleanup() end)
 
-    it("registers its corner widget, the legend region and a ViewComplete redraw", function()
+    it("registers its corner widget and a ViewComplete redraw; the legend goes under the backpack", function()
         assert.equal("mailworthy_lock", reg.widget.id, "the ID Baganator remembers from the glow-only widget")
         assert.equal("Mailworthy tags and lock glow", reg.widget.label)
         assert.same({ corner = "top_left", priority = 1 }, reg.widget.position)
-        assert.equal("backpack", reg.region.view)
-        assert.equal("bottom_left", reg.region.position)
         assert.truthy(reg.callbacks.ViewComplete, "redraws after each layout pass")
-        assert.truthy(reg.region.region.text:find("AH", 1, true), "the legend explains the tags, no hover needed")
+        assert.is_nil(reg.region, "no region in its button row (Baganator calls SetFrameLevel on those)")
         assert.is_true(ns.BagAddons.Installed("baganator"))
+        local button = baganatorLive(0, 1)
+        baganatorShow(reg, button, widgets, COPPER)
+        reg.callbacks.ViewComplete.fn(reg.callbacks.ViewComplete.owner)
+        assert.truthy(baganatorLegend(), "a font string under Baganator_SingleViewBackpackViewFrame...")
+        assert.truthy(baganatorLegend().text:find("AH", 1, true), "the legend explains the tags, no hover needed")
+        assert.truthy(ns.Report.Build():find("legend shown under its bags", 1, true))
+    end)
+
+    it("draws nothing once the player takes our widget out of every corner (Baganator's Icons settings)", function()
+        local button = baganatorLive(0, 1)
+        baganatorShow(reg, button, widgets, COPPER)
+        assert.equal("AH", tagOf(button))
+        reg.active = false
+        MailworthyCharDB.lockedItems[COPPER] = { link = "Copper Ore" }
+        openWindow(ns)
+        reg.callbacks.ViewComplete.fn(reg.callbacks.ViewComplete.owner)
+        assert.is_nil(tagOf(button))
+        assert.is_false(glowing(ns, button))
+        assert.equal("", baganatorLegend().text)
     end)
 
     it("tags each live slot with its verdict and holds the corner only while a tag shows", function()
@@ -231,7 +264,6 @@ describe("bag addons: Baganator", function()
         ns.HandleSlash("feature baganatorTags off")
         ns.BankAlt.Redraw()
         assert.is_nil(tagOf(button), "the next redraw clears it")
-        assert.equal("", reg.region.region.text)
         local ns2 = loadAddon({ db = MailworthyDB, charDB = MailworthyCharDB })
         local reg2 = stubBaganator()
         login(ns2)

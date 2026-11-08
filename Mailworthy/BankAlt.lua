@@ -190,6 +190,15 @@ function BankAlt.TagShown(button)
     return t ~= nil and t.bg:IsShown() == true
 end
 
+--- Place a button's tag on `region` (Baganator: our corner widget, wherever the player put it), or
+--- back in the top-left corner with nil.
+function BankAlt.AnchorTag(button, region)
+    local t = tags[button]
+    if not t then return end
+    t.bg:ClearAllPoints()
+    if region then t.bg:SetAllPoints(region) else t.bg:SetPoint("TOPLEFT", 2, -2) end
+end
+
 --- The legend under the bags ("" while no tags show), shared by Blizzard's bags and the bag addons.
 function BankAlt.LegendText()
     local mode = ns.Features.On("bankAltTags") and BankAlt.Mode()

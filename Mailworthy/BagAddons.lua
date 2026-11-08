@@ -7,9 +7,13 @@
 --   * Baganator (846): a corner widget (`Baganator.API.RegisterCornerWidget`: onInit(itemButton)
 --     once per button, onUpdate(widget, details) whenever the button shows an item), the public
 --     `Baganator.CallbackRegistry` "ViewComplete" after every layout pass (an emptied slot gets
---     no onUpdate), a "backpack" bottom-left region for the legend (`RegisterRegion`) and
---     `RequestItemButtonsRefresh`. Live buttons inherit ContainerFrameItemButtonTemplate
---     (GetBagID); another character's (cached) buttons and guild bank buttons don't.
+--     no onUpdate), `IsCornerWidgetActive` (the player took it out of every corner: nothing drawn)
+--     and `RequestItemButtonsRefresh`. The tag sits on our widget, so it follows the corner the
+--     player picks. The legend goes under the backpack frame ("Baganator_*BackpackViewFrame*",
+--     found from a live button's parents), not in its button row: Baganator calls SetFrameLevel
+--     on those, which a font string lacks (Codex review). Live buttons inherit
+--     ContainerFrameItemButtonTemplate (GetBagID); another character's (cached) buttons and guild
+--     bank buttons don't.
 --   * Bagnon (12.1.x, its BagBrother engine): a post-hook on the class method
 --     `Bagnon.ContainerItem.Update` (every inventory and bank button, live or cached, runs it on
 --     each redraw; `IsCached`, `GetBag`, `GetID`). BagBrother's `Item:Bind` copies the class's
@@ -44,6 +48,8 @@ local seen = { baganator = setmetatable({}, weak), bagnon = setmetatable({}, wea
     arkInventory = setmetatable({}, weak) } -- button -> true (ArkInventory: { loc, bag, slot })
 local installed, errors, legends = {}, { baganator = 0, bagnon = 0, arkInventory = 0 }, {}
 local baganatorOwners = setmetatable({}, weak) -- widget -> its item button
+local baganatorWidgets = setmetatable({}, weak) -- item button -> our widget
+local baganatorLegends = setmetatable({}, weak) -- Baganator's backpack frame -> our legend
 local baganatorOwner = {} -- our owner key in Baganator's callback registry
 
 local function logError(key, err)
@@ -71,14 +77,18 @@ end
 -- Legends: the tags explained under each addon's bag window, no hover needed (Blizzard's bags have
 -- theirs in BankAlt.lua). Font strings, kept here.
 
-local function legendUnder(key, host)
-    if legends[key] then return legends[key] end
+--- A legend font string under `host` (another addon's bag frame: a region, not a field), or nil.
+local function makeLegend(host)
     if type(host) ~= "table" or type(host.CreateFontString) ~= "function" then return nil end
     local ok, fs = pcall(host.CreateFontString, host, nil, "OVERLAY", "GameFontHighlightSmall")
     if not ok or type(fs) ~= "table" then return nil end
     fs:SetPoint("TOPRIGHT", host, "BOTTOMRIGHT", -10, -4)
-    legends[key] = fs
     return fs
+end
+
+local function legendUnder(key, host)
+    legends[key] = legends[key] or makeLegend(host)
+    return legends[key]
 end
 
 local function setLegend(key, fs)
@@ -105,9 +115,17 @@ local function baganatorSlot(button)
     return nil
 end
 
+--- Is our widget in one of Baganator's corners? (Its Icons settings; true when it can't say.)
+local function baganatorActive()
+    local api = baganatorAPI()
+    if not api or type(api.IsCornerWidgetActive) ~= "function" then return true end
+    local ok, active = pcall(api.IsCornerWidgetActive, BagAddons.BAGANATOR_ID)
+    return not ok or active ~= false
+end
+
 --- Draw one Baganator button; true when it shows one of our tags.
 local function drawBaganator(button, shownID, wanted)
-    if not BagAddons.On("baganator") then
+    if not BagAddons.On("baganator") or not baganatorActive() then
         ns.Border.Clear(button)
         return false
     end
@@ -117,7 +135,21 @@ local function drawBaganator(button, shownID, wanted)
         return false
     end
     ns.Border.DrawBagSlot(button, bag, slot, shownID, wanted)
+    ns.BankAlt.AnchorTag(button, baganatorWidgets[button])
     return ns.BankAlt.TagShown(button)
+end
+
+--- The backpack frame a live button sits in (read only: GetParent / GetName up the chain).
+local function baganatorBackpack(button)
+    local region = button
+    for _ = 1, 12 do
+        local ok, parent = pcall(region.GetParent, region)
+        if not ok or type(parent) ~= "table" or type(parent.GetParent) ~= "function" then return nil end
+        local okName, name = pcall(parent.GetName, parent)
+        if okName and type(name) == "string" and name:find("^Baganator_%a*BackpackViewFrame") then return parent end
+        region = parent
+    end
+    return nil
 end
 
 --- Baganator's onInit: an empty texture the size of our tag that remembers its button. A texture,
@@ -128,6 +160,7 @@ function BagAddons.BaganatorInit(itemButton)
     widget:SetSize(18, 11)
     widget:Hide()
     baganatorOwners[widget] = itemButton
+    baganatorWidgets[itemButton] = widget
     seen.baganator[itemButton] = true
     return widget
 end
@@ -165,9 +198,13 @@ local function redrawBaganator(wanted)
                 ok, err = pcall(drawBaganator, button, shownID, wanted)
             end
             if not ok then logError("baganator", err) end
+            -- One legend per backpack frame (single and category views are two frames).
+            local backpack = baganatorSlot(button) and baganatorBackpack(button)
+            if backpack and not baganatorLegends[backpack] then baganatorLegends[backpack] = makeLegend(backpack) end
         end
     end
-    setLegend("baganator", legends.baganator)
+    local text = BagAddons.On("baganator") and baganatorActive() and ns.BankAlt.LegendText() or ""
+    for _, fs in pairs(baganatorLegends) do pcall(fs.SetText, fs, text) end
 end
 
 function BagAddons.InstallBaganator()
@@ -188,15 +225,6 @@ function BagAddons.InstallBaganator()
             local okRedraw, errRedraw = pcall(redrawBaganator)
             if not okRedraw then logError("baganator", errRedraw) end
         end, baganatorOwner)
-    end
-    -- The legend: a font string made here (UIParent's region), which Baganator places in the
-    -- backpack's bottom-left button row.
-    if type(api.RegisterRegion) == "function" and type(UIParent) == "table" then
-        local okFs, fs = pcall(UIParent.CreateFontString, UIParent, nil, "OVERLAY", "GameFontHighlightSmall")
-        if okFs and type(fs) == "table" and pcall(api.RegisterRegion, "Mailworthy tags", "mailworthy_legend",
-            "backpack", "bottom_left", fs) then
-            legends.baganator = fs
-        end
     end
     ns.Log.Add("bagaddons", "Baganator: tags and lock glow registered (its settings, Icons, top left corner)")
     return true
@@ -409,7 +437,8 @@ function BagAddons.ReportLines()
                 v and ("v" .. tostring(v)) or "loaded", BagAddons.FEATURE[key],
                 ns.Features.On(BagAddons.FEATURE[key]) and "on" or "off",
                 installed[key] and "hooked" or "not hooked", count(seen[key]), errors[key],
-                legends[key] and ", legend shown under its bags" or "")
+                (legends[key] or (key == "baganator" and next(baganatorLegends))) and ", legend shown under its bags"
+                    or "")
         end
         lines[#lines + 1] = "bag addon: " .. name .. " " .. text
     end
