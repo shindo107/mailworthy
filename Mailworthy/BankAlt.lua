@@ -258,7 +258,8 @@ function BankAlt.TooltipLines(item, record, settings)
     end
     if record then
         local was = BankAlt.TAGS[record.route] and BankAlt.TAGS[record.route].label
-            or (record.route == "bank" and "Bank") or (record.route == "common" and "Common item") or tostring(record.reason)
+            or (record.route == "bank" and "Bank") or (record.route == "common" and "Common item")
+            or (record.route == ns.Valuation.NO_PRICE and "No auction price yet") or tostring(record.reason)
         lines[#lines + 1] = { string.format("Mailed for: %s%s, %s, from %s", was,
             record.gain and (" +" .. money(record.gain)) or "", date("%b %d", record.at or 0), tostring(record.from)),
             0.55, 0.75, 1 }

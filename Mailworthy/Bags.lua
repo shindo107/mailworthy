@@ -251,7 +251,8 @@ end
 
 local money = function(c) return ns.Valuation.Money(c) end
 
-local ROUTE = { ah = "AH", de = "DE", common = "COMMON", bank = "BANK", friend = "FRIEND", ["return"] = "RETURN" }
+local ROUTE = { ah = "AH", de = "DE", common = "COMMON", bank = "BANK", friend = "FRIEND", ["return"] = "RETURN",
+    noprice = "NO PRICE" }
 
 local function itemName(item)
     local name = item.link:match("%[(.-)%]") or item.link
@@ -377,8 +378,7 @@ function Bags.Report(result)
             .. (s.returns and "; return to sender: on (what other characters mailed you goes back)" or ""),
         "prices: " .. (result.priced and (ns.Prices.SOURCE_NAME[result.source] or "Auctionator")
             or "none (no Auctionator or TradeSkillMaster: mailing common items)")
-            .. ((result.priced and (s.serverDay or math.huge) < ns.Valuation.FRESH_REALM_DAYS)
-                and " (fresh realm: unpriced white trade goods are mailed)" or ""),
+            .. (result.priced and " (no auction price yet: to the bank alt)" or ""),
         string.format("settings: %dh listing (deposit x%d), AH cut %d%%, postage %s per stack, "
             .. "min gain %s and %d%%, disenchant %s, max price age %d days, launch day %s, profession materials %s",
             ns.Valuation.DURATION_HOURS[s.duration], ns.Valuation.DEPOSIT_MULTIPLIER[s.duration],

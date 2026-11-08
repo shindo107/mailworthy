@@ -1,6 +1,7 @@
 -- The decision rule (docs/PLAN.md "Decision rule"): mail an item to the bank
 -- alt when the auction house (after cut, deposit and postage) or disenchanting
--- beats the vendor by at least the minimum gain; otherwise it stays in the bags.
+-- beats the vendor by at least the minimum gain, or when there's no auction price yet
+-- (Valuation.Unpriced); otherwise it stays in the bags.
 -- Pure: no WoW API calls, so every case is a busted spec.
 --
 -- An item is every stack of one item link in the bags (so one item never
@@ -21,7 +22,6 @@ Valuation.DEPOSIT_RATE = 0.05
 Valuation.MIN_DEPOSIT = 100
 Valuation.MEDIAN_DAYS = 3        -- the smoothed price: median of the last 3 scanned days
 Valuation.LAUNCH_EPOCH = 1793833200 -- Forever launch: 2026-11-04 15:00 PST (docs/ALGORITHM-RESEARCH.md)
-Valuation.FRESH_REALM_DAYS = 14  -- launch days 0-13: unpriced white trade goods are mailed
 Valuation.TRADE_GOODS = 7        -- item class: cloth, ore, herbs, leather, enchanting materials...
 Valuation.RAID_DAY = 35          -- Dec 9, 2026: the first raids; enchanting mats, herbs, elementals sell from here
 Valuation.BANK_UNTIL_DAY = 60    -- no Bank verdicts from this launch day on (research 4.4)
@@ -171,15 +171,78 @@ function Valuation.ServerDay(now, firstSeen)
     return math.max(0, math.floor((now - launch) / 86400))
 end
 
---- Pure: research 4.2. With Auctionator installed but no price for this item yet, a white
---- trade good is mailed during the first FRESH_REALM_DAYS launch days: cloth, ore, herbs and
---- leather always sell on a fresh realm, and in launch week almost nothing has a price.
---- The exception to AGENTS "an item without a price stays" (operator, 2026-10-20); never
---- when the price call itself failed.
-function Valuation.FreshRealmDefault(item, price, settings)
-    return type(price) == "table" and price.ah == nil and not price.failed
-        and item.quality == 1 and item.classID == Valuation.TRADE_GOODS
-        and tonumber(settings.serverDay) ~= nil and settings.serverDay < Valuation.FRESH_REALM_DAYS
+-- Unpriced items (operator, 2026-11-08: "going to the bank alt on no data is better than holding
+-- on the main"): with an auction price source installed but no auction price for an item, it is
+-- mailed to the bank alt (route NO_PRICE, chip "No price") to wait there for one, instead of
+-- staying in the bags. Grey junk stays for the vendor; a failed price call is never "no price
+-- yet" (AGENTS safety): that item stays. The hard keeps (locked, soulbound, quest, a quest needs
+-- it, in use, tools) and the profession keep come first, as for everything.
+Valuation.NO_PRICE = "noprice"
+Valuation.UNPRICED_GEAR = true -- unpriced green / blue weapons and armor go too (see the PR's questions)
+
+-- Staple trade goods ("flat rules for certain common tradegoods", operator, 2026-11-08): what
+-- always sells above a vendor on any realm, at any level. Used only when there's no auction
+-- price: then the item is mailed as a common item ("always mail", never an invented copper
+-- value), with the Bank verdict (BankReason: late-demand goods before the first raids) on top.
+-- Without any price source too, whatever its quality (the green and blue essences, shards and
+-- elemental essences, which the white-items rule would keep). Replaces the launch-days 0-13
+-- exception for white trade goods (2026-10-20). Classic item IDs (cross-checked with TierData.lua,
+-- Disenchant.lua and Stale.lua where they appear there).
+Valuation.STAPLES = {
+    -- cloth
+    [2589] = "Linen Cloth", [2592] = "Wool Cloth", [4306] = "Silk Cloth", [4338] = "Mageweave Cloth",
+    [14047] = "Runecloth", [14256] = "Felcloth",
+    -- leather and hides
+    [2934] = "Ruined Leather Scraps", [2318] = "Light Leather", [2319] = "Medium Leather", [4234] = "Heavy Leather",
+    [4304] = "Thick Leather", [8170] = "Rugged Leather", [783] = "Light Hide", [4232] = "Medium Hide",
+    [4235] = "Heavy Hide", [8169] = "Thick Hide", [8171] = "Rugged Hide",
+    -- ore, bars and stone
+    [2770] = "Copper Ore", [2771] = "Tin Ore", [2772] = "Iron Ore", [2775] = "Silver Ore", [2776] = "Gold Ore",
+    [3858] = "Mithril Ore", [7911] = "Truesilver Ore", [10620] = "Thorium Ore", [11370] = "Dark Iron Ore",
+    [2840] = "Copper Bar", [3576] = "Tin Bar", [2841] = "Bronze Bar", [2842] = "Silver Bar", [3575] = "Iron Bar",
+    [3577] = "Gold Bar", [3859] = "Steel Bar", [3860] = "Mithril Bar", [6037] = "Truesilver Bar", [12359] = "Thorium Bar",
+    [2835] = "Rough Stone", [2836] = "Coarse Stone", [2838] = "Heavy Stone", [7912] = "Solid Stone", [12365] = "Dense Stone",
+    -- herbs
+    [2447] = "Peacebloom", [765] = "Silverleaf", [2449] = "Earthroot", [785] = "Mageroyal", [2450] = "Briarthorn",
+    [3820] = "Stranglekelp", [2453] = "Bruiseweed", [3355] = "Wild Steelbloom", [3369] = "Grave Moss",
+    [3356] = "Kingsblood", [3357] = "Liferoot", [3818] = "Fadeleaf", [3821] = "Goldthorn", [3358] = "Khadgar's Whisker",
+    [3819] = "Wintersbite", [4625] = "Firebloom", [8831] = "Purple Lotus", [8836] = "Arthas' Tears", [8838] = "Sungrass",
+    [8839] = "Blindweed", [8845] = "Ghost Mushroom", [8846] = "Gromsblood", [13464] = "Golden Sansam",
+    [13463] = "Dreamfoil", [13465] = "Mountain Silversage", [13466] = "Plaguebloom", [13467] = "Icecap",
+    [13468] = "Black Lotus",
+    -- elemental
+    [7067] = "Elemental Earth", [7068] = "Elemental Fire", [7069] = "Elemental Air", [7070] = "Elemental Water",
+    [7075] = "Core of Earth", [7076] = "Essence of Earth", [7077] = "Heart of Fire", [7078] = "Essence of Fire",
+    [7079] = "Globe of Water", [7080] = "Essence of Water", [7081] = "Breath of Wind", [7082] = "Essence of Air",
+    [7972] = "Ichor of Undeath", [12803] = "Living Essence", [12808] = "Essence of Undeath",
+    -- enchanting
+    [10940] = "Strange Dust", [11083] = "Soul Dust", [11137] = "Vision Dust", [11176] = "Dream Dust",
+    [16204] = "Illusion Dust", [10938] = "Lesser Magic Essence", [10939] = "Greater Magic Essence",
+    [10998] = "Lesser Astral Essence", [11082] = "Greater Astral Essence", [11134] = "Lesser Mystic Essence",
+    [11135] = "Greater Mystic Essence", [11174] = "Lesser Nether Essence", [11175] = "Greater Nether Essence",
+    [16202] = "Lesser Eternal Essence", [16203] = "Greater Eternal Essence", [10978] = "Small Glimmering Shard",
+    [11084] = "Large Glimmering Shard", [11138] = "Small Glowing Shard", [11139] = "Large Glowing Shard",
+    [11177] = "Small Radiant Shard", [11178] = "Large Radiant Shard", [14343] = "Small Brilliant Shard",
+    [14344] = "Large Brilliant Shard",
+}
+
+function Valuation.IsStaple(item)
+    return Valuation.STAPLES[tonumber(item.itemID) or -1] ~= nil
+end
+
+-- Recipes (item class 9) by subclass (Enum.ItemRecipeSubclass, Blizzard_APIDocumentationGenerated/
+-- ItemConstantsDocumentation.lua on Forever): the crafting profession (skill line ID, as
+-- PROFESSION_MATS) that learns it. Books (0) and Fishing (9) have no crafting profession: they
+-- follow the normal rule. A profession binding takes its recipes (Routes.Matches).
+Valuation.RECIPE = 9
+Valuation.RECIPE_PROFESSION = {
+    [1] = 165, [2] = 197, [3] = 202, [4] = 164, [5] = 185, [6] = 171, [7] = 129, [8] = 333,
+}
+
+--- Pure: the crafting profession (skill line ID) that learns a recipe, or nil.
+function Valuation.RecipeProfession(item)
+    if item.classID ~= Valuation.RECIPE then return nil end
+    return Valuation.RECIPE_PROFESSION[tonumber(item.subclassID) or -1]
 end
 
 -- Research 4.4: trade goods whose demand comes with the level-60 crowd and the first
@@ -377,8 +440,9 @@ local evaluate
 --- price: nil when there's no price source at all (no Auctionator); else
 ---   { ah = copper per unit or nil, age = days or nil, de = copper per item or nil }
 ---   history = Prices.History rows (optional), exact = true / false / nil }
---- Returns { action = "mail" | "keep", route = "ah" | "de" | "common" | "bank" (mail only; bank =
----   mail it and hold it, listRoute = the route it would have had), reason,
+--- Returns { action = "mail" | "keep", route = "ah" | "de" | "common" | "bank" | "noprice" (mail only;
+---   bank = mail it and hold it, listRoute = the route it would have had; noprice = no auction price
+---   yet, the bank alt holds it), reason, failed (a "no price" keep: the price call failed),
 ---   vendor, deposit, depositCounted, postage, ahUnit (the smoothed unit price), median / medianDays
 ---   (the higher median the last scan beat, if it did), scans (days
 ---   behind it), liquidity (Valuation.Liquidity), ahNet, deNet, gain, threshold } (copper, totals).
@@ -417,9 +481,13 @@ evaluate = function(item, price, settings)
     local postage = settings.postage * (item.stacks or 1)
 
     if price == nil then
-        -- No price source: mail plain white (common) items, keep the rest (operator, 2026-10-13).
+        -- No price source: mail plain white (common) items, keep the rest (operator, 2026-10-13),
+        -- except the staple trade goods, whatever their quality (operator, 2026-11-08).
         if item.quality == 1 then
             return mail("common", "common item (no price data)", { vendor = vendor, postage = postage }, item, settings)
+        end
+        if (item.quality or 0) >= 1 and Valuation.IsStaple(item) then
+            return mail("common", "staple trade good (no price data)", { vendor = vendor, postage = postage }, item, settings)
         end
         return keep(item.quality == 0 and "junk (no price data)" or "uncommon or better (no price data)",
             { vendor = vendor })
@@ -440,11 +508,7 @@ evaluate = function(item, price, settings)
     end
     if r.ahNet == nil and r.deNet == nil then
         if stale then return keep(string.format("price too old (%d days)", price.age), r) end
-        if Valuation.FreshRealmDefault(item, price, settings) then
-            return mail("common", "common trade good (fresh realm, no price yet)", { vendor = vendor, postage = postage },
-                item, settings)
-        end
-        return keep("no price", r)
+        return Valuation.Unpriced(item, price, vendor, postage, settings)
     end
 
     local best, route = r.ahNet, "ah"
@@ -454,7 +518,24 @@ evaluate = function(item, price, settings)
     if r.gain >= r.threshold then
         return mail(route, route == "ah" and "auction house" or "disenchant", r, item, settings)
     end
+    -- Disenchanting alone doesn't pay, and the auction house has no price yet: it may still sell
+    -- there, so it goes like any unpriced item.
+    if price.ah == nil and not stale then return Valuation.Unpriced(item, price, vendor, postage, settings) end
     return keep("not worth it", r)
+end
+
+--- Pure: the verdict for an item the price source has no auction price for (not a stale one):
+--- a failed price call keeps it (never "no price yet"), grey junk stays for the vendor, a staple
+--- trade good is mailed as a common item (Bank on top, BankReason), anything else goes to the bank
+--- alt to wait for a price (route NO_PRICE). Unpriced gear only while UNPRICED_GEAR is on.
+function Valuation.Unpriced(item, price, vendor, postage, settings)
+    if type(price) == "table" and price.failed then return keep("no price", { vendor = vendor, failed = true }) end
+    if (item.quality or 0) == 0 then return keep("junk (no price data)", { vendor = vendor }) end
+    if Valuation.IsStaple(item) then
+        return mail("common", "staple trade good (no price yet)", { vendor = vendor, postage = postage }, item, settings)
+    end
+    if not Valuation.UNPRICED_GEAR and Valuation.CanDisenchant(item) then return keep("no price", { vendor = vendor }) end
+    return mail(Valuation.NO_PRICE, "no auction price yet", { vendor = vendor, postage = postage }, item, settings)
 end
 
 --- "1g 2s 3c", "-45c", "0c".

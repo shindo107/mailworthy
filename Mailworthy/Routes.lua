@@ -6,6 +6,9 @@
 -- account's characters on this realm + faction (MailworthyDB.routes) or for this
 -- character only (MailworthyCharDB.routes); this character's bindings win.
 --
+-- A profession binding also takes its profession's recipes (item class 9, Valuation.RecipeProfession;
+-- operator, 2026-11-08: "recipes should go to their respective profession mappings"), cap included.
+--
 -- Safety: locks, soulbound / quest / in-use items and profession tools still
 -- stay; a binding never mails what the normal rule wouldn't touch. The price
 -- cap ("to my alt above 5g each", a stepper on the binding) keeps a material
@@ -47,9 +50,12 @@ Routes.HARD_KEEPS = {
     ["profession tool"] = true, ["item info not loaded yet"] = true,
 }
 
--- Verdicts a class binding doesn't override either: AGENTS safety keeps an unpriced item (with
--- Auctionator) and anything but white items (without it) in the bags (Codex review, 2026-11-08).
+-- Verdicts a class binding doesn't override either: AGENTS safety keeps anything but white items
+-- (without a price source) in the bags (Codex review, 2026-11-08), and an item with no auction
+-- price goes to the bank alt, not a class binding (operator, 2026-11-08: the price cap can't be
+-- checked without a price).
 function Routes.PriceKeep(verdict)
+    if verdict and verdict.action == "mail" and verdict.route == ns.Valuation.NO_PRICE then return true end
     if not (verdict and verdict.action == "keep") then return false end
     local reason = tostring(verdict.reason)
     return reason == "no price" or reason == "uncommon or better (no price data)"
@@ -108,7 +114,7 @@ Routes.BINDING_MATS = { [333] = "dust, essences, shards, green and blue gear", [
 function Routes.Professions()
     local list = {}
     for id, p in pairs(ns.Valuation.PROFESSION_MATS) do
-        list[#list + 1] = { id = id, name = p.name, mats = Routes.BINDING_MATS[id] or p.mats }
+        list[#list + 1] = { id = id, name = p.name, mats = (Routes.BINDING_MATS[id] or p.mats) .. ", recipes" }
     end
     table.sort(list, function(a, b) return a.name < b.name end)
     return list
@@ -137,7 +143,7 @@ end
 
 --- Pure: the item is one of the binding's profession's primary materials: a trade good of its
 --- own subclasses (cloth for Tailoring, herbs for Alchemy), or, for Enchanting, a green or
---- blue weapon or armor piece to disenchant. What a profession uses on the side (Tiers.KEEP:
+--- blue weapon or armor piece to disenchant; or a recipe the profession learns. What a profession uses on the side (Tiers.KEEP:
 --- an engineer's Linen Cloth, a blacksmith's gems) isn't mailed to a binding (2026-11-07: "only
 --- focus on the primary materials ... they can ask or acquire some minor pieces"); it follows
 --- the normal rule. A material the bound player's skill (`route.skill`, Routes.Skill) is past
@@ -151,6 +157,10 @@ function Routes.Matches(route, item, tiers, priceOf)
         and ns.Valuation.CanDisenchant(item) then
         return true
     end
+    -- A recipe its profession learns (operator, 2026-11-08: "recipes should go to their respective
+    -- profession mappings"); the cap still sends a recipe the auction house pays well for to the bank alt.
+    local recipeFor = ns.Valuation.RecipeProfession(item)
+    if recipeFor then return recipeFor == tonumber(route.profession) end
     local p = ns.Valuation.PROFESSION_MATS[tonumber(route.profession) or -1]
     if not (p and item.classID == ns.Valuation.TRADE_GOODS and p.subclasses[item.subclassID] == true) then
         return false
@@ -276,7 +286,8 @@ function Routes.Divert(item, verdict, price, settings, routes)
     local n = item.count or 1
     return {
         action = "mail", route = Routes.ROUTE, to = to, crafter = crafter, key = route.key, what = Routes.What(route),
-        reason = Routes.What(route) .. " go to " .. tostring(to),
+        reason = ns.Valuation.RecipeProfession(item) and (Routes.ProfessionName(route.profession) .. " recipe goes to "
+            .. tostring(to)) or (Routes.What(route) .. " go to " .. tostring(to)),
         vendor = (item.vendor or 0) * n, postage = (settings and settings.postage or 30) * (item.stacks or 1),
         ahUnit = unit,
     }

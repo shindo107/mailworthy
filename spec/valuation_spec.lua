@@ -114,10 +114,11 @@ describe("valuation", function()
             assert.equal("mail", V.Evaluate(item(), { ah = 60 }, S).action)
         end)
 
-        it("an item Auctionator has no price for stays", function()
-            local r = V.Evaluate(item(), { ah = nil }, S)
-            assert.equal("keep", r.action)
-            assert.equal("no price", r.reason)
+        it("an item Auctionator has no price for goes to the bank alt (operator, 2026-11-08)", function()
+            local r = V.Evaluate(item({ itemID = 858, link = "[Lesser Healing Potion]", classID = 0 }), { ah = nil }, S)
+            assert.equal("mail", r.action)
+            assert.equal(V.NO_PRICE, r.route)
+            assert.equal("no auction price yet", r.reason)
         end)
     end)
 
@@ -200,7 +201,7 @@ describe("valuation", function()
         end)
     end)
 
-    describe("server day and the fresh-realm default (ALGORITHM-RESEARCH 4.2)", function()
+    describe("server day", function()
         local LAUNCH = V.LAUNCH_EPOCH
 
         it("counts days since Forever's launch, 0 before it", function()
@@ -217,36 +218,6 @@ describe("valuation", function()
             assert.equal(10, V.ServerDay(LAUNCH, LAUNCH - 10 * 86400))
             assert.equal(2, V.ServerDay(LAUNCH + 2 * 86400, LAUNCH + 86400), "a later first sight changes nothing")
             assert.equal(2, V.ServerDay(LAUNCH + 2 * 86400, "junk"))
-        end)
-
-        it("mails an unpriced white trade good in the first 14 launch days, then keeps it", function()
-            local stone = item({ itemID = 2835, link = "[Rough Stone]", count = 10, vendor = 2 })
-            S.serverDay = 0
-            local r = V.Evaluate(stone, { ah = nil }, S)
-            assert.equal("mail", r.action)
-            assert.equal("common", r.route)
-            assert.equal("common trade good (fresh realm, no price yet)", r.reason)
-            assert.equal(20, r.vendor)
-            assert.equal(30, r.postage)
-            S.serverDay = 13
-            assert.equal("mail", V.Evaluate(stone, { ah = nil }, S).action)
-            S.serverDay = 14
-            assert.equal("no price", V.Evaluate(stone, { ah = nil }, S).reason)
-            S.serverDay = nil
-            assert.equal("no price", V.Evaluate(stone, { ah = nil }, S).reason, "unknown server day: the old rule")
-            S.serverDay = 0
-            assert.equal("no price", V.Evaluate(stone, { ah = nil, failed = true }, S).reason,
-                "the price call failed: that is not 'no price yet' (AGENTS safety)")
-        end)
-
-        it("leaves everything else alone", function()
-            S.serverDay = 0
-            assert.equal("no price", V.Evaluate(item({ quality = 0 }), { ah = nil }, S).reason, "grey")
-            assert.equal("no price", V.Evaluate(item({ quality = 2 }), { ah = nil }, S).reason, "green")
-            assert.equal("no price", V.Evaluate(item({ classID = 4 }), { ah = nil }, S).reason, "white armor")
-            assert.equal("not worth it", V.Evaluate(item(), { ah = 40 }, S).reason, "priced: the numbers decide")
-            assert.equal("price too old (8 days)", V.Evaluate(item(), { ah = 40, age = 8 }, S).reason)
-            assert.equal("mail", V.Evaluate(item(), nil, S).action, "no Auctionator: the common rule as before")
         end)
     end)
 
@@ -303,6 +274,155 @@ describe("valuation", function()
         end)
     end)
 
+    describe("no auction price yet (operator, 2026-11-08)", function()
+        -- "going to the bank alt on no data is better than holding on the main"
+        local potion = function(o)
+            local t = item({ itemID = 858, link = "[Lesser Healing Potion]", classID = 0, count = 5, vendor = 5 })
+            for k, v in pairs(o or {}) do t[k] = v end
+            return t
+        end
+        local recipe = item({ itemID = 7975, link = "[Plans: Iridescent Hammer]", count = 1, quality = 2, classID = 9,
+            subclassID = 4, vendor = 450 })
+
+        it("goes to the bank alt on any launch day, with no gain made up", function()
+            for _, day in ipairs({ 0, 13, 14, 90 }) do
+                S.serverDay = day
+                local r = V.Evaluate(potion(), { ah = nil }, S)
+                assert.equal("mail", r.action)
+                assert.equal(V.NO_PRICE, r.route)
+                assert.is_nil(r.gain)
+                assert.is_nil(r.listRoute, "never turned into Bank: it goes to the bank alt as it is")
+                assert.equal(25, r.vendor)
+                assert.equal(30, r.postage)
+            end
+            S.serverDay = nil
+            assert.equal(V.NO_PRICE, V.Evaluate(potion(), { ah = nil }, S).route, "unknown server day too")
+        end)
+
+        it("recipes and green or blue gear too; grey junk stays for the vendor", function()
+            assert.equal(V.NO_PRICE, V.Evaluate(recipe, { ah = nil }, S).route, "the screenshot's Plans: Iridescent Hammer")
+            assert.equal(V.NO_PRICE, V.Evaluate(potion({ quality = 2, classID = 4 }), { ah = nil }, S).route, "green armor")
+            assert.equal(V.NO_PRICE, V.Evaluate(potion({ quality = 3, classID = 2 }), { ah = nil }, S).route, "blue weapon")
+            assert.equal(V.NO_PRICE, V.Evaluate(potion({ classID = 4 }), { ah = nil }, S).route, "white armor")
+            local junk = V.Evaluate(potion({ quality = 0, classID = 15 }), { ah = nil }, S)
+            assert.equal("keep", junk.action)
+            assert.equal("junk (no price data)", junk.reason)
+            V.UNPRICED_GEAR = false
+            assert.equal("no price", V.Evaluate(potion({ quality = 2, classID = 4 }), { ah = nil }, S).reason,
+                "the switch keeps unpriced gear")
+            assert.equal(V.NO_PRICE, V.Evaluate(recipe, { ah = nil }, S).route, "recipes aren't gear")
+            V.UNPRICED_GEAR = true
+        end)
+
+        it("never when the price call failed, never past the age limit, never over a price", function()
+            local failed = V.Evaluate(potion(), { ah = nil, failed = true }, S)
+            assert.equal("keep", failed.action)
+            assert.equal("no price", failed.reason)
+            assert.is_true(failed.failed)
+            assert.equal("keep", V.Evaluate(item(), { ah = nil, failed = true }, S).action, "a staple neither (AGENTS safety)")
+            assert.equal("price too old (8 days)", V.Evaluate(potion(), { ah = 40, age = 8 }, S).reason)
+            assert.equal("not worth it", V.Evaluate(item(), { ah = 40 }, S).reason, "priced: the numbers decide")
+        end)
+
+        it("the hard keeps and the profession keep come first", function()
+            for _, o in ipairs({ { locked = true }, { bound = true }, { quest = true }, { questFor = "Goulash" },
+                { inUse = true } }) do
+                assert.equal("keep", V.Evaluate(potion(o), { ah = nil }, S).action)
+            end
+            assert.equal("profession tool", V.Evaluate(potion({ itemID = 2901 }), { ah = nil }, S).reason)
+            S.professions = { 197 }
+            assert.equal("your Tailoring needs it", V.Evaluate(item({ subclassID = 5 }), { ah = nil }, S).reason)
+        end)
+
+        it("disenchanting that doesn't pay leaves the auction house open: to the bank alt", function()
+            S = V.Settings(nil, true)
+            local green = potion({ count = 1, quality = 2, classID = 4, vendor = 500 })
+            local r = V.Evaluate(green, { ah = nil, de = 100 }, S)
+            assert.equal(V.NO_PRICE, r.route)
+            assert.is_nil(r.gain, "the loss on disenchanting isn't counted as its gain")
+            assert.equal("de", V.Evaluate(green, { ah = nil, de = 5000 }, S).route, "disenchanting that pays still wins")
+            assert.equal("not worth it", V.Evaluate(green, { ah = 400, de = 100 }, S).reason, "priced: the numbers decide")
+        end)
+
+        it("a staple trade good is mailed as a common item, whatever the launch day or quality", function()
+            for _, day in ipairs({ 0, 13, 14, 90 }) do
+                S.serverDay = day
+                local r = V.Evaluate(item({ itemID = 2835, link = "[Rough Stone]", count = 10, vendor = 2 }), { ah = nil }, S)
+                assert.equal("common", r.route)
+                assert.equal("staple trade good (no price yet)", r.reason)
+            end
+            local essence = item({ itemID = 10938, link = "[Lesser Magic Essence]", quality = 2, subclassID = 12, count = 2 })
+            S.serverDay = 40
+            assert.equal("common", V.Evaluate(essence, { ah = nil }, S).route)
+            S.serverDay = 10
+            assert.equal("bank", V.Evaluate(essence, { ah = nil }, S).route, "late demand before the raids: Bank on top")
+        end)
+    end)
+
+    describe("staple trade goods (the flat rules, operator, 2026-11-08)", function()
+        it("is one table of item IDs to names: cloth, leather, ore, bars, stone, herbs, elemental, enchanting", function()
+            local n = 0
+            for id, name in pairs(V.STAPLES) do
+                n = n + 1
+                assert.equal("number", type(id))
+                assert.equal("string", type(name))
+            end
+            assert.is_true(n >= 100, "the list in the PR")
+            for _, id in ipairs({ 2589, 14047, 2318, 2770, 3860, 2835, 2447, 13468, 7068, 10940, 14344 }) do
+                assert.truthy(V.STAPLES[id], id)
+            end
+            assert.is_true(V.IsStaple({ itemID = 4306 }))
+            assert.is_false(V.IsStaple({ itemID = 858 }))
+            assert.is_false(V.IsStaple({}))
+        end)
+
+        it("agrees with the names the addon's other tables give the same IDs", function()
+            local ns = loadAddon()
+            local others = {}
+            for _, list in pairs(ns.Tiers.DONE) do
+                for _, row in ipairs(list) do others[row[1]] = row[3] end
+            end
+            for id, name in pairs(V.LATE_METALS) do others[id] = name end
+            for id, name in pairs(V.STARTER_HERBS) do others[id] = name end
+            local checked = 0
+            for id, name in pairs(V.STAPLES) do
+                if others[id] then
+                    assert.equal(others[id], name, "item " .. id)
+                    checked = checked + 1
+                end
+            end
+            assert.is_true(checked >= 40, "cross-checked " .. checked)
+        end)
+
+        it("without any price source, a non-white staple is mailed too; other greens stay", function()
+            local essence = item({ itemID = 10938, link = "[Lesser Magic Essence]", quality = 2, subclassID = 12, count = 2 })
+            local r = V.Evaluate(essence, nil, S)
+            assert.equal("mail", r.action)
+            assert.equal("staple trade good (no price data)", r.reason)
+            assert.equal("uncommon or better (no price data)",
+                V.Evaluate(item({ itemID = 5000, quality = 2, classID = 4 }), nil, S).reason)
+            assert.equal("junk (no price data)", V.Evaluate(item({ quality = 0 }), nil, S).reason, "a grey never")
+        end)
+    end)
+
+    describe("recipes (operator, 2026-11-08)", function()
+        it("knows each recipe's crafting profession from its subclass (Enum.ItemRecipeSubclass)", function()
+            local function of(sub) return V.RecipeProfession({ classID = 9, subclassID = sub }) end
+            assert.equal(165, of(1), "Leatherworking")
+            assert.equal(197, of(2), "Tailoring")
+            assert.equal(202, of(3), "Engineering")
+            assert.equal(164, of(4), "Blacksmithing")
+            assert.equal(185, of(5), "Cooking")
+            assert.equal(171, of(6), "Alchemy")
+            assert.equal(129, of(7), "First Aid")
+            assert.equal(333, of(8), "Enchanting")
+            assert.is_nil(of(0), "a book")
+            assert.is_nil(of(9), "Fishing: not a crafting profession")
+            assert.is_nil(V.RecipeProfession({ classID = 7, subclassID = 4 }), "not a recipe")
+            for _, id in pairs(V.RECIPE_PROFESSION) do assert.truthy(V.PROFESSION_MATS[id], "bindable: " .. id) end
+        end)
+    end)
+
     describe("bank (ALGORITHM-RESEARCH 4.4)", function()
         local function dust(o)
             local t = item({ itemID = 10940, link = "[Strange Dust]", subclassID = 12, count = 10, vendor = 2 })
@@ -347,15 +467,15 @@ describe("valuation", function()
             assert.equal("de", V.Evaluate(green, { ah = 100, de = 1000 }, S).route)
         end)
 
-        it("banks common items too (no Auctionator, or the fresh-realm default)", function()
+        it("banks common items too (no Auctionator, or an unpriced staple)", function()
             S.serverDay = 10
             local r = V.Evaluate(dust(), nil, S)
             assert.equal("bank", r.route)
             assert.equal("common", r.listRoute)
-            assert.equal("bank", V.Evaluate(dust(), { ah = nil }, S).route, "fresh realm, no price yet")
+            assert.equal("bank", V.Evaluate(dust(), { ah = nil }, S).route, "a staple, no price yet")
             S.serverDay = 40
             assert.equal("common", V.Evaluate(dust(), nil, S).route)
-            assert.equal("no price", V.Evaluate(dust(), { ah = nil }, S).reason)
+            assert.equal("staple trade good (no price yet)", V.Evaluate(dust(), { ah = nil }, S).reason)
         end)
 
         it("banks a flooded market that was worth 1.5x more last week, until launch day 60", function()
@@ -422,7 +542,7 @@ describe("valuation", function()
     describe("disenchant", function()
         local green
         before_each(function()
-            green = item({ count = 1, quality = 2, classID = 4, vendor = 50 })
+            green = item({ itemID = 5000, link = "[Green Gloves]", count = 1, quality = 2, classID = 4, vendor = 50 })
             S = V.Settings(nil, true)
         end)
 
@@ -437,7 +557,7 @@ describe("valuation", function()
             assert.equal(1000 - 30, r.deNet)
             assert.equal(920, r.gain)
             S.disenchant = false
-            assert.equal("no price", V.Evaluate(green, { de = 1000 }, S).reason)
+            assert.equal(V.NO_PRICE, V.Evaluate(green, { de = 1000 }, S).route, "no auction price: to the bank alt")
         end)
 
         it("the better of AH and disenchant wins", function()
@@ -454,7 +574,7 @@ describe("valuation", function()
             assert.equal("mail", r.action)
             assert.equal("common", r.route)
             assert.equal("junk (no price data)", V.Evaluate(item({ quality = 0 }), nil, S).reason)
-            assert.equal("uncommon or better (no price data)", V.Evaluate(item({ quality = 2 }), nil, S).reason)
+            assert.equal("uncommon or better (no price data)", V.Evaluate(item({ itemID = 5000, quality = 2 }), nil, S).reason)
         end)
     end)
 

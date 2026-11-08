@@ -54,6 +54,7 @@ UI.CHIPS = {
     de = { "Disenchant", 0.45, 0.25, 0.65 },
     common = { "Common", 0.4, 0.4, 0.4 },
     bank = { "Bank", 0.15, 0.5, 0.45 },
+    noprice = { "No price", 0.35, 0.35, 0.5 }, -- no auction price yet: the bank alt holds it (2026-11-08)
     friend = { "to a friend", 0.55, 0.35, 0.12 }, -- the chip says "to <first name>"
     ["return"] = { "back to sender", 0.5, 0.3, 0.5 }, -- the chip says "back to <first name>"
 }
@@ -102,7 +103,7 @@ function UI.StayReason(r)
         if (r.gain or 0) <= 0 then return "sells better at a vendor" end
         return string.format("only %s more than a vendor (needs %s)", money(r.gain), money(r.threshold))
     end
-    if r.reason == "no price" then return "no auction price yet" end
+    if r.reason == "no price" then return r.failed and "the price lookup failed" or "no auction price yet" end
     if r.reason == "locked" then return "locked (press to unlock)" end
     if r.reason == "junk (no price data)" then return "junk: sell it at a vendor" end
     if r.reason == "uncommon or better (no price data)" then return "uncommon: needs Auctionator prices" end

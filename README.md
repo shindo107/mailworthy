@@ -60,8 +60,9 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   keeps its own price scans, and the "Mailed for" tooltip line stays on the sending account.
 - **No math needed:** prices are Auctionator's last scan, held down by the 3-day median
   when the last scan is a spike (one empty market can't flip a verdict), half the deposit counts (the game refunds it on a sale), a flooded
-  market is valued at its floor, and the rule knows the realm's launch day: in launch week
-  unpriced white trade goods are mailed, before the first raids enchanting materials, herbs
+  market is valued at its floor, an item with no auction price yet goes to the bank alt to wait
+  for one (grey junk stays for the vendor), recipes go to the friend bound to their
+  profession, and the rule knows the realm's launch day: before the first raids enchanting materials, herbs
   and elementals are tagged **B** (bank them, they sell higher later), and later the
   minimum gain grows with the gold supply. Details: `docs/PLAN.md` "Decision rule".
 - **After sending:** your main's bags tag what's left for the vendor with **V** (grey

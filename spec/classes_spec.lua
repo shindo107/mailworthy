@@ -87,10 +87,13 @@ describe("class-only items", function()
         assert.equal("locked", find(ns.Bags.Evaluate().keep, SCROLL).result.reason)
     end)
 
-    it("never over the price rules: unpriced with Auctionator, or a green without it, stays (Codex review)", function()
+    it("never over the price rules: unpriced with Auctionator goes to the bank alt, a green without it stays (Codex review)", function()
         ns.Routes.Add(BOB, "MAGE")
         prices[WowStub.link(SCROLL, "Scroll: VOCE WELL")] = nil
-        assert.equal("no price", find(ns.Bags.Evaluate().keep, SCROLL).result.reason)
+        -- operator, 2026-11-08: no auction price = to the bank alt; never to a class binding (no cap check)
+        local unpriced = find(ns.Bags.Evaluate().mail, SCROLL).result
+        assert.equal("noprice", unpriced.route)
+        assert.is_nil(unpriced.to)
         _G.Auctionator = nil
         WowStub.setBag(0, 1, WowStub.item(SCROLL, "Scroll: VOCE WELL", { quality = 2, sell = 15, class = 0 }))
         assert.equal("uncommon or better (no price data)", find(ns.Bags.Evaluate().keep, SCROLL).result.reason)
