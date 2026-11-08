@@ -94,9 +94,10 @@ ns.On("PLAYER_LOGIN", function()
 end)
 
 local HELP = {
-    "At a mailbox: click the Mailworthy button under the mail window. Controller: Send Mail tab (R1), then Triangle (Y).",
+    "At a mailbox: open the Send Mail tab and the Mailworthy window opens (the Mailworthy button under the mail window"
+        .. " toggles it). Controller: Send Mail tab (R1); Triangle (Y) closes and reopens it.",
     "Lock an item (it stays locked wherever it moves): Alt+click it, or L3 in your bags (controller).",
-    "Locked items glow blue while a mailbox is open (settings: always); a new lock glows a moment anywhere."
+    "Locked items glow blue while the Mailworthy window is open (settings: always); a new lock glows a moment anywhere."
         .. " In the Mailworthy window, pressing an item locks or unlocks it.",
     "/mw or /mw settings - bank alt, minimum gain, disenchant, listing length, keep your professions' materials"
         .. " (also: tags, lock glow, minimap button)",
@@ -109,7 +110,7 @@ local HELP = {
         .. " and received)",
     "/mw summary - on your bank alt (or without one): what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
-        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|peerMark"
+        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail|peerMark"
         .. "|baganatorTags|bagnonTags|arkInventoryTags|betterBagsTags|auctionatorTags> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",
