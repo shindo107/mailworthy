@@ -660,8 +660,13 @@ function Ledger.RecordSent(mail, via)
     local other = clean(mail.to) or tostring(mail.to)
     local s = store()
     s.nextId = (tonumber(s.nextId) or 0) + 1 -- names the mail in values and answers; never reused
+    -- A guild template rule's mail (Mailer.lua, Contributions.Tag): scope "guild", the rule's profession
+    -- skill line and the template's revision. Blizzard's Send button never carries one.
+    local guild = via == "Mailworthy" and type(mail.guild) == "table" and tonumber(mail.guild.profession) and {
+        key = mail.guild.key, profession = tonumber(mail.guild.profession), rev = tonumber(mail.guild.rev) } or nil
     local entry = Ledger.Add({ id = s.nextId, dir = "sent", other = other, subject = mail.subject,
-        items = valued(mail.items), money = tonumber(mail.money) or 0, cod = tonumber(mail.cod) or 0, via = via })
+        items = valued(mail.items), money = tonumber(mail.money) or 0, cod = tonumber(mail.cod) or 0, via = via,
+        scope = guild and "guild" or nil, guild = guild })
     if entry.counted then queueValues(entry) end
     return entry
 end
@@ -840,6 +845,9 @@ function Ledger.LineText(e)
     if (tonumber(e.money) or 0) > 0 then parts[#parts + 1] = money(e.money) .. " gold" end
     local flags = {}
     if e.via == "Mailworthy" then flags[#flags + 1] = "sent by Mailworthy" end
+    if e.scope == "guild" and type(e.guild) == "table" then
+        flags[#flags + 1] = "guild rule: " .. tostring(ns.Routes.ProfessionName(e.guild.profession) or e.guild.profession)
+    end
     if (tonumber(e.cod) or 0) > 0 then flags[#flags + 1] = "COD " .. money(e.cod) end
     if e.returned then flags[#flags + 1] = "returned mail" end
     if e.own then flags[#flags + 1] = "own character" end

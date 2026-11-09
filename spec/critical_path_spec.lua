@@ -3,10 +3,12 @@
 -- the Send Mail tab alone) and the controller,
 -- with and without Auctionator, with TradeSkillMaster alone and with both, items with no auction
 -- price yet (to the bank alt), with a binding (a profession's or a class's, recipes to their
--- profession's), with a guild template, without a bank alt or with it skipped for the visit, with
+-- profession's), with a guild template (its mail tagged in the log and counted for the guild
+-- contributions, nobody else's, never mail to the player's own characters; guildmates' shared counts
+-- change nothing mailed), without a bank alt or with it skipped for the visit, with
 -- Return to sender (on a main and on the bank alt itself), and on SavedVariables an older build
--- left behind. CI runs this file on its own before the rest, and a tag can't publish
--- unless it passes.
+-- left behind (an early alpha's, and v0.30.0's guild template with a full mail log). CI runs this
+-- file on its own before the rest, and a tag can't publish unless it passes.
 --
 -- These tests check outcomes, not tuning: what was previewed is exactly what was sent,
 -- to exactly the recipients shown, and the AGENTS.md safety rules hold for every mail.
@@ -638,6 +640,113 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
     end)
 
+    --- Guild contributions (Contributions.lua, Raid Ledger ROK-2148): only a guild rule's mail is tagged
+    --- in the log and counted, in stack units, for the sending character; MailworthyAPI says the same.
+    local function assertGuildCounted(rulesTo)
+        local units = 0 -- every stack the guild rule's mails carried (Enchanting takes green gear too)
+        for i, mail in ipairs(WowStub.state.sent) do
+            if rulesTo[mail.name] then
+                for _, it in ipairs(WowStub.state.sentItems[i]) do units = units + it.count end
+            end
+        end
+        assert.is_true(units > 0)
+        local me = ns.PlayerName()
+        local key = "Classic Beta PvP|Alliance|Bank Of Azeroth"
+        for _, e in ipairs(ns.Ledger.Store().log) do
+            if e.dir == "sent" and e.subject ~= "old" then
+                if rulesTo[e.other] then
+                    assert.equal("guild", e.scope, "a guild rule's mail to " .. e.other .. " isn't tagged")
+                    assert.equal(ENCHANTING, e.guild.profession)
+                    assert.equal(ns.Guild.Template().rev, e.guild.rev)
+                else
+                    assert.is_nil(e.scope, "mail to " .. e.other .. " is tagged as a guild rule's")
+                    assert.is_nil(e.guild, "mail to " .. e.other .. " is tagged as a guild rule's")
+                end
+            end
+        end
+        local now = WowStub.state.serverTime
+        local counted = MailworthyDB.guildGiven[key][me:lower()]
+        assert.equal(units, counted.total)
+        local export = MailworthyAPI.v1.GetGuildExport()
+        -- asOf (Raid Ledger's contract delta, operator 2026-11-08 "Yes, share in hellos"): own givers carry generatedAt.
+        assert.same({ { characterName = me, itemsAllTime = units, countingSince = counted.since, asOf = export.generatedAt,
+            days = { { day = math.floor(now / 86400), items = units } } } }, export.givers)
+        assert.equal(ns.Guild.Template().rev, export.template.rev)
+    end
+
+    it("a guild rule's mail is tagged and counted for the guild; the bank alt's and a binding's aren't", function()
+        guildTemplate()
+        ns.Guild.SetUse(true)
+        ns.Routes.Add("Cara Friend", 197) -- a personal Tailoring binding: its Wool Cloth is never counted
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940])
+        assert.equal("Cara Friend", preview[2592])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true, ["Cara Friend"] = true })
+        assertGuildCounted({ [BOB] = true })
+    end)
+
+    -- Raid Ledger can't tell which characters share an account, so Mailworthy leaves mail to the
+    -- player's own characters out of the counts (operator, 2026-11-08), even when that alt is the
+    -- guild's profession master. It is still mailed (the rule is on and shown) and still tagged.
+    it("a guild rule naming one of the player's own characters: mailed as shown, never counted", function()
+        local ALT = "Alty Alterson"
+        MailworthyDB.characters["Alty Alterson|Classic Beta PvP|Alliance"] = { name = ALT,
+            realm = "Classic Beta PvP", faction = "Alliance", class = "MAGE", level = 10 }
+        local gm = "Guild Master"
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = {
+            { name = gm, rank = 0, online = true }, { name = ALT, rank = 3 }, { name = BOB, rank = 3, online = true } } }
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        for _, m in ipairs(ns.Guild.Encode(WowStub.state.serverTime - 60, gm, { { profession = ENCHANTING, to = ALT } })) do
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m, "GUILD", BOB)
+        end
+        ns.Guild.SetUse(true)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(ALT, preview[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [ALT] = true })
+        local tagged = false
+        for _, e in ipairs(ns.Ledger.Store().log) do
+            if e.dir == "sent" and e.other == ALT then tagged = e.scope == "guild" end
+        end
+        assert.is_true(tagged, "the mail to the alt is still logged as a guild rule's")
+        assert.is_nil(MailworthyDB.guildGiven["Classic Beta PvP|Alliance|Bank Of Azeroth"], "mail to an own alt was counted")
+        local export = MailworthyAPI.v1.GetGuildExport()
+        assert.is_nil(export.givers, "an own alt's mail reached the export")
+        assert.same({ { professionSkillLineId = ENCHANTING, recipientName = ALT } }, export.template.rules)
+    end)
+
+    -- Shared in hellos (operator, 2026-11-08: "Yes, share in hellos"): a guildmate's counts are information
+    -- only. What they say never changes what is previewed or sent; the export carries them after ours.
+    it("a guildmate's shared counts change nothing mailed; the export carries them after this account's", function()
+        guildTemplate()
+        ns.Guild.SetUse(true)
+        local now = WowStub.state.serverTime
+        for _, m in ipairs(ns.Contributions.Encode({ total = 500, since = now - 86400,
+            days = { [math.floor(now / 86400)] = 500 } }, now - 30)) do
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m, "GUILD", BOB)
+        end
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+        local givers = MailworthyAPI.v1.GetGuildExport().givers
+        assert.equal(2, #givers)
+        assert.equal(ns.PlayerName(), givers[1].characterName)
+        assert.same({ characterName = BOB, itemsAllTime = 500, countingSince = now - 86400, asOf = now - 30,
+            days = { { day = math.floor(now / 86400), items = 500 } } }, givers[2])
+    end)
+
     it("a guild template turned off in one press: only the bank alt gets mail", function()
         guildTemplate()
         ns.Guild.SetUse(true)
@@ -828,6 +937,64 @@ describe("critical path: an older build's SavedVariables", function()
         assertQuiet(ns)
         local report = ns.Report.Build()
         assert.truthy(report:find(BANK_ALT, 1, true), "/mw report still builds")
+        assert.is_nil(MailworthyAPI.v1.GetGuildExport(), "no guild: the export is nil, not an error")
+        assert.is_nil(next(MailworthyDB.guildGiven), "nothing counted without a guild rule")
+        _G.Auctionator = nil
+    end)
+
+    -- v0.30.0 (before guild contributions): a guild template in use and a full mail log with no
+    -- guild tags. The next guild rule's mail is tagged and counted; nothing earlier is, and the
+    -- count outlives the log's pruning.
+    it("v0.30.0's guild template and full mail log: the next guild rule's mail is tagged and counted", function()
+        local saved = oldSaved()
+        local rev = 1791900000 - 3600
+        saved.db.guildTemplates = { [REALM_KEY .. "|Bank Of Azeroth"] = { rev = rev, from = "Guild Master", at = rev,
+            use = true, rules = { { profession = ENCHANTING, to = BOB, cap = 50000 } } } }
+        local log = {}
+        for i = 1, 2000 do
+            log[i] = { id = i, at = rev - i, dir = "received", char = "Rettana Quilwrit", other = "Someone Else",
+                subject = "old", items = { { itemID = 10940, name = "Strange Dust", count = 1 } }, money = 0, cod = 0 }
+        end
+        saved.db.ledger = { [REALM_KEY] = { log = log, players = {}, expect = {}, outbox = {}, nextId = 0 } }
+        local ns = loadAddon(saved)
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = {
+            { name = "Guild Master", rank = 0, online = true }, { name = BOB, rank = 3, online = true } } }
+        local prices = fillBags()
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        useAuctionator(prices)
+        ns.Fire("ADDON_LOADED", "Mailworthy")
+        ns.Fire("PLAYER_LOGIN")
+        assert.same({}, MailworthyDB.guildGiven, "the counters start empty: nothing before this build is counted")
+        assert.same({}, MailworthyDB.guildHeard, "no guildmate's counts before this build")
+        ns.Fire("MAIL_SHOW")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+        assert.equal(ns.Ledger.LOG_MAX, #ns.Ledger.Store().log, "the log is pruned to its cap")
+        local key = REALM_KEY .. "|Bank Of Azeroth"
+        local units = 0
+        for i, mail in ipairs(WowStub.state.sent) do
+            if mail.name == BOB then
+                for _, it in ipairs(WowStub.state.sentItems[i]) do units = units + it.count end
+            end
+        end
+        assert.is_true(units >= 20, "the Strange Dust went to Bob")
+        for _, e in ipairs(ns.Ledger.Store().log) do
+            if e.dir == "sent" then
+                assert.equal(e.other == BOB and "guild" or nil, e.scope, "mail to " .. e.other)
+                if e.other == BOB then assert.equal(rev, e.guild.rev) end
+            end
+        end
+        assert.equal(units, MailworthyDB.guildGiven[key]["rettana quilwrit"].total)
+        for i = 1, ns.Ledger.LOG_MAX do ns.Ledger.Add({ dir = "received", other = "Someone Else", subject = "new " .. i }) end
+        for _, e in ipairs(ns.Ledger.Store().log) do assert.is_nil(e.guild, "the tagged mail should have been pruned") end
+        assert.equal(units, MailworthyAPI.v1.GetGuildExport().givers[1].itemsAllTime, "the count outlives the log")
+        assertQuiet(ns)
         _G.Auctionator = nil
     end)
 end)

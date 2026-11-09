@@ -5,6 +5,8 @@ exclude_files = { ".luarocks/**", ".install/**", "lua_modules/**", ".release/**"
 -- Globals the addon defines (SavedVariables + slash command registration).
 globals = {
     "MailworthyDB", "MailworthyCharDB",
+    -- the read-only API other addons call (Contributions.lua: MailworthyAPI.v1.GetGuildExport)
+    "MailworthyAPI",
     "SLASH_MAILWORTHY1", "SLASH_MAILWORTHY2", "SlashCmdList",
 }
 

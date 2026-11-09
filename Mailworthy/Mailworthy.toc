@@ -33,6 +33,7 @@ Version.lua
 Bags.lua
 Mailer.lua
 Ledger.lua
+Contributions.lua
 Returns.lua
 Widgets.lua
 MailButton.lua

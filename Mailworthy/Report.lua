@@ -109,6 +109,7 @@ function Report.Build()
     for _, l in ipairs(ns.Stale.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.TierCheck.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.Ledger.ReportLines()) do lines[#lines + 1] = l end
+    for _, l in ipairs(ns.Contributions.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.BagAddons.ReportLines()) do lines[#lines + 1] = l end
     for _, l in ipairs(ns.AuctionatorTags.ReportLines()) do lines[#lines + 1] = l end
     lines[#lines + 1] = "mail tabs: " .. ns.MailWindow.TabState() .. "; Inbox: " .. tostring(ns.MailWindow.OnInbox())
