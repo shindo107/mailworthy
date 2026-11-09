@@ -7,7 +7,7 @@
      Row 1: one send, before / during / after (controller reach to Send, Stop, the receipt).
      Row 2: the states that dead-end today (no bank alt, short on postage, a crafter of your own).
      Row 3: away from the Send button (settings redraw the list, the locked items window, the
-     mailbox-trip line). Rendered to media/qol-prototype.png by tools/build-icons.sh. The names
+     mailbox-trip line). Row 4: button names on PlayStation, Xbox and Steam Deck. Rendered to media/qol-prototype.png by tools/build-icons.sh. The names
      are made up (same cast as ux-pass-prototype.html). -->
 <style>
   :root {
@@ -16,10 +16,10 @@
     --mint: #33ff99; --note: #9ec7ff; --warn: #ff8040; --new: #ff7ad9;
   }
   * { box-sizing: border-box; }
-  /* Authored at 1660 x 1730 (the PNG's size): three columns. In a narrower window the
+  /* Authored at 1660 x 2080 (the PNG's size): three columns. In a narrower window the
      columns wrap to two or one and the page scrolls (no script: it also works in a static preview). */
   html { margin: 0; overflow: auto; }
-  body { margin: 0; max-width: 1660px; min-height: 1730px; }
+  body { margin: 0; max-width: 1660px; min-height: 2080px; }
   body {
     font: 13px/1.35 "Trebuchet MS", "Segoe UI", Arial, sans-serif; color: var(--text);
     background: radial-gradient(ellipse at 30% 20%, #3a4a3a 0%, #1d241c 45%, #0d110d 100%);
@@ -145,6 +145,15 @@
   .new { box-shadow: 0 0 0 2px var(--new) !important; border-radius: 4px; }
   .nav.new { box-shadow: 0 0 0 7px var(--new) !important; }
   .total .new { margin-top: 5px; padding: 1px 4px; }
+  .pad { padding-top: 12px; }
+  .padline { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 2px 8px; }
+  .padline:nth-child(odd) { background: var(--row); } .padline:nth-child(even) { background: var(--row-alt); }
+  .padline .where { color: var(--dim); font-size: 11px; width: 150px; flex: none; }
+  .padline .btn { margin-left: auto; }
+  .gp { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px; vertical-align: -3px;
+    background: #2a2a2a; border: 1px solid #bbb; color: #fff; font: bold 10px Arial, sans-serif; }
+  .gp.sh { border-radius: 5px 5px 3px 3px; padding: 0 5px; } .gp.st { border-style: double; border-width: 3px; height: 19px; }
+  .gp.ps { color: #cfe0ff; } .gp.xa { background: #2e7d32; } .gp.xb { background: #b3261e; } .gp.xy { background: #b58900; }
   .tip .h { color: var(--gold); font-weight: bold; font-size: 13px; }
 </style>
 </head>
@@ -152,7 +161,7 @@
 <div class="page">
   <div class="banner"><h1>Mailworthy quality of life</h1>
     <span>Prototype only, nothing built. Every button works by mouse and by Cross on the D-pad highlight (gold outline).</span></div>
-  <div class="key"><b>Pink outline</b> = new or changed. Not drawn here: ForeverMail / Kerzo Postal Suite compatibility (their code has to be read first).</div>
+  <div class="key"><b>Pink outline</b> = new or changed. Controller icons are stand-ins for the game's own. Not drawn here: ForeverMail / Kerzo Postal Suite compatibility (their code has to be read first).</div>
 
   <div class="grid">
     <!-- ============ Row 1: one send ============ -->
@@ -412,6 +421,57 @@
         <div>Click: settings. Drag: move this button.</div>
         <div>Bank alt: Penny Ledgerwick</div>
         <div class="new" style="padding:0 4px; margin:2px -4px">Worth mailing now: 14 items, <span class="money">+2<i class="g"></i>10<i class="s"></i></span></div>
+      </div>
+    </div>
+
+    <!-- ============ Row 4: any controller ============ -->
+    <div class="rowhead">Any controller <small>suggestion 13 (added 2026-11-09)</small></div>
+
+    <div>
+      <div class="cap"><b>13 · PlayStation</b><span class="size">as today, icons in place of words</span>
+        <ul><li>The face-button icons already come from the game</li><li>R1 and L3 become the game's own icons too (today they are typed words)</li><li>Chat can't be relied on to draw icons, so it uses the name</li></ul></div>
+      <div class="frame">
+        <div class="content pad ">
+          <div class="padline"><span class="where">Under the mail window, on the Inbox</span>
+            <span class="hint" style="font-size:12px"><span class="new" style="padding:1px 3px"><span class="gp sh">R1</span></span> to Send Mail, then <span class="gp ps">&#9651;</span></span><span class="btn small">Mailworthy <span class="gp ps">&#9651;</span></span></div>
+          <div class="padline"><span class="where">Send, opened on the Inbox</span><span class="btn off new">Send Mail tab: <span class="gp sh">R1</span></span></div>
+          <div class="padline"><span class="where">Every window's footer</span><span class="hint" style="font-size:12px"><span class="gp ps">&#10005;</span> press &nbsp; <span class="gp ps">&#9675;</span> close &nbsp; D-pad move</span></div>
+          <div class="padline"><span class="where">A locked item's tooltip</span><span class="lockname" style="font-weight:normal;font-size:12px">Alt+click it (<span class="new" style="padding:1px 3px"><span class="gp st">L3</span></span> on a controller) to unlock.</span></div>
+          <div class="chat" style="margin-top:8px;font-size:12px"><span class="mw">Mailworthy</span>: Switch to the Send Mail tab (<span class="new" style="padding:0 3px">R1</span>): Mailworthy opens there.<br>
+            <span class="mw">Mailworthy</span>: Lock an item: Alt+click it, or <span class="new" style="padding:0 3px">L3</span> in your bags.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>13 · Xbox</b><span class="size">today: "R1", "L3" and "Triangle" in the text</span>
+        <ul><li>Same code path: the game hands out its Xbox icon set</li><li>Names in chat follow the controller type: RB, LS, Y</li><li>"Triangle" leaves /mw help and the Inbox chat line</li></ul></div>
+      <div class="frame">
+        <div class="content pad ">
+          <div class="padline"><span class="where">Under the mail window, on the Inbox</span>
+            <span class="hint" style="font-size:12px"><span class="new" style="padding:1px 3px"><span class="gp sh">RB</span></span> to Send Mail, then <span class="gp xy">Y</span></span><span class="btn small">Mailworthy <span class="gp xy">Y</span></span></div>
+          <div class="padline"><span class="where">Send, opened on the Inbox</span><span class="btn off new">Send Mail tab: <span class="gp sh">RB</span></span></div>
+          <div class="padline"><span class="where">Every window's footer</span><span class="hint" style="font-size:12px"><span class="gp xa">A</span> press &nbsp; <span class="gp xb">B</span> close &nbsp; D-pad move</span></div>
+          <div class="padline"><span class="where">A locked item's tooltip</span><span class="lockname" style="font-weight:normal;font-size:12px">Alt+click it (<span class="new" style="padding:1px 3px"><span class="gp st">LS</span></span> on a controller) to unlock.</span></div>
+          <div class="chat" style="margin-top:8px;font-size:12px"><span class="mw">Mailworthy</span>: Switch to the Send Mail tab (<span class="new" style="padding:0 3px">RB</span>): Mailworthy opens there.<br>
+            <span class="mw">Mailworthy</span>: Lock an item: Alt+click it, or <span class="new" style="padding:0 3px">LS</span> in your bags.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>13 · Steam Deck</b><span class="size">no Deck icon set in the game</span>
+        <ul><li>The game has four sets: two Xbox-style, PlayStation, Switch</li><li>A Deck normally reports as an Xbox-style pad: same A / B / X / Y faces</li><li>Its bumpers and sticks show as RB / LS where the Deck prints R1 / L3</li></ul></div>
+      <div class="frame">
+        <div class="content pad ">
+          <div class="padline"><span class="where">Under the mail window, on the Inbox</span>
+            <span class="hint" style="font-size:12px"><span class="new" style="padding:1px 3px"><span class="gp sh">RB</span></span> to Send Mail, then <span class="gp xy">Y</span></span><span class="btn small">Mailworthy <span class="gp xy">Y</span></span></div>
+          <div class="padline"><span class="where">Send, opened on the Inbox</span><span class="btn off new">Send Mail tab: <span class="gp sh">RB</span></span></div>
+          <div class="padline"><span class="where">Every window's footer</span><span class="hint" style="font-size:12px"><span class="gp xa">A</span> press &nbsp; <span class="gp xb">B</span> close &nbsp; D-pad move</span></div>
+          <div class="padline"><span class="where">A locked item's tooltip</span><span class="lockname" style="font-weight:normal;font-size:12px">Alt+click it (<span class="new" style="padding:1px 3px"><span class="gp st">LS</span></span> on a controller) to unlock.</span></div>
+          <div class="chat" style="margin-top:8px;font-size:12px"><span class="mw">Mailworthy</span>: Switch to the Send Mail tab (<span class="new" style="padding:0 3px">RB</span>): Mailworthy opens there.<br>
+            <span class="mw">Mailworthy</span>: Lock an item: Alt+click it, or <span class="new" style="padding:0 3px">LS</span> in your bags.</div>
+        </div>
       </div>
     </div>
   </div>
