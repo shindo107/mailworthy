@@ -250,9 +250,11 @@ local tipRow, tipPad
 UI.stats = { padTips = 0 } -- /mw report: tooltips the controller's highlight showed
 
 -- Through TooltipDataProcessor (installed at login, as Border's line is) the lines are added each
--- time the game builds the tooltip, so a rebuild (item data arriving) keeps them; without it they
--- are added once, when the tooltip is shown.
-local viaProcessor = false
+-- time the game builds the tooltip, so a rebuild (item data arriving) keeps them. A build that
+-- didn't come (no processor; the item already left its slot mid-send, so there is no item data:
+-- Codex review, 2026-11-09) leaves them to showTooltip, which adds them once. `tipAdded`: this
+-- showing's tooltip has them.
+local viaProcessor, tipAdded = false, false
 
 --- The item whose row tooltip `tooltip` is, with Mailworthy's own lines on it, or nil: Border
 --- leaves its "Alt+click to unlock" line off that tooltip (here a plain press does it). The
@@ -268,6 +270,7 @@ end
 local function addLines(tooltip)
     local where, press = UI.TooltipLines(tipRow.item, tipRow.staying, tipPad, ns.Config.BankAlt(), ns.Mailer.Busy())
     local c = ns.Border.COLOR
+    tipAdded = true
     tooltip:AddLine(" ")
     tooltip:AddLine(where, c[1], c[2], c[3], true)
     tooltip:AddLine(press, 1, 0.82, 0, true)
@@ -285,6 +288,7 @@ function UI.InstallTooltip()
     local itemType = type(enum) == "table" and type(enum.TooltipDataType) == "table" and enum.TooltipDataType.Item
     if type(processor) ~= "table" or type(processor.AddTooltipPostCall) ~= "function" or itemType == nil then
         ns.Log.Add("ui", "TooltipDataProcessor missing: row tooltip lines added once, at show")
+        viaProcessor = false
         return false
     end
     local ok, err = pcall(processor.AddTooltipPostCall, itemType, function(tooltip, data)
@@ -307,8 +311,15 @@ local function showTooltip(row, pad)
     tipRow, tipPad = row, pad or false
     local slot = row.item.slots and row.item.slots[1]
     GameTooltip:SetOwner(row.button, "ANCHOR_RIGHT")
+    tipAdded = false
     if slot then pcall(GameTooltip.SetBagItem, GameTooltip, slot.bag, slot.slot) end
-    if ns.Features.On("tooltipLines") and not viaProcessor then addLines(GameTooltip) end
+    -- Nothing in the slot any more (sent a moment ago): the item by its link, so the lines below
+    -- still have a name over them.
+    local built = GameTooltip:NumLines()
+    if (tonumber(built) or 0) == 0 and row.item.link then
+        pcall(GameTooltip.SetHyperlink, GameTooltip, row.item.link)
+    end
+    if ns.Features.On("tooltipLines") and not tipAdded then addLines(GameTooltip) end
     GameTooltip:Show()
 end
 
@@ -1084,7 +1095,6 @@ UI.RefreshIfShown = refreshIfShown
 
 ns.On("PLAYER_LOGIN", function()
     UI.Create()
-    viaProcessor = false
     if ns.Features.On("tooltipLines") then UI.InstallTooltip() end
     -- Our own watcher frame (created at login, on UIParent): reads which tab shows, five
     -- times a second, nothing more. Errors are logged, never raised every frame.

@@ -230,8 +230,14 @@ describe("mail window", function()
                 for _, fn in ipairs(postCalls) do fn(GameTooltip, { id = id }) end
             end
             _G.MailworthyMailButton:Click()
+            -- In game SetBagItem builds the tooltip, post-calls and all: the lines are there once.
+            rawset(GameTooltip, "SetBagItem", function()
+                for _, fn in ipairs(postCalls) do fn(GameTooltip, { id = 2770 }) end
+            end)
             enter(_G.MailworthyMailRow1)
-            assert.equal(0, #lines, "not added twice: the build adds them")
+            assert.equal(3, #lines, "not added twice: the build added them")
+            rawset(GameTooltip, "SetBagItem", nil)
+            enter(_G.MailworthyMailRow1)
             build(2770)
             assert.is_true(said("Click to lock"))
             build(2770) -- item data arrived: the game cleared the tooltip and built it again
@@ -242,6 +248,17 @@ describe("mail window", function()
             build(2770)
             assert.is_false(said("Click to lock"))
             assert.is_nil(ns.MailWindow.TooltipItem())
+            -- Mid-send the item has left its slot: no item data, no build, and the lines still show.
+            enter(_G.MailworthyStayRow1) -- no build for this one (the stub's SetBagItem does nothing)
+            assert.equal(3, #lines)
+            assert.is_true(said("It stays: "))
+            _G.MailworthyMailSend:Click()
+            WowStub.runTimers()
+            assert.is_true(ns.Mailer.Busy())
+            assert.is_true(_G.MailworthyMailRow1:IsShown(), "the list on screen is the one being sent")
+            enter(_G.MailworthyMailRow1)
+            assert.equal(3, #lines)
+            assert.is_true(said(ns.MailWindow.BUSY_LINE))
             _G.Enum, _G.TooltipDataProcessor = nil, nil
             for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("tooltip error", 1, true), line) end
         end)
