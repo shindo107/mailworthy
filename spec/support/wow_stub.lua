@@ -156,6 +156,8 @@ local function newWidget(kind, name)
         if key == "Show" then return function() self.shown = true; runHooks("OnShow") end end
         if key == "Hide" then return function() self.shown = false; runHooks("OnHide") end end
         if key == "IsShown" then return function() return self.shown end end
+        if key == "SetOwner" then return function(_, owner) rawset(self, "owner", owner) end end
+        if key == "GetOwner" then return function() return rawget(self, "owner") end end
         if key == "SetText" then return function(_, t) self.text = t end end
         if key == "SetPoint" then
             return function(_, ...)

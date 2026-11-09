@@ -131,7 +131,7 @@ describe("mail window", function()
         local lines, shows, hides
         before_each(function()
             lines, shows, hides = {}, 0, 0
-            rawset(GameTooltip, "SetOwner", function() lines = {} end)
+            rawset(GameTooltip, "SetOwner", function(self, owner) rawset(self, "owner", owner); lines = {} end)
             rawset(GameTooltip, "AddLine", function(_, t) lines[#lines + 1] = t end)
             rawset(GameTooltip, "Show", function() shows = shows + 1 end)
             rawset(GameTooltip, "Hide", function() hides = hides + 1 end)
@@ -204,6 +204,46 @@ describe("mail window", function()
             assert.is_true(said("Press to unlock."))
             ns.MailWindow.Frame():Hide()
             assert.is_nil(ns.MailWindow.TooltipItem(), "closed with the window")
+        end)
+
+        it("while a send runs a press changes nothing, and the tooltip says so (Codex review)", function()
+            local _, press = ns.MailWindow.TooltipLines({ result = { route = "ah" } }, false, false, "Roknua", true)
+            assert.equal(ns.MailWindow.BUSY_LINE, press)
+            _G.MailworthyMailButton:Click()
+            _G.MailworthyMailSend:Click()
+            assert.is_true(ns.Mailer.Busy())
+            enter(_G.MailworthyMailRow1)
+            assert.is_true(said(ns.MailWindow.BUSY_LINE))
+            assert.is_false(said("to lock"))
+            _G.MailworthyMailRow1:Click()
+            assert.is_false(ns.Locks.IsItemLocked(2770), "the press did nothing, as the tooltip said")
+            WowStub.runTimers()
+        end)
+
+        it("the lines come back when the game rebuilds the tooltip, and only on the row's own (Codex review)", function()
+            local postCalls = {}
+            _G.Enum = { TooltipDataType = { Item = 0 } }
+            _G.TooltipDataProcessor = { AddTooltipPostCall = function(_, fn) table.insert(postCalls, fn) end }
+            assert.is_true(ns.MailWindow.InstallTooltip())
+            local function build(id)
+                lines = {}
+                for _, fn in ipairs(postCalls) do fn(GameTooltip, { id = id }) end
+            end
+            _G.MailworthyMailButton:Click()
+            enter(_G.MailworthyMailRow1)
+            assert.equal(0, #lines, "not added twice: the build adds them")
+            build(2770)
+            assert.is_true(said("Click to lock"))
+            build(2770) -- item data arrived: the game cleared the tooltip and built it again
+            assert.is_true(said("Click to lock"))
+            build(2589)
+            assert.is_false(said("Click to lock"), "another item's data")
+            GameTooltip:SetOwner(_G.MailworthyMailSend) -- the same ore hovered somewhere else
+            build(2770)
+            assert.is_false(said("Click to lock"))
+            assert.is_nil(ns.MailWindow.TooltipItem())
+            _G.Enum, _G.TooltipDataProcessor = nil, nil
+            for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("tooltip error", 1, true), line) end
         end)
 
         it("the mouse leaving a row doesn't take the controller's tooltip off another row", function()
