@@ -37,7 +37,7 @@ render media/bank-alt-prototype.html 900 640 media/bank-alt-prototype.png
 render media/bindings-prototype.html 1180 850 media/bindings-prototype.png
 render media/ux-pass-prototype.html 1580 1290 media/ux-pass-prototype.png
 render media/guild-template-prototype.html 1760 1300 media/guild-template-prototype.png
-render media/qol-prototype.html 1660 2080 media/qol-prototype.png
+render media/qol-prototype.html 1660 2100 media/qol-prototype.png
 echo "media/ui-prototype.png, media/bank-alt-prototype.png, media/bindings-prototype.png, media/ux-pass-prototype.png, media/guild-template-prototype.png, media/qol-prototype.png"
 for page in media/gallery/*.html; do
   render "$page" 1280 720 "${page%.html}.png" 1.25

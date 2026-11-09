@@ -16,10 +16,10 @@
     --mint: #33ff99; --note: #9ec7ff; --warn: #ff8040; --new: #ff7ad9;
   }
   * { box-sizing: border-box; }
-  /* Authored at 1660 x 2080 (the PNG's size): three columns. In a narrower window the
+  /* Authored at 1660 x 2100 (the PNG's size): three columns. In a narrower window the
      columns wrap to two or one and the page scrolls (no script: it also works in a static preview). */
   html { margin: 0; overflow: auto; }
-  body { margin: 0; max-width: 1660px; min-height: 2080px; }
+  body { margin: 0; max-width: 1660px; min-height: 2100px; }
   body {
     font: 13px/1.35 "Trebuchet MS", "Segoe UI", Arial, sans-serif; color: var(--text);
     background: radial-gradient(ellipse at 30% 20%, #3a4a3a 0%, #1d241c 45%, #0d110d 100%);
@@ -154,6 +154,7 @@
     background: #2a2a2a; border: 1px solid #bbb; color: #fff; font: bold 10px Arial, sans-serif; }
   .gp.sh { border-radius: 5px 5px 3px 3px; padding: 0 5px; } .gp.st { border-style: double; border-width: 3px; height: 19px; }
   .gp.ps { color: #cfe0ff; } .gp.xa { background: #2e7d32; } .gp.xb { background: #b3261e; } .gp.xy { background: #b58900; }
+  .uphint { color: var(--new); font-size: 11px; font-weight: bold; white-space: nowrap; }
   .tip .h { color: var(--gold); font-weight: bold; font-size: 13px; }
 </style>
 </head>
@@ -169,13 +170,13 @@
 
     <div>
       <div class="cap"><b>1 · Before: the controller reaches Send</b><span class="size">today: about 12 D-pad presses</span>
-        <ul><li><b>Variant A (drawn):</b> on the Send Mail tab the highlight starts on Send: R1, Cross</li>
-          <li><b>Variant B:</b> it starts top-left as today; D-pad Up from the top row jumps to Send: R1, Up, Cross</li>
+        <ul><li>The highlight starts top-left, as today</li>
+          <li><b>D-pad Up from the top row jumps to Send:</b> R1, Up, Cross (and Down from Send goes back to the top)</li>
           <li>Pagers go both ways (today "1/3 &gt;" only goes forward)</li></ul></div>
       <div class="frame">
         <div class="title"><img src="logo-512.png" alt=""><span>Mailworthy &#9651;</span><span class="x">x</span></div>
         <div class="content">
-          <div class="to"><b>To:</b><span class="who">Penny Ledgerwick</span><span class="note">your bank alt · 2 mails</span><span class="btn grey small">Skip once</span></div>
+          <div class="to"><b>To:</b><span class="who">Penny Ledgerwick</span><span class="note">your bank alt · 2 mails</span><span class="btn grey small nav">Skip once</span></div>
           <div class="tomore"><span>Bob Thornfield</span><span class="note">Enchanting materials · 1 mail</span></div>
           <h3>Mailing <small class="right"><span class="btn grey small step new">&lt;</span>1/3<span class="btn grey small step new">&gt;</span> 19 items · 3 mails</small></h3>
           <table>
@@ -198,12 +199,13 @@
             <div class="big money">+1<i class="g"></i>96<i class="s"></i>59<i class="c"></i> more than vendoring</div>
             <div class="sub">after the 5% AH cut, 24h deposits and 8s 10c postage</div>
           </div>
-          <div class="actions"><span class="btn send nav new">Send to Penny, Bob</span><span class="btn grey">Settings</span>
+          <div class="actions"><span class="btn send new">Send to Penny, Bob</span><span class="btn grey">Settings</span>
             <span class="hint legend">&#9747; press &nbsp; &#9711; close &nbsp; D-pad move</span></div>
+          <div class="uphint" style="margin-top:6px">&#9650; D-pad Up from the top row lands on Send</div>
         </div>
       </div>
-      <div class="variant"><b>Your call:</b> A is the fewest presses, but a second Cross right after R1 sends before the list is read.
-        B keeps one deliberate press in between.</div>
+      <div class="variant"><b>Chosen (operator, 2026-11-09):</b> Up jumps to Send. Not chosen: starting the highlight on Send,
+        where a second Cross right after R1 would send before the list is read.</div>
     </div>
 
     <div>
