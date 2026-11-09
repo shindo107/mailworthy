@@ -127,6 +127,164 @@ describe("mail window", function()
         assert.equal(1, #ns.MailWindow.Result().mail)
     end)
 
+    describe("row tooltips (operator, 2026-11-09: click to lock)", function()
+        local lines, shows, hides
+        before_each(function()
+            lines, shows, hides = {}, 0, 0
+            rawset(GameTooltip, "SetOwner", function(self, owner) rawset(self, "owner", owner); lines = {} end)
+            rawset(GameTooltip, "AddLine", function(_, t) lines[#lines + 1] = t end)
+            rawset(GameTooltip, "Show", function() shows = shows + 1 end)
+            rawset(GameTooltip, "Hide", function() hides = hides + 1 end)
+        end)
+        after_each(function()
+            for _, k in ipairs({ "SetOwner", "AddLine", "Show", "Hide" }) do rawset(GameTooltip, k, nil) end
+        end)
+        local function enter(row) row.scripts.OnEnter(row) end
+        local function said(needle)
+            return table.concat(lines, "\n"):find(needle, 1, true) ~= nil
+        end
+
+        it("the lines: where the item stands and what a press does, by mouse and by controller", function()
+            local L = ns.MailWindow.TooltipLines
+            local where, press = L({ result = { route = "ah" } }, false, false, "Roknua Themicrulah")
+            assert.equal("Mailing to Roknua.", where)
+            assert.equal("Click to lock: it stays in your bags and is never mailed.", press)
+            where = L({ result = { route = "friend", to = "Bob Smith" } }, false, false, "Roknua")
+            assert.equal("Mailing to Bob.", where, "a binding's recipient, as the row's chip says")
+            where = L({ result = { route = "return", to = "Ann" } }, false, false, "Roknua")
+            assert.equal("Going back to Ann.", where)
+            where, press = L({ result = { reason = "locked" } }, true, true)
+            assert.equal("Locked in Mailworthy: it stays in your bags and is never mailed.", where)
+            assert.equal("Press to unlock.", press)
+            where, press = L({ result = { reason = "not worth it", gain = 0 } }, true, false)
+            assert.equal("It stays: sells better at a vendor.", where)
+            assert.equal("Click to lock it, so it always stays.", press)
+        end)
+
+        it("the mouse over a Mailing row says click to lock; over the locked row, click to unlock", function()
+            _G.MailworthyMailButton:Click()
+            enter(_G.MailworthyMailRow1)
+            assert.is_true(said("Mailing to Roknua."))
+            assert.is_true(said("Click to lock"))
+            _G.MailworthyMailRow1:Click() -- locked: it moved to Staying, the row is gone
+            assert.is_true(hides > 0, "no tooltip left on a row that went away")
+            enter(_G.MailworthyStayRow1)
+            assert.is_true(said("Click to unlock."))
+            assert.equal(2770, ns.MailWindow.TooltipItem())
+            _G.MailworthyStayRow1.scripts.OnLeave(_G.MailworthyStayRow1)
+            assert.is_nil(ns.MailWindow.TooltipItem())
+        end)
+
+        it("the tooltip follows a redraw: the row under the mouse now holds another item", function()
+            _G.MailworthyMailButton:Click()
+            enter(_G.MailworthyStayRow1) -- Linen Cloth: sells better at a vendor
+            assert.is_true(said("Click to lock it"))
+            ns.Locks.ToggleItem(2770, WowStub.link(2770, "Copper Ore"), "spec") -- the locked ore takes row 1
+            assert.equal(2770, ns.MailWindow.TooltipItem())
+            assert.is_true(said("Click to unlock."))
+        end)
+
+        it("controller: the highlight on a row shows the same tooltip with Press; off the rows it goes", function()
+            WowStub.state.gamepadUI = true
+            WowStub.state.activeFrame = MailFrame
+            _G.MailworthyMailButton:Click()
+            ns.Nav.Select(_G.MailworthyMailRow1)
+            assert.is_true(shows > 0)
+            assert.is_true(said("Press to lock: it stays in your bags and is never mailed."))
+            assert.is_true(ns.PadKey.Report():find("1 row tooltip(s) shown", 1, true) ~= nil, ns.PadKey.Report())
+            hides = 0
+            ns.Nav.Select(_G.MailworthyMailSend)
+            assert.is_true(hides > 0, "the highlight left the rows")
+            assert.is_nil(ns.MailWindow.TooltipItem())
+            ns.Nav.Select(_G.MailworthyMailRow1)
+            ns.Nav.Press() -- Cross locks it: the row went away, the tooltip with it or on to what is there
+            assert.is_true(ns.Locks.IsItemLocked(2770))
+            assert.is_true(ns.MailWindow.TooltipItem() == nil or said("Press to"))
+            ns.Nav.Select(_G.MailworthyStayRow1)
+            assert.is_true(said("Press to unlock."))
+            ns.MailWindow.Frame():Hide()
+            assert.is_nil(ns.MailWindow.TooltipItem(), "closed with the window")
+        end)
+
+        it("while a send runs a press changes nothing, and the tooltip says so (Codex review)", function()
+            local _, press = ns.MailWindow.TooltipLines({ result = { route = "ah" } }, false, false, "Roknua", true)
+            assert.equal(ns.MailWindow.BUSY_LINE, press)
+            _G.MailworthyMailButton:Click()
+            _G.MailworthyMailSend:Click()
+            assert.is_true(ns.Mailer.Busy())
+            enter(_G.MailworthyMailRow1)
+            assert.is_true(said(ns.MailWindow.BUSY_LINE))
+            assert.is_false(said("to lock"))
+            _G.MailworthyMailRow1:Click()
+            assert.is_false(ns.Locks.IsItemLocked(2770), "the press did nothing, as the tooltip said")
+            WowStub.runTimers()
+        end)
+
+        it("the lines come back when the game rebuilds the tooltip, and only on the row's own (Codex review)", function()
+            local postCalls = {}
+            _G.Enum = { TooltipDataType = { Item = 0 } }
+            _G.TooltipDataProcessor = { AddTooltipPostCall = function(_, fn) table.insert(postCalls, fn) end }
+            assert.is_true(ns.MailWindow.InstallTooltip())
+            local function build(id)
+                lines = {}
+                for _, fn in ipairs(postCalls) do fn(GameTooltip, { id = id }) end
+            end
+            _G.MailworthyMailButton:Click()
+            -- In game SetBagItem builds the tooltip, post-calls and all: the lines are there once.
+            rawset(GameTooltip, "SetBagItem", function()
+                for _, fn in ipairs(postCalls) do fn(GameTooltip, { id = 2770 }) end
+            end)
+            enter(_G.MailworthyMailRow1)
+            assert.equal(3, #lines, "not added twice: the build added them")
+            rawset(GameTooltip, "SetBagItem", nil)
+            enter(_G.MailworthyMailRow1)
+            build(2770)
+            assert.is_true(said("Click to lock"))
+            build(2770) -- item data arrived: the game cleared the tooltip and built it again
+            assert.is_true(said("Click to lock"))
+            build(2589)
+            assert.is_false(said("Click to lock"), "another item's data")
+            GameTooltip:SetOwner(_G.MailworthyMailSend) -- the same ore hovered somewhere else
+            build(2770)
+            assert.is_false(said("Click to lock"))
+            assert.is_nil(ns.MailWindow.TooltipItem())
+            -- Mid-send the item has left its slot: no item data, no build, and the lines still show.
+            enter(_G.MailworthyStayRow1) -- no build for this one (the stub's SetBagItem does nothing)
+            assert.equal(3, #lines)
+            assert.is_true(said("It stays: "))
+            _G.MailworthyMailSend:Click()
+            WowStub.runTimers()
+            assert.is_true(ns.Mailer.Busy())
+            assert.is_true(_G.MailworthyMailRow1:IsShown(), "the list on screen is the one being sent")
+            enter(_G.MailworthyMailRow1)
+            assert.equal(3, #lines)
+            assert.is_true(said(ns.MailWindow.BUSY_LINE))
+            _G.Enum, _G.TooltipDataProcessor = nil, nil
+            for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("tooltip error", 1, true), line) end
+        end)
+
+        it("the mouse leaving a row doesn't take the controller's tooltip off another row", function()
+            _G.MailworthyMailButton:Click()
+            ns.Nav.Select(_G.MailworthyMailRow1)
+            _G.MailworthyStayRow1.scripts.OnLeave(_G.MailworthyStayRow1)
+            assert.equal(2770, ns.MailWindow.TooltipItem())
+        end)
+
+        it("/mw feature tooltipLines off: the item's own tooltip by mouse, none from the controller", function()
+            MailworthyDB.features = MailworthyDB.features or {}
+            MailworthyDB.features.tooltipLines = false
+            _G.MailworthyMailButton:Click()
+            enter(_G.MailworthyMailRow1)
+            assert.equal(1, shows)
+            assert.equal(0, #lines)
+            assert.is_nil(ns.MailWindow.TooltipItem())
+            _G.MailworthyMailRow1.scripts.OnLeave(_G.MailworthyMailRow1)
+            shows = 0
+            ns.Nav.Select(_G.MailworthyMailRow1)
+            assert.equal(0, shows)
+        end)
+    end)
+
     it("Send mails the list to the bank alt; Settings opens the settings", function()
         _G.MailworthyMailButton:Click()
         _G.MailworthyMailSend:Click()

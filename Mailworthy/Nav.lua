@@ -93,6 +93,11 @@ local function entryFor(button, candidates)
     return nil
 end
 
+local listeners = {}
+--- `fn(button)` after the highlight moved (nil: it went away). A window shows what it has for
+--- the highlighted button there (the mail window: an item row's tooltip).
+function Nav.OnSelect(fn) listeners[#listeners + 1] = fn end
+
 function Nav.Select(button)
     current = button
     for _, h in pairs(highlights) do h:Hide() end
@@ -104,6 +109,10 @@ function Nav.Select(button)
         highlight:SetPoint("TOPLEFT", button, "TOPLEFT", -4, 4)
         highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 4, -4)
         highlight:Show()
+    end
+    for _, fn in ipairs(listeners) do
+        local ok, err = pcall(fn, button)
+        if not ok then ns.Log.Add("nav", "select listener error: %s", tostring(err)) end
     end
 end
 
