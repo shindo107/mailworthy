@@ -63,10 +63,7 @@
   .btn.grey { background: linear-gradient(#4a4036, #2b241c); }
   .btn.small { min-width: 0; height: 22px; padding: 0 9px; font-size: 11px; }
   .btn.step { min-width: 24px; width: 24px; padding: 0; }
-  .btn.wide { width: 100%; justify-content: flex-start; height: 24px; }
-  .btn.on { color: var(--mint); }
   .btn.off { color: #8d8474; background: linear-gradient(#35302a, #26211b); border-color: #6b5a3a; box-shadow: none; }
-  .btn .val { color: var(--white); font-weight: normal; }
   .btn .meta { color: var(--dim); font-weight: normal; }
   .nav { outline: 2px solid var(--gold); outline-offset: 3px; }
   h3 { margin: 12px 0 5px; font: bold 13px Georgia, serif; color: var(--gold); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -93,7 +90,7 @@
   .kept .tag { color: var(--note); }
   .busy table { opacity: .55; }
 
-  .to { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--row);
+  .to { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; background: var(--row);
     border: 1px solid #3a2e1c; border-radius: 4px; }
   .to b { color: var(--gold); }
   .to .who { color: var(--white); font-weight: bold; font-size: 14px; }
@@ -102,7 +99,7 @@
   .to .btn { margin-left: auto; }
   .tomore { padding: 3px 10px 0 38px; font-size: 12px; display: flex; gap: 8px; }
   .tomore .note { color: var(--dim); margin-left: auto; }
-  .offer { margin-top: 6px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #2a2013;
+  .offer { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; background: #2a2013;
     border: 1px solid #8c5a1e; border-radius: 4px; font-size: 12px; }
   .offer b { color: var(--gold); }
   .offer .buttons { margin-left: auto; display: flex; gap: 6px; }
@@ -113,7 +110,7 @@
   .total .ok { color: var(--text); font-size: 12px; }
   .total.plain { background: var(--row); border-color: #3a2e1c; }
   .total.plain .big { color: var(--white); }
-  .actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
   .actions .btn { height: 30px; font-size: 13px; min-width: 100px; }
   .actions .send { min-width: 180px; }
   .actions .legend { white-space: nowrap; margin-left: auto; }
@@ -146,7 +143,7 @@
   .nav.new { box-shadow: 0 0 0 7px var(--new) !important; }
   .total .new { margin-top: 5px; padding: 1px 4px; }
   .pad { padding-top: 12px; }
-  .padline { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 2px 8px; }
+  .padline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 30px; padding: 2px 8px; }
   .padline:nth-child(odd) { background: var(--row); } .padline:nth-child(even) { background: var(--row-alt); }
   .padline .where { color: var(--dim); font-size: 11px; width: 150px; flex: none; }
   .padline .btn { margin-left: auto; }
@@ -295,7 +292,7 @@
           </table>
           <div class="total plain">
             <div class="big money">+79<i class="s"></i>61<i class="c"></i> would go to a bank alt</div>
-            <div class="sub">Pick one and this list mails itself; until then your bags carry the AH / DE / V tags.</div>
+            <div class="sub">Pick one and this list is ready to send; until then your bags carry the AH / DE / V tags.</div>
           </div>
           <div class="actions"><span class="btn send off new">Nothing to send</span><span class="btn grey">Settings</span></div>
         </div>
@@ -365,7 +362,7 @@
     <div class="rowhead">Around the window <small>suggestions 4, 7 and 9</small></div>
 
     <div>
-      <div class="cap"><b>4 · Settings redraw the list as you press</b><span class="size">today: only when Settings closes</span>
+      <div class="cap"><b>4 · Settings redraw the list as you press</b><span class="size">today: a change shows when Settings closes</span>
         <ul><li>Settings already opens beside the Mailworthy window</li>
           <li>Each stepper or toggle press re-scans: the count and the total move at once</li>
           <li>Send still holds if the list changed since it was last shown</li></ul></div>
