@@ -213,6 +213,19 @@ describe("why a locked item glows: the tooltip line", function()
         for _, line in ipairs(ns.Log.Lines()) do assert.is_nil(line:find("error", 1, true), line) end
     end)
 
+    it("stays off a Mailworthy window row's tooltip, which says press to unlock itself", function()
+        MailFrame:Show()
+        SendMailFrame:Show()
+        ns.MailWindow.Show("send")
+        local row = _G.MailworthyStayRow1
+        lines = {}
+        row.scripts.OnEnter(row)
+        assert.equal(2770, ns.MailWindow.TooltipItem())
+        assert.equal(0, #hover(2770))
+        row.scripts.OnLeave(row)
+        assert.equal(1, #hover(2770), "in the bags it still says why it glows")
+    end)
+
     it("explains the glow on a locked item while the window is open, in the glow's blue", function()
         openWindow(ns)
         local got = hover(2770)

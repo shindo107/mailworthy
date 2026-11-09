@@ -268,6 +268,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 
 | API / behaviour | What to check | Status |
 |---|---|---|
+| Row tooltips from the controller (2026-11-09): the D-pad highlight on an item row of the Mailworthy window calls `GameTooltip:SetOwner` / `SetBagItem` / `AddLine` / `Show` from addon code (as the mouse path always has), `Hide` when it moves off | with a controller at the mailbox: D-pad onto a Mailing row shows the item tooltip beside the window, ending "Press to lock: ..."; it goes when the highlight reaches Send; jumping, targeting and item use still work after closing the mailbox; `/mw report` "N row tooltip(s) shown" above 0. Off: `/mw feature tooltipLines off` | open (2026-11-09) |
 | `## Interface: 16001` | addon loads without "out of date" | confirmed for LedgerLink (build 1.60.1.70205) |
 | Auctionator `API.v1` on Forever | S5 | **confirmed** (Auctionator 340; price, age, exactness, disenchant calls) |
 | Real AH prices for bag items | `/mw scan` after an Auctionator scan | **seen** (v0.2.0 scan: Copper Ore 1s 74c, Fishing Pole 9s, all age 0); per unit still to confirm against the tooltip; Mailworthy assumes `GetAuctionPriceByItemLink` is per unit and `GetAuctionAgeByItemLink` is in days (Auctionator's convention; S5 saw age 0) |

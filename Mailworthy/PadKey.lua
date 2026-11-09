@@ -201,10 +201,11 @@ function PadKey.Report()
     for name, n in pairs(PadKey.stats.sets) do sets[#sets + 1] = name .. " x" .. n end
     table.sort(sets)
     return string.format("controller bindings: sets %s, applies %d, clears %d, presses %d, PAD4 now %s, PADDUP now %s; "
-        .. "highlight followed %d window change(s), %d back to the opener's button",
+        .. "highlight followed %d window change(s), %d back to the opener's button, %d row tooltip(s) shown",
         #sets > 0 and table.concat(sets, ", ") or "none", PadKey.stats.applies, PadKey.stats.clears,
         PadKey.stats.presses, tostring(select(2, pcall(GetBindingAction, "PAD4", true))),
-        tostring(select(2, pcall(GetBindingAction, "PADDUP", true))), ns.Nav.stats.follows, ns.Nav.stats.returns)
+        tostring(select(2, pcall(GetBindingAction, "PADDUP", true))), ns.Nav.stats.follows, ns.Nav.stats.returns,
+        ns.MailWindow.stats.padTips)
 end
 
 ns.On("PLAYER_LOGIN", function() PadKey.Create() end)

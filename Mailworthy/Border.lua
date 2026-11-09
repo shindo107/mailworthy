@@ -119,7 +119,10 @@ end
 
 local function onTooltip(tooltip, data)
     if tooltip ~= rawget(_G, "GameTooltip") then return end
-    local line = Border.TooltipLine(type(data) == "table" and tonumber(data.id) or nil)
+    local id = type(data) == "table" and tonumber(data.id) or nil
+    -- A row of the Mailworthy window says it itself ("Click to unlock": MailWindow.TooltipLines).
+    if id and ns.MailWindow and ns.MailWindow.TooltipItem() == id then return end
+    local line = Border.TooltipLine(id)
     if not line then return end
     tooltip:AddLine(line, Border.COLOR[1], Border.COLOR[2], Border.COLOR[3], true)
 end

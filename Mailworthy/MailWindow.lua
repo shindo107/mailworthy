@@ -13,7 +13,9 @@
 -- moves Mailworthy's own highlight, Cross presses, Circle closes (PadKey "window"
 -- set, Nav). Every row is a button: pressing an item locks it (it stays in the
 -- bags) or unlocks it, so the controller can change the list without a menu.
--- Everything the mouse tooltip shows is also on the row itself.
+-- A row's tooltip (the mouse over it, or the controller's highlight on it) is the item's own plus
+-- where it stands and what a press does ("Click to lock ...", "Press to unlock."; switch
+-- tooltipLines). Everything it says is also on the row itself.
 --
 -- Return to sender (operator, 2026-11-08; Returns.lua): a toggle beside Settings, on every
 -- character. While it is on (lit green, like every toggle that is on), what other characters
@@ -219,12 +221,80 @@ local function toggleLock(row)
     end
 end
 
-local function showTooltip(row)
-    if not row.item or type(GameTooltip) ~= "table" then return end
+--- Pure: what a row's tooltip adds under the item's own (operator, 2026-11-09: "add a click to
+--- lock tooltip to the rows of items being mailed"): where the item stands, then what a press
+--- does. `item` is a row's item (a scan entry), `staying` its list, `pad` the controller ("Press"
+--- for "Click"), `bankAlt` the saved bank alt. Returns the two lines.
+function UI.TooltipLines(item, staying, pad, bankAlt)
+    local r = item.result or {}
+    local verb = pad and "Press" or "Click"
+    if staying then
+        if r.reason == "locked" then
+            return "Locked in Mailworthy: it stays in your bags and is never mailed.", verb .. " to unlock."
+        end
+        return "It stays: " .. UI.StayReason(r) .. ".", verb .. " to lock it, so it always stays."
+    end
+    local to = r.to or bankAlt
+    local where = to and ((r.route == "return" and "Going back to " or "Mailing to ") .. firstName(to) .. ".")
+        or "Mailing."
+    return where, verb .. " to lock: it stays in your bags and is never mailed."
+end
+
+-- The row whose tooltip shows (the mouse over it, or the controller's highlight on it), and
+-- whether the controller put it there.
+local tipRow, tipPad
+UI.stats = { padTips = 0 } -- /mw report: tooltips the controller's highlight showed
+
+--- The item whose row tooltip shows with Mailworthy's own lines, or nil: Border leaves its
+--- "Alt+click to unlock" line off that tooltip (here a plain press does it).
+function UI.TooltipItem()
+    return tipRow and tipRow.item and ns.Features.On("tooltipLines") and tipRow.item.itemID or nil
+end
+
+local function hideTooltip()
+    if not tipRow then return end
+    tipRow = nil
+    if type(GameTooltip) == "table" then GameTooltip:Hide() end
+end
+
+local function showTooltip(row, pad)
+    if not row.item or type(GameTooltip) ~= "table" then return hideTooltip() end
+    tipRow, tipPad = row, pad or false
     local slot = row.item.slots and row.item.slots[1]
     GameTooltip:SetOwner(row.button, "ANCHOR_RIGHT")
     if slot then pcall(GameTooltip.SetBagItem, GameTooltip, slot.bag, slot.slot) end
+    if ns.Features.On("tooltipLines") then
+        local where, press = UI.TooltipLines(row.item, row.staying, pad, ns.Config.BankAlt())
+        local c = ns.Border.COLOR
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(where, c[1], c[2], c[3], true)
+        GameTooltip:AddLine(press, 1, 0.82, 0, true)
+    end
     GameTooltip:Show()
+end
+
+local function leaveRow(row)
+    if tipRow == row then hideTooltip() end
+end
+
+-- After a redraw the row under the mouse or the highlight may hold another item, or none.
+local function refreshTooltip()
+    if not tipRow then return end
+    if tipRow.item and tipRow.button:IsVisible() then showTooltip(tipRow, tipPad) else hideTooltip() end
+end
+
+local rowOf = {} -- item row button -> row
+
+-- The controller's highlight (Nav) on an item row shows the tooltip the mouse gets there, with
+-- "Press" for "Click"; anywhere else it goes away. Our own frames and GameTooltip only.
+local function onNavSelect(button)
+    local row = button and rowOf[button]
+    if row and row.item and ns.Features.On("tooltipLines") then
+        UI.stats.padTips = UI.stats.padTips + 1
+        showTooltip(row, true)
+    elseif tipRow and (tipPad or not button) then
+        hideTooltip()
+    end
 end
 
 local function rowButton(name, parent, height)
@@ -260,8 +330,9 @@ local function createMailRows()
         row.gain:SetPoint("RIGHT", -8, 0)
         b:SetScript("OnClick", function() toggleLock(row) end)
         b:SetScript("OnEnter", function() showTooltip(row) end)
-        b:SetScript("OnLeave", function() if type(GameTooltip) == "table" then GameTooltip:Hide() end end)
+        b:SetScript("OnLeave", function() leaveRow(row) end)
         b:Hide()
+        rowOf[b] = row
         mailRows[i] = row
     end
 end
@@ -283,8 +354,10 @@ local function createStayRows()
         row.reason:SetTextColor(0.55, 0.75, 1)
         b:SetScript("OnClick", function() toggleLock(row) end)
         b:SetScript("OnEnter", function() showTooltip(row) end)
-        b:SetScript("OnLeave", function() if type(GameTooltip) == "table" then GameTooltip:Hide() end end)
+        b:SetScript("OnLeave", function() leaveRow(row) end)
         b:Hide()
+        row.staying = true
+        rowOf[b] = row
         stayRows[i] = row
     end
 end
@@ -490,7 +563,9 @@ function UI.Create()
     end
     frame:HookScript("OnShow", glow)
     frame:HookScript("OnHide", glow)
+    frame:HookScript("OnHide", hideTooltip)
     ns.Nav.Attach(frame)
+    ns.Nav.OnSelect(onNavSelect)
     ns.Log.Add("ui", "mail window created%s", type(send) == "table" and " under SendMailFrame" or "")
     return frame
 end
@@ -744,6 +819,7 @@ function UI.Refresh(keepScan)
     shown.legend = (marked and 1 or 0) + (pad and 1 or 0) + (notice and 1 or 0) -- footer lines, under the buttons
     frame:SetHeight(UI.Layout(shown))
     ns.Nav.Revalidate()
+    refreshTooltip()
 end
 
 --- Pure: the chat line after Return to sender is pressed: `on`, and the scan's recipients of
