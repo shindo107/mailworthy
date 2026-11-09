@@ -16,18 +16,21 @@
     --mint: #33ff99; --note: #9ec7ff; --warn: #ff8040; --new: #ff7ad9;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; width: 1660px; height: 1730px; overflow: hidden; }
+  /* Authored at 1660 x 1730 (the PNG's size): three columns. In a narrower window the
+     columns wrap to two or one and the page scrolls (no script: it also works in a static preview). */
+  html { margin: 0; overflow: auto; }
+  body { margin: 0; max-width: 1660px; min-height: 1730px; }
   body {
     font: 13px/1.35 "Trebuchet MS", "Segoe UI", Arial, sans-serif; color: var(--text);
     background: radial-gradient(ellipse at 30% 20%, #3a4a3a 0%, #1d241c 45%, #0d110d 100%);
   }
   .page { padding: 18px 24px; }
-  .banner { display: flex; align-items: baseline; gap: 16px; margin-bottom: 6px; }
+  .banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; margin-bottom: 6px; }
   .banner h1 { margin: 0; font: bold 20px Georgia, serif; color: var(--gold); }
   .banner span { color: var(--dim); font-size: 13px; }
   .key { color: var(--dim); font-size: 12px; margin-bottom: 14px; }
   .key b { color: var(--new); }
-  .grid { display: grid; grid-template-columns: 510px 510px 510px; column-gap: 40px; row-gap: 26px; align-items: start; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 510px)); column-gap: 40px; row-gap: 26px; align-items: start; }
   .rowhead { grid-column: 1 / -1; margin: 0 0 -12px; font: bold 15px Georgia, serif; color: var(--text);
     border-bottom: 1px solid #4b5a48; padding-bottom: 4px; }
   .rowhead small { color: var(--dim); font: 12px "Trebuchet MS", Arial, sans-serif; margin-left: 10px; }
