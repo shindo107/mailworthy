@@ -35,6 +35,7 @@ Mailer.lua
 Ledger.lua
 Contributions.lua
 Returns.lua
+Trip.lua
 Widgets.lua
 MailButton.lua
 Nav.lua
