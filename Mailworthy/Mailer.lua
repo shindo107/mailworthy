@@ -9,6 +9,12 @@
 -- SendMail. The next mail follows MAIL_SEND_SUCCESS without another press
 -- (measured: alpha2 send test). It stops on MAIL_FAILED, a closed mailbox,
 -- combat, the Send Mail tab going away, or no answer within 10 s.
+--
+-- QoL pass (operator, 2026-11-09, media/qol-prototype.png): the player can stop a run
+-- (Mailer.RequestStop: a mail waiting for the game's answer is counted first, then the rest is
+-- given back), nothing is sent the player can't pay the postage for (Mailer.Short before Send,
+-- GetSendMailPrice against GetMoney before each SendMail), and a run ends with a receipt
+-- (Mailer.Receipt, Mailer.ReceiptText): what went, to whom, its gain, what stayed and why.
 local _, ns = ...
 
 local Mailer = {}
@@ -67,6 +73,20 @@ end
 
 function Mailer.Status() return state.status end
 function Mailer.Busy() return state.busy end
+--- True once the player pressed Stop while a mail was waiting for the game's answer.
+function Mailer.Stopping() return state.busy and state.stopRequested ~= nil end
+
+--- What the mail list costs to send and what the player has, when that isn't enough: need, have
+--- (copper); nil when it is, or when the game doesn't say what the player has. `items` is the
+--- scan's mail list (each item's result.postage: Valuation's postage for its stacks).
+function Mailer.Short(items)
+    local have = call(GetMoney)
+    if type(have) ~= "number" then return nil end
+    local need = 0
+    for _, item in ipairs(items or {}) do need = need + (tonumber(item.result and item.result.postage) or 0) end
+    if need > have then return need, have end
+    return nil
+end
 
 --- Pure: split the items to mail into mails of PER_MAIL stacks each, per recipient: the
 --- bank alt's mails first, then one run per binding (an item's result.to and what) in the
@@ -128,6 +148,20 @@ function Mailer.Blocker(bankAlt, mails)
     if InCombatLockdown() then return "not in combat" end
     if not sendTabShown() then return "switch to the Send Mail tab first" end
     if not mails or #mails == 0 then return "nothing to mail" end
+    -- Short on postage: nothing goes until the whole list can be paid for (QoL pass, 2026-11-09).
+    local items, seen = {}, {}
+    for _, mail in ipairs(mails) do
+        for _, stack in ipairs(mail.stacks) do
+            if stack.item and not seen[stack.item] then
+                seen[stack.item] = true
+                items[#items + 1] = stack.item
+            end
+        end
+    end
+    local need, have = Mailer.Short(items)
+    if need then
+        return string.format("postage is %s and you have %s", ns.Valuation.Money(need), ns.Valuation.Money(have))
+    end
     return nil
 end
 
@@ -175,6 +209,96 @@ end
 
 local sendNext
 
+-- The receipt of the run that just ended (`stopped`: why it ended early, nil when it mailed
+-- everything it planned): what the mails that went carried. An item's gain is the scan's, for
+-- all its stacks: a stack's share is by count.
+local function finish(stopped)
+    local receipt = { sent = state.sent, planned = #(state.mails or {}), stacks = state.stacks, gain = 0,
+        priced = false, recipients = {}, stayed = state.stayed or {}, stopped = stopped }
+    local seen = {}
+    for _, mail in ipairs(state.mails or {}) do
+        if mail.sent then
+            local to = tostring(mail.to)
+            if not seen[to:lower()] then
+                seen[to:lower()] = true
+                receipt.recipients[#receipt.recipients + 1] = to
+            end
+            for _, stack in ipairs(mail.attached or {}) do
+                local item = stack.item or {}
+                local gain = item.result and tonumber(item.result.gain)
+                if gain and (tonumber(item.count) or 0) > 0 then
+                    receipt.priced = true
+                    receipt.gain = receipt.gain + gain * stack.count / item.count
+                end
+            end
+        end
+    end
+    receipt.gain = math.floor(receipt.gain + 0.5)
+    state.receipt = receipt
+end
+
+--- The last run's receipt (see `finish`), or nil: none yet, a run is on, or it was dismissed.
+function Mailer.Receipt() return not state.busy and state.receipt or nil end
+
+--- The player changed the list after a run: its receipt and status no longer describe it.
+function Mailer.Dismiss()
+    if state.busy then return end
+    state.receipt, state.status = nil, nil
+end
+
+local function plural(n, one, many) return string.format("%d %s", n, n == 1 and one or (many or one .. "s")) end
+local function itemName(link) return tostring(link):match("%[(.-)%]") or tostring(link) end
+local function firstNames(names)
+    local out = {}
+    for i, name in ipairs(names) do out[i] = tostring(name):match("^(%S+)") or tostring(name) end
+    return out
+end
+local function andList(names)
+    if #names == 0 then return "nobody" end
+    if #names == 1 then return names[1] end
+    return table.concat(names, ", ", 1, #names - 1) .. " and " .. names[#names]
+end
+
+--- Pure: the receipt as text (media/qol-prototype.png, "After: a receipt"). `vendorLeft`: items
+--- left in the bags for the vendor. Returns the window's headline, its note (may be ""), and the
+--- one chat line.
+function Mailer.ReceiptText(r, vendorLeft)
+    local money = ns.Valuation.Money
+    local gain = r.priced and r.gain > 0 and ("+" .. money(r.gain)) or nil
+    local head, chat
+    if r.stopped then
+        head = string.format("Stopped after %d of %s: %s.", r.sent, plural(r.planned, "mail"), r.stopped)
+        chat = head
+        if r.sent > 0 then
+            local went = string.format(" Sent to %s%s.", andList(firstNames(r.recipients)), gain and (": " .. gain) or "")
+            head, chat = head .. went, chat .. string.format(" Sent %s to %s%s.", plural(r.stacks, "stack"),
+                andList(r.recipients), gain and (": " .. gain .. " more than vendoring") or "")
+        end
+    elseif r.sent == 0 then
+        head = "Nothing was sent."
+        chat = head
+    else
+        head = string.format("Sent %s to %s%s", plural(r.sent, "mail"), andList(firstNames(r.recipients)),
+            gain and (": " .. gain) or ".")
+        chat = string.format("Sent %s (%s) to %s%s.", plural(r.sent, "mail"), plural(r.stacks, "stack"),
+            andList(r.recipients), gain and (": " .. gain .. " more than vendoring") or "")
+    end
+    local notes = {}
+    if #r.stayed > 0 then
+        local first = r.stayed[1]
+        local more = #r.stayed > 1 and string.format(" and %d more", #r.stayed - 1) or ""
+        notes[#notes + 1] = string.format("%s stayed: %s (%s)%s. Check the list.", plural(#r.stayed, "stack"),
+            itemName(first.link), first.why, more)
+        chat = chat .. string.format(" %s stayed (%s: %s%s).", plural(#r.stayed, "stack"), itemName(first.link),
+            first.why, more)
+    end
+    if (vendorLeft or 0) > 0 then
+        notes[#notes + 1] = string.format("%s left for the vendor.", plural(vendorLeft, "item"))
+        chat = chat .. " " .. notes[#notes]
+    end
+    return head, table.concat(notes, "\n"), chat
+end
+
 local function waitFor(index)
     after(Mailer.TIMEOUT, function()
         if state.busy and state.waiting == index then
@@ -198,6 +322,13 @@ local function sendMail(index)
     end
     pcall(SetSendMailCOD, 0)
     pcall(SetSendMailMoney, 0)
+    -- The game's own check before its Send button (MailFrame.lua): what this mail costs
+    -- against what the player has. Short: give the attachments back, send nothing more.
+    local price, have = call(GetSendMailPrice), call(GetMoney)
+    if type(price) == "number" and type(have) == "number" and price > have then
+        return Mailer.Stop(string.format("postage for mail %d is %s and you have %s", index,
+            ns.Valuation.Money(price), ns.Valuation.Money(have)))
+    end
     state.waiting = index
     ns.lastCommand = string.format("Mailworthy send %d/%d", index, #state.mails)
     local subject, body = string.format(Mailer.SUBJECT, index, #state.mails), ""
@@ -220,7 +351,13 @@ sendNext = function(index)
     if not state.busy then return end
     if index > #state.mails then
         state.busy = false
+        finish(nil)
         setStatus("Sent %d mail(s), %d stacks, to %s.", state.sent, state.stacks, Mailer.Recipients(state.mails, true))
+        -- One short sound (the kit Forever's own MailFrame.lua plays); a missing kit plays nothing.
+        local kit = rawget(_G, "SOUNDKIT")
+        if state.sent > 0 and type(kit) == "table" and kit.IG_MAINMENU_OPTION_CHECKBOX_ON then
+            pcall(PlaySound, kit.IG_MAINMENU_OPTION_CHECKBOX_ON)
+        end
         for _, fn in ipairs(sentListeners) do pcall(fn, state.sent) end
         return
     end
@@ -240,6 +377,7 @@ sendNext = function(index)
             end
         else
             state.skipped = state.skipped + 1
+            state.stayed[#state.stayed + 1] = { link = stack.link, itemID = stack.itemID, count = stack.count, why = why }
             ns.Log.Add("mailer", "skipped %s (bag %d slot %d): %s", tostring(stack.link), stack.bag, stack.slot, why)
         end
     end
@@ -273,6 +411,7 @@ function Mailer.Start(items, bankAlt)
     state.run = state.run + 1
     state.busy, state.mails, state.bankAlt = true, mails, bankAlt
     state.sent, state.stacks, state.skipped, state.waiting = 0, 0, 0, nil
+    state.stayed, state.receipt, state.stopRequested = {}, nil, nil
     ns.Log.Add("mailer", "start: %d mail(s) to %s", #mails, Mailer.Recipients(mails))
     sendNext(1)
     return true
@@ -282,8 +421,20 @@ function Mailer.Stop(reason)
     if not state.busy then return end
     -- Give back what this run attached, unless a mail is already on its way.
     if not state.waiting and sendTabShown() then pcall(ClearSendMail) end
-    state.busy, state.waiting = false, nil
+    state.busy, state.waiting, state.stopRequested = false, nil, nil
+    finish(tostring(reason))
     setStatus("Stopped after %d of %d mail(s): %s.", state.sent, #(state.mails or {}), tostring(reason))
+end
+
+--- The player's Stop (the window's Send button while a run is on). Between mails: stop now,
+--- what is attached goes back. While a mail waits for the game's answer it can't be called
+--- back: the run ends when the answer comes, so that mail is counted and logged like any other.
+function Mailer.RequestStop(reason)
+    if not state.busy then return end
+    reason = reason or "stopped by you"
+    if not state.waiting then return Mailer.Stop(reason) end
+    state.stopRequested = reason
+    setStatus("Stopping after mail %d of %d...", state.waiting, #state.mails)
 end
 
 ns.On("MAIL_SEND_SUCCESS", function()
@@ -315,6 +466,10 @@ ns.On("MAIL_SEND_SUCCESS", function()
         if not okCount then ns.Log.Add("mailer", "contributions error: %s", tostring(err)) end
     end
     ns.Log.Add("mailer", "MAIL_SEND_SUCCESS for mail %d", index)
+    if state.stopRequested then
+        if index >= #state.mails then return sendNext(index + 1) end -- it was the last one: all sent
+        return Mailer.Stop(state.stopRequested)
+    end
     notify()
     after(Mailer.DELAY, function() sendNext(index + 1) end)
 end)
@@ -331,5 +486,5 @@ ns.On("MAIL_CLOSED", function() Mailer.Stop("the mailbox closed") end)
 ns.On("PLAYER_REGEN_DISABLED", function() Mailer.Stop("combat") end)
 ns.On("PLAYER_LOGIN", function() Mailer.Prune() end)
 ns.On("MAIL_SHOW", function()
-    if not state.busy then state.status = nil end
+    if not state.busy then state.status, state.receipt = nil, nil end
 end)

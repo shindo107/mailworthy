@@ -62,7 +62,8 @@ describe("mail window", function()
         assert.equal("bank alt skipped", result.keep[1].result.held, "the auction item tops Staying")
         assert.equal("|cffffd100To:|r Roknua Themicrulah", ns.MailWindow.Texts().to[1])
         assert.equal("Undo skip", text("MailworthyMailSkipBankAlt"))
-        assert.equal("Send", text("MailworthyMailSend"), "nothing goes to the bank alt: not named on Send")
+        assert.equal("Nothing to send", text("MailworthyMailSend"), "nothing goes to the bank alt")
+        assert.is_false(_G.MailworthyMailSend:IsEnabled())
         skip:Click()
         assert.equal(1, #ns.MailWindow.Result().mail)
         assert.equal("Skip once", text("MailworthyMailSkipBankAlt"))
@@ -285,6 +286,175 @@ describe("mail window", function()
         end)
     end)
 
+    describe("the send path (QoL pass, operator 2026-11-09: Stop, receipt, postage, nothing to send)", function()
+        local send
+        before_each(function()
+            _G.MailworthyMailButton:Click()
+            send = _G.MailworthyMailSend
+        end)
+        local function printed() return table.concat(WowStub.printed, "\n") end
+
+        it("the Send button's text and state", function()
+            local S = ns.MailWindow.SendState
+            assert.same({ "Send to Roknua", true }, { S({ mails = 2, send = "Send to Roknua" }) })
+            assert.same({ "Stop", true }, { S({ busy = true, mails = 2, send = "Send to Roknua" }) })
+            assert.same({ "Stopping...", false }, { S({ busy = true, stopping = true, mails = 2 }) })
+            assert.same({ "Nothing to send", false }, { S({ mails = 0, send = "Send" }) })
+            assert.same({ "Postage: 3s 60c", false }, { S({ mails = 2, need = 360, send = "Send to Roknua" }) })
+            assert.same({ "Click Send Mail", false }, { S({ inbox = true, mails = 2 }) })
+            assert.same({ "Send Mail tab: R1", false }, { S({ inbox = true, pad = true, mails = 0 }) })
+            assert.same({ "Sending...", false }, { S({ inbox = true, busy = true, mails = 2 }) }, "no Stop on the Inbox")
+        end)
+
+        it("with nothing on the list Send is greyed out and says so", function()
+            assert.equal("Send to Roknua", text("MailworthyMailSend"))
+            _G.MailworthyMailRow1:Click() -- locked: nothing left to mail
+            assert.equal("Nothing to send", text("MailworthyMailSend"))
+            assert.is_false(send:IsEnabled())
+            send:Click()
+            WowStub.runTimers()
+            assert.equal(0, #WowStub.state.sent)
+        end)
+
+        it("Stop before the mail leaves: what was attached goes back, nothing is sent", function()
+            send:Click()
+            assert.is_true(ns.Mailer.Busy())
+            assert.equal("Stop", text("MailworthyMailSend"))
+            assert.is_true(send:IsEnabled())
+            assert.equal(1, #WowStub.state.attached)
+            send:Click()
+            assert.is_false(ns.Mailer.Busy())
+            assert.equal(0, #WowStub.state.attached, "given back")
+            WowStub.runTimers()
+            assert.equal(0, #WowStub.state.sent)
+            assert.equal("Stopped after 0 of 1 mail: stopped by you.\n1 item left for the vendor.", ns.MailWindow.Texts().note)
+            assert.equal("Send to Roknua", text("MailworthyMailSend"), "the list is still there to send")
+            assert.truthy(printed():find("Stopped after 0 of 1 mail: stopped by you.", 1, true))
+            assert.equal(0, #WowStub.state.sounds, "no sound for a stopped run")
+        end)
+
+        it("a press while sending never replaces the progress with 'already sending'", function()
+            send:Click()
+            WowStub.runTimers() -- the mail is with the game: waiting for its answer
+            assert.truthy(ns.Mailer.Status():find("Sending mail 1 of 1", 1, true))
+            ns.MailWindow.Send()
+            assert.truthy(ns.Mailer.Status():find("Sending mail 1 of 1", 1, true))
+            assert.is_nil(printed():find("already sending", 1, true))
+        end)
+
+        it("Stop while a mail waits for the game: that mail is counted, then the run ends", function()
+            WowStub.setBag(0, 4, WowStub.item(2771, "Tin Ore", { count = 20, sell = 5 }))
+            prices[WowStub.link(2771, "Tin Ore")] = 300
+            ns.Mailer.PER_MAIL = 1 -- two mails
+            ns.MailWindow.Refresh()
+            send:Click()
+            WowStub.runTimers()
+            assert.equal(1, #WowStub.state.sent)
+            send:Click()
+            assert.is_true(ns.Mailer.Busy(), "the mail on its way can't be called back")
+            assert.equal("Stopping...", text("MailworthyMailSend"))
+            assert.is_false(send:IsEnabled())
+            ns.Fire("MAIL_SEND_SUCCESS")
+            WowStub.runTimers()
+            assert.is_false(ns.Mailer.Busy())
+            assert.equal(1, #WowStub.state.sent, "the second mail never went")
+            assert.equal(0, #WowStub.state.attached)
+            local receipt = ns.Mailer.Receipt()
+            assert.equal(1, receipt.sent)
+            assert.equal("stopped by you", receipt.stopped)
+            assert.truthy(ns.MailWindow.Texts().note:find("Stopped after 1 of 2 mails: stopped by you. Sent to Roknua", 1, true))
+            assert.equal(1, #ns.MailWindow.Result().mail, "the other ore is still on the list")
+            ns.Mailer.PER_MAIL = 12
+        end)
+
+        it("controller: Cross on the Send button stops the run", function()
+            WowStub.state.gamepadUI = true
+            WowStub.state.activeFrame = MailFrame
+            local watcher = _G.MailworthyPadWatcher
+            watcher.scripts.OnUpdate(watcher, 0.2)
+            send:Click()
+            ns.Nav.Select(send)
+            WowStub.state.now = WowStub.state.now + 1
+            _G.MailworthyPadCross:Click()
+            assert.is_false(ns.Mailer.Busy())
+            WowStub.runTimers()
+            assert.equal(0, #WowStub.state.sent)
+        end)
+
+        it("after a send: the receipt in the window and in chat, one sound", function()
+            WowStub.setBag(0, 4, WowStub.item(769, "Chunk of Boar Meat", { count = 3, sell = 15 }))
+            prices[WowStub.link(769, "Chunk of Boar Meat")] = 16 -- not worth mailing: left for the vendor
+            ns.MailWindow.Refresh()
+            send:Click()
+            WowStub.runTimers()
+            ns.Fire("MAIL_SEND_SUCCESS")
+            WowStub.runTimers()
+            assert.is_false(ns.Mailer.Busy())
+            local texts = ns.MailWindow.Texts()
+            assert.truthy(texts.total:find("^Sent 1 mail to Roknua: %+"), texts.total)
+            assert.truthy(texts.note:find("left for the vendor.", 1, true), texts.note)
+            assert.truthy(printed():find("Sent 1 mail (1 stack) to Roknua Themicrulah: +", 1, true), printed())
+            assert.truthy(printed():find("more than vendoring.", 1, true))
+            assert.same({ 856 }, WowStub.state.sounds)
+            local _, count = printed():gsub("Sent 1 mail %(1 stack%)", "")
+            assert.equal(1, count, "printed once")
+            _G.MailworthyStayRow1:Click() -- the player changes the list: the receipt has had its say
+            assert.is_nil(ns.Mailer.Receipt())
+            assert.is_nil(ns.MailWindow.Texts().total:find("^Sent"))
+        end)
+
+        it("the receipt's words", function()
+            local R = ns.Mailer.ReceiptText
+            local head, notes, chat = R({ sent = 3, planned = 3, stacks = 18, gain = 16679, priced = true,
+                recipients = { "Penny Ledgerwick", "Bob Thornfield" },
+                stayed = { { link = WowStub.link(2770, "Copper Ore"), why = "count changed" } } }, 2)
+            assert.equal("Sent 3 mails to Penny and Bob: +1g 66s 79c", head)
+            assert.equal("1 stack stayed: Copper Ore (count changed). Check the list.\n2 items left for the vendor.", notes)
+            assert.equal("Sent 3 mails (18 stacks) to Penny Ledgerwick and Bob Thornfield: +1g 66s 79c more than vendoring."
+                .. " 1 stack stayed (Copper Ore: count changed). 2 items left for the vendor.", chat)
+            head, notes, chat = R({ sent = 1, planned = 1, stacks = 2, gain = 0, priced = false,
+                recipients = { "Roknua Themicrulah" }, stayed = {} }, 0)
+            assert.equal("Sent 1 mail to Roknua.", head)
+            assert.equal("", notes)
+            assert.equal("Sent 1 mail (2 stacks) to Roknua Themicrulah.", chat, "no price source: no gain")
+            head = R({ sent = 1, planned = 3, stacks = 12, gain = 500, priced = true, recipients = { "Penny Ledgerwick" },
+                stayed = {}, stopped = "combat" }, 0)
+            assert.equal("Stopped after 1 of 3 mails: combat. Sent to Penny: +5s.", head)
+            head = R({ sent = 0, planned = 2, stacks = 0, gain = 0, priced = false, recipients = {},
+                stayed = { { link = "x", why = "gone" }, { link = "y", why = "gone" } } }, 0)
+            assert.equal("Nothing was sent.", head)
+        end)
+
+        it("short on postage: Send is greyed out with the postage, the note says what is missing; money brings it back", function()
+            WowStub.state.gold = 10
+            ns.MailWindow.Refresh()
+            assert.equal("Postage: 30c", text("MailworthyMailSend"))
+            assert.is_false(send:IsEnabled())
+            assert.truthy(ns.MailWindow.Texts().note:find(
+                "Postage is 30c and you have 10c. Press an item to keep it, or come back with 20c more.", 1, true))
+            send:Click()
+            WowStub.runTimers()
+            assert.equal(0, #WowStub.state.sent)
+            assert.is_false(ns.Mailer.Start(ns.MailWindow.Result().mail, "Roknua Themicrulah"), "the mailer refuses too")
+            assert.equal("Can't send: postage is 30c and you have 10c.", ns.Mailer.Status())
+            WowStub.state.gold = 5000
+            ns.Fire("PLAYER_MONEY")
+            assert.equal("Send to Roknua", text("MailworthyMailSend"))
+            assert.is_true(send:IsEnabled())
+        end)
+
+        it("money gone mid-run: the attachments go back and nothing is sent", function()
+            WowStub.state.gold = 5000
+            send:Click()
+            WowStub.state.gold = 5
+            WowStub.runTimers()
+            assert.is_false(ns.Mailer.Busy())
+            assert.equal(0, #WowStub.state.sent)
+            assert.equal(0, #WowStub.state.attached)
+            assert.truthy(ns.Mailer.Status():find("postage for mail 1 is 30c and you have 5c", 1, true), ns.Mailer.Status())
+        end)
+    end)
+
     it("Send mails the list to the bank alt; Settings opens the settings", function()
         _G.MailworthyMailButton:Click()
         _G.MailworthyMailSend:Click()
@@ -469,7 +639,8 @@ describe("mail window", function()
         ns.Config.SetBankAlt("Roknua Themicrulah")
         MailworthyDB.bankAlts["Classic Beta PvP|Alliance"] = "Rettana Quilwrit"
         ns.MailWindow.Show("send")
-        assert.equal("Send", text("MailworthyMailSend"))
+        assert.equal("Nothing to send", text("MailworthyMailSend"))
+        assert.is_false(_G.MailworthyMailSend:IsEnabled())
         _G.MailworthyMailSend:Click()
         WowStub.runTimers()
         assert.equal(0, #WowStub.state.sent)

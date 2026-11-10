@@ -874,6 +874,117 @@ describe("critical path: mailing", function()
         assertReturnSubjects({ [BOB] = true, [MAIN] = true })
     end)
 
+    --- The mails that went, checked against the preview (a run that was stopped or refused went
+    --- only part of the way): what each carried was previewed for that recipient, and the log
+    --- holds exactly those mails.
+    local function assertSafeSoFar(preview, allowed, mails)
+        assert.equal(mails, #WowStub.state.sent)
+        local partial = {}
+        for _, carried in ipairs(WowStub.state.sentItems) do
+            for _, it in ipairs(carried) do partial[it.itemID] = preview[it.itemID] or "not previewed" end
+        end
+        if mails > 0 then return assertSafeAndComplete(ns, partial, allowed) end
+        for _, e in ipairs(ns.Ledger.Store().log) do assert.are_not.equal("sent", e.dir, "logged a mail that never went") end
+    end
+
+    it("Stop mid-run (mouse): the mail on its way is counted, no later mail goes, the log holds exactly what went", function()
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        local send = _G.MailworthyMailSend
+        send:Click()
+        WowStub.runTimers()
+        assert.equal(1, #WowStub.state.sent, "the first mail is with the game")
+        send:Click() -- Stop
+        assert.is_true(ns.Mailer.Busy(), "it waits for the game's answer for the mail it can't call back")
+        ns.Fire("MAIL_SEND_SUCCESS")
+        for _ = 1, 3 do
+            WowStub.runTimers()
+            ns.Fire("MAIL_SEND_SUCCESS")
+        end
+        assert.is_false(ns.Mailer.Busy())
+        assert.equal(0, #WowStub.state.attached, "nothing left on the send tab")
+        assertSafeSoFar(preview, { [BANK_ALT] = true }, 1)
+        assert.truthy(ns.Mailer.Status():find("^Stopped after 1 of %d+ mail%(s%): stopped by you"), ns.Mailer.Status())
+        assert.is_true(#ns.MailWindow.Result().mail > 0, "the rest is still on the list")
+        -- A second press of Send mails the rest, as previewed.
+        local rest = previewed(ns)
+        send:Click()
+        deliver(ns)
+        for itemID, to in pairs(rest) do preview[itemID] = to end
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("Stop before the first mail leaves (controller): everything attached goes back, nothing is mailed or logged", function()
+        WowStub.state.gamepadUI = true
+        WowStub.state.activeFrame = MailFrame
+        mailbox()
+        local watcher = _G.MailworthyPadWatcher
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        _G.MailworthyPadTriangle:Click()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        local preview = previewed(ns)
+        ns.Nav.Select(_G.MailworthyMailSend)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click() -- Send
+        assert.is_true(ns.Mailer.Busy())
+        assert.is_true(#WowStub.state.attached > 0)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click() -- Stop
+        assert.is_false(ns.Mailer.Busy())
+        assert.equal(0, #WowStub.state.attached)
+        for _ = 1, 3 do
+            WowStub.runTimers()
+            ns.Fire("MAIL_SEND_SUCCESS")
+        end
+        assertSafeSoFar(preview, { [BANK_ALT] = true }, 0)
+    end)
+
+    it("short on postage: Send is greyed out and nothing is sent, by the button or by the mailer itself", function()
+        WowStub.state.gold = 31 -- one stack's postage; the list needs far more
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        local send = _G.MailworthyMailSend
+        assert.is_false(send:IsEnabled())
+        assert.truthy(tostring(send.text):find("^Postage: "), tostring(send.text))
+        send:Click()
+        assert.is_false(ns.Mailer.Start(ns.MailWindow.Result().mail, BANK_ALT))
+        for _ = 1, 3 do
+            WowStub.runTimers()
+            ns.Fire("MAIL_SEND_SUCCESS")
+        end
+        assertSafeSoFar(preview, { [BANK_ALT] = true }, 0)
+        assert.equal(0, #WowStub.state.attached)
+        -- With the money, the same list goes as previewed.
+        WowStub.state.gold = 100000
+        ns.Fire("PLAYER_MONEY")
+        assert.is_true(send:IsEnabled())
+        send:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("money that runs out mid-run: the mail being built is given back, only the mails paid for went", function()
+        WowStub.state.gold = 100000
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        _G.MailworthyMailSend:Click()
+        WowStub.runTimers()
+        assert.equal(1, #WowStub.state.sent)
+        WowStub.state.gold = 1 -- spent elsewhere while the first mail was on its way
+        ns.Fire("MAIL_SEND_SUCCESS")
+        for _ = 1, 3 do
+            WowStub.runTimers()
+            ns.Fire("MAIL_SEND_SUCCESS")
+        end
+        assert.is_false(ns.Mailer.Busy())
+        assert.equal(0, #WowStub.state.attached)
+        assertSafeSoFar(preview, { [BANK_ALT] = true }, 1)
+        assert.truthy(ns.Mailer.Status():find("postage for mail 2", 1, true), ns.Mailer.Status())
+    end)
+
     it("bags that change after the preview: Send re-reads them, and a slot that changes mid-run is skipped", function()
         local pants = function() return WowStub.item(6125, "Brawler's Pants", { bound = true, quality = 2, sell = 300, class = 4 }) end
         mailbox()

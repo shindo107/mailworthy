@@ -24,7 +24,9 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   (or click **Mailworthy** under the mail window; controller: R1 to the Send Mail tab opens
   it, Triangle closes and reopens it). Opened on the Inbox, its Send button is greyed out and says "Click Send Mail". The window shows who gets the mail, what goes and why,
   what stays and why, and the total gain. **Send** mails it all in one press, 12 stacks
-  per mail. Pressing an item locks it, so it stays. **Skip once** beside your bank alt keeps
+  per mail; while it runs the button is **Stop** (the mail already on its way arrives, the rest
+  stays). When it is done the window and chat say what went, to whom, for how much, and what
+  stayed. If you can't pay the postage, nothing is sent and Send shows the postage instead. Pressing an item locks it, so it stays. **Skip once** beside your bank alt keeps
   its share in the bags for this visit (bindings still go). Hovering an item says what the
   window does with it, or why it stays.
 - **Return to sender:** a toggle in the window, on every character (bank alt too). Pressed,
@@ -268,6 +270,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 
 | API / behaviour | What to check | Status |
 |---|---|---|
+| Send path (QoL pass, 2026-11-09): `GetMoney()` and `GetSendMailPrice()` (both in Forever's `MailFrame.lua`, its own Send check), the `PLAYER_MONEY` event (standard, not found in Forever's source; registered in `pcall`, without it the postage note updates at the next redraw), `PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)` (the kit `MailFrame.lua` plays; `pcall`) | at a mailbox: Send, then Stop mid-run: the mail on its way arrives, the rest stays, the note says "Stopped after 1 of N"; a full send ends with "Sent N mails to ...: +gain" in the window and one chat line, and one click sound; with less money than the postage Send reads "Postage: ..." greyed out, and looting or selling a little brings it back | open (2026-11-09) |
 | Row tooltips from the controller (2026-11-09): the D-pad highlight on an item row of the Mailworthy window calls `GameTooltip:SetOwner` / `SetBagItem` / `AddLine` / `Show` from addon code (as the mouse path always has), `Hide` when it moves off; `NumLines` and `SetHyperlink(link)` (pcall'd) when the row's item already left its bag slot mid-send | with a controller at the mailbox: D-pad onto a Mailing row shows the item tooltip beside the window, ending "Press to lock: ..."; it goes when the highlight reaches Send; jumping, targeting and item use still work after closing the mailbox; `/mw report` "N row tooltip(s) shown" above 0. Off: `/mw feature tooltipLines off` | open (2026-11-09) |
 | `## Interface: 16001` | addon loads without "out of date" | confirmed for LedgerLink (build 1.60.1.70205) |
 | Auctionator `API.v1` on Forever | S5 | **confirmed** (Auctionator 340; price, age, exactness, disenchant calls) |

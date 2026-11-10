@@ -26,6 +26,7 @@ read_globals = {
     "SendMailFrame", "InboxFrame", "SendMail", "ClearSendMail", "ClickSendMailItemButton", "GetSendMailItem",
     "GetSendMailPrice", "ATTACHMENTS_MAX_SEND", "C_Mail", "GetInboxNumItems", "GetInboxHeaderInfo",
     "GetInboxInvoiceInfo", "SetSendMailMoney", "SetSendMailCOD",
+    "GetMoney", "PlaySound",
     -- the mail ledger (Ledger.lua): post-hooks on the take calls, the attachments being taken
     "GetInboxItem",
     -- price sources

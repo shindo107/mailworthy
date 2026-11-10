@@ -27,7 +27,7 @@ local function defaultState()
         professions = { { index = 6, name = "Mining", rank = 12, maxRank = 75, skillLine = 186 } },
         numSlots = { [0] = 20, [1] = 4, [2] = 6, [3] = 0, [4] = 0 },
         bags = { [0] = {}, [1] = {}, [2] = {} },
-        attached = {}, cursor = nil, used = {}, sent = {}, sentItems = {}, postage = 30, money = 0, cod = 0, moneyCalls = {},
+        attached = {}, cursor = nil, used = {}, sent = {}, sentItems = {}, sounds = {}, postage = 30, money = 0, cod = 0, moneyCalls = {},
         inbox = {}, invoices = {}, takes = {},
         quests = {}, -- the quest log: { { title, header = true?, objectives = { { text, type } } } }
         itemClasses = {}, -- itemID -> "Mage" / "Mage, Warlock": the tooltip's "Classes: ..." line
@@ -488,6 +488,10 @@ _G.GetSendMailItem = function(i)
     local item = s().attached[i]
     if item then return item.hyperlink:match("%[(.-)%]") or "name", item.itemID, 0, item.stackCount, item.quality end
 end
+-- What the player has (copper); nil until a spec sets WowStub.state.gold: no postage check.
+_G.GetMoney = function() return s().gold end
+_G.SOUNDKIT = { IG_MAINMENU_OPTION_CHECKBOX_ON = 856 }
+_G.PlaySound = function(kit) table.insert(s().sounds, kit) end
 _G.GetSendMailPrice = function() return s().postage * math.max(1, #s().attached) end
 _G.ClearSendMail = function()
     for _, item in ipairs(s().attached) do item.isLocked = false end

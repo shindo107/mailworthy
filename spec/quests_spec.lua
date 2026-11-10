@@ -128,8 +128,12 @@ describe("quests", function()
     it("a quest abandoned after the preview: Send holds, the list shows the item going (Codex review)", function()
         MailFrame:Show()
         SendMailFrame:Show()
+        -- Something else to mail, so Send can be pressed (an empty list greys it out: "Nothing to send").
+        WowStub.setBag(0, 2, WowStub.item(2770, "Copper Ore", { count = 20, sell = 5, class = 7 }))
+        prices[WowStub.link(2770, "Copper Ore")] = 5000
         _G.MailworthyMailButton:Click()
         assert.is_nil(find(ns.MailWindow.Result().mail, MEAT), "under Staying")
+        assert.truthy(find(ns.MailWindow.Result().mail, 2770))
         WowStub.state.quests = {}
         ns.Quests.Invalidate() -- the log changed; the window hasn't redrawn yet
         _G.MailworthyMailSend:Click()

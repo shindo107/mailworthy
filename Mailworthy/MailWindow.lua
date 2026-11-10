@@ -73,7 +73,7 @@ function UI.Texts()
     for _, line in ipairs(toLines) do
         if line.name:IsShown() then to[#to + 1] = line.name:GetText() .. " | " .. line.note:GetText() end
     end
-    return { to = to, note = totalNote and totalNote:GetText() }
+    return { to = to, note = totalNote and totalNote:GetText(), total = totalLine and totalLine:GetText() }
 end
 
 --- Pure: "|cffRRGGBB" + name from an item link (no brackets), or the link as is.
@@ -217,6 +217,7 @@ local function toggleLock(row)
     if row.item and not ns.Mailer.Busy() then
         -- A fresh lock goes to the top of Staying (locked items first): show that page.
         if not ns.Locks.IsItemLocked(row.item.itemID) then pages.stay = 1 end
+        ns.Mailer.Dismiss() -- the list changes: the last run's receipt no longer describes it
         ns.Locks.ToggleItem(row.item.itemID, row.item.link, "Mailworthy window")
     end
 end
@@ -435,6 +436,7 @@ local function createRouteRows()
     -- Skip once for the bank alt too (operator, 2026-11-08): its share stays this visit, bindings go.
     skipAltButton = W.Button(frame, "Skip once", 84, function()
         if ns.Mailer.Busy() then return end
+        ns.Mailer.Dismiss()
         ns.Bags.SkipBankAlt(not ns.Bags.BankAltSkipped())
         UI.Refresh()
     end, "MailworthyMailSkipBankAlt")
@@ -445,7 +447,8 @@ local function createRouteRows()
         row.text:SetWidth(300)
         row.text:SetJustifyH("LEFT")
         row.skip = W.Button(frame, "Skip once", 84, function()
-            if not row.key then return end
+            if not row.key or ns.Mailer.Busy() then return end
+            ns.Mailer.Dismiss()
             if ns.Routes.Skipped(row.key) then ns.Routes.Unskip(row.key) else ns.Routes.SkipOnce(row.key) end
             UI.Refresh()
         end, "MailworthyMailSkip" .. i)
@@ -597,7 +600,10 @@ function UI.Create()
     totalNote:SetWidth(WIDTH - 48)
     totalNote:SetJustifyH("LEFT")
 
-    sendButton = W.Button(frame, "Send", 190, function() UI.Send() end, "MailworthyMailSend")
+    -- Send; while a run is on, the same button is Stop (QoL pass, 2026-11-09).
+    sendButton = W.Button(frame, "Send", 190, function()
+        if ns.Mailer.Busy() then UI.Stop() else UI.Send() end
+    end, "MailworthyMailSend")
     settingsButton = W.Button(frame, "Settings", 110, function() ns.SettingsUI.Show(frame) end, "MailworthyMailSettings")
     returnButton = W.Button(frame, "Return to sender", 150, function() UI.ToggleReturns() end, "MailworthyMailReturn")
     legend = W.Label(frame, "GameFontHighlightSmall")
@@ -846,19 +852,35 @@ function UI.Refresh(keepScan)
     -- While sending (and after), the mailer's progress or problem takes the fees line.
     local status = ns.Mailer.Status()
     if status then totalNote:SetText(status) end
-    sendButton:SetText(ns.Mailer.Busy() and "Sending..." or UI.SendText(t.recipients, bankAlt, isBankAlt, skipped))
-    renderedInbox = UI.OnInbox()
-    sendButton:Show()
-    if renderedInbox then
-        -- Mail goes out from the Send Mail tab only, and we never switch tabs ourselves
-        -- (MailFrameTab_OnClick taints the controller UI). Send is greyed out here and names the
-        -- tab (operator, 2026-11-08: "the button should be greyed out with a 'click send mail'
-        -- text"); on Send Mail the watcher redraws it as "Send to ..." and the list follows.
-        if not ns.Mailer.Busy() then sendButton:SetText(UI.InboxSendText(pad)) end -- else "Sending..."
-        sendButton:Disable() -- busy or not: nothing is sent from the Inbox (Codex review)
-    else
-        sendButton:Enable()
+    -- After a run: its receipt (what went, to whom, the gain; what stayed; what is left for the
+    -- vendor). A run that mailed everything takes the headline too; a stopped one leaves the
+    -- headline to the list still waiting.
+    local busy = ns.Mailer.Busy()
+    local receipt = ns.Mailer.Receipt()
+    if receipt then
+        local head, notes = ns.Mailer.ReceiptText(receipt, UI.VendorLeft(result))
+        if receipt.stopped then
+            totalNote:SetText(head .. (notes ~= "" and ("\n" .. notes) or ""))
+        else
+            totalLine:SetText(head)
+            totalNote:SetText(notes)
+        end
     end
+    -- Short on postage: nothing would go (Mailer.Blocker), so the window says what is missing.
+    local need, have = nil, nil
+    if not busy then need, have = ns.Mailer.Short(result.mail) end
+    if need then totalNote:SetText("|cffff8040" .. UI.PostageText(need, have) .. "|r") end
+    renderedInbox = UI.OnInbox()
+    local label, enabled = UI.SendState({ busy = busy, stopping = ns.Mailer.Stopping(), inbox = renderedInbox,
+        pad = pad, mails = #result.mail, need = need,
+        send = UI.SendText(t.recipients, bankAlt, isBankAlt, skipped) })
+    sendButton:SetText(label)
+    sendButton:Show()
+    -- On the Inbox: mail goes out from the Send Mail tab only, and we never switch tabs ourselves
+    -- (MailFrameTab_OnClick taints the controller UI). Send is greyed out there and names the
+    -- tab (operator, 2026-11-08: "the button should be greyed out with a 'click send mail'
+    -- text"); on Send Mail the watcher redraws it as "Send to ..." and the list follows.
+    if enabled then sendButton:Enable() else sendButton:Disable() end
     returnButton:SetText(ns.Returns.On() and "Return to sender: on" or "Return to sender")
     W.SetToggled(returnButton, ns.Returns.On())
     if ns.Returns.Available() then returnButton:Show() else returnButton:Hide() end
@@ -894,6 +916,7 @@ end
 function UI.ToggleReturns()
     if ns.Mailer.Busy() or not ns.Returns.Available() then return end
     ns.lastCommand = "Mailworthy Return to sender"
+    ns.Mailer.Dismiss()
     local on = ns.Returns.Toggle()
     pages.mail, pages.stay = 1, 1
     UI.Refresh()
@@ -964,8 +987,60 @@ function UI.InboxSendText(pad)
     return pad and "Send Mail tab: R1" or "Click Send Mail"
 end
 
+--- Pure: the Send button's text and whether it can be pressed (media/qol-prototype.png). `s`:
+--- busy (a run is on), stopping (Stop was pressed, a mail is still waiting for its answer),
+--- inbox (the Inbox tab shows), pad, mails (items on the mail list), need (the postage, when the
+--- player can't pay it), send (UI.SendText's "Send to ..."). On the Inbox nothing is ever sent
+--- or stopped from here (Codex review); a run on shows as "Sending...".
+function UI.SendState(s)
+    if s.inbox then return s.busy and "Sending..." or UI.InboxSendText(s.pad), false end
+    if s.stopping then return "Stopping...", false end
+    if s.busy then return "Stop", true end
+    if (s.mails or 0) == 0 then return "Nothing to send", false end
+    if s.need then return "Postage: " .. money(s.need), false end
+    return s.send, true
+end
+
+--- Pure: the note under the total when the player can't pay the postage.
+function UI.PostageText(need, have)
+    return string.format("Postage is %s and you have %s. Press an item to keep it, or come back with %s more.",
+        money(need), money(have), money(need - have))
+end
+
+--- How many items of a scan stay for the vendor (the bank alt view's V: BankAlt.Verdict).
+function UI.VendorLeft(scan)
+    local n = 0
+    for _, item in ipairs(scan and scan.keep or {}) do
+        local ok, verdict = pcall(ns.BankAlt.Verdict, item)
+        if ok and verdict == "v" then n = n + 1 end
+    end
+    return n
+end
+
+--- Stop (the Send button while a run is on; mouse, or Cross on it).
+function UI.Stop()
+    if not ns.Mailer.Busy() or UI.OnInbox() then return end
+    ns.lastCommand = "Mailworthy Stop"
+    ns.Mailer.RequestStop("stopped by you")
+end
+
+-- A run ended: its receipt goes to chat once, the same words as the window's.
+local printedReceipt
+local function printReceipt()
+    local receipt = ns.Mailer.Receipt()
+    if not receipt or receipt == printedReceipt then return end
+    printedReceipt = receipt
+    local scan = result
+    if not (frame and frame:IsShown()) then
+        local ok, fresh = pcall(ns.Bags.Evaluate)
+        scan = ok and fresh or nil
+    end
+    local _, _, chat = ns.Mailer.ReceiptText(receipt, UI.VendorLeft(scan))
+    ns.Print(chat)
+end
+
 function UI.Send()
-    if not result or UI.OnInbox() then return end
+    if not result or UI.OnInbox() or ns.Mailer.Busy() then return end
     ns.lastCommand = "Mailworthy Send"
     local shown, alt, stayed = result.mail, shownAlt, result.keep
     UI.Refresh() -- the freshest scan, so the mail list is what's in the bags now
@@ -1114,6 +1189,8 @@ ns.On("PLAYER_LOGIN", function()
     -- update for the sent items may have come mid-send, when it was skipped (v0.4.0).
     ns.Mailer.OnChanged(function()
         if frame and frame:IsShown() then UI.Refresh(ns.Mailer.Busy()) end
+        local ok, err = pcall(printReceipt)
+        if not ok then ns.Log.Add("ui", "receipt error: %s", tostring(err)) end
     end)
     local settings = ns.SettingsUI.Frame()
     if settings then settings:HookScript("OnHide", refreshIfShown) end
@@ -1133,4 +1210,8 @@ ns.Version.OnChanged(function()
 end)
 ns.On("BAG_UPDATE_DELAYED", function()
     if not ns.Mailer.Busy() then refreshIfShown() end
+end)
+-- Money came or went: the postage check follows (from the scan on screen).
+ns.On("PLAYER_MONEY", function()
+    if frame and frame:IsShown() and not ns.Mailer.Busy() then UI.Refresh(true) end
 end)
