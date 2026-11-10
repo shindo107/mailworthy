@@ -425,6 +425,86 @@ describe("mail window", function()
             assert.equal("Nothing was sent.", head)
         end)
 
+        it("the receipt gives way when something new joins the list (Codex review)", function()
+            send:Click()
+            WowStub.runTimers()
+            ns.Fire("MAIL_SEND_SUCCESS")
+            WowStub.runTimers()
+            ns.Fire("BAG_UPDATE_DELAYED") -- the sent ore leaving the bags: the receipt stays
+            assert.truthy(ns.MailWindow.Texts().total:find("^Sent 1 mail"), ns.MailWindow.Texts().total)
+            WowStub.setBag(0, 4, WowStub.item(2771, "Tin Ore", { count = 20, sell = 5 }))
+            prices[WowStub.link(2771, "Tin Ore")] = 300
+            ns.Fire("BAG_UPDATE_DELAYED")
+            assert.is_nil(ns.Mailer.Receipt())
+            local texts = ns.MailWindow.Texts()
+            assert.truthy(texts.total:find("more than vendoring", 1, true), texts.total)
+            assert.truthy(texts.note:find("postage", 1, true), texts.note)
+            assert.equal("Send to Roknua", text("MailworthyMailSend"))
+        end)
+
+        it("an empty list is read again by itself, so a greyed-out Send comes back (Codex review)", function()
+            _G.MailworthyMailRow1:Click() -- locked: nothing to send
+            assert.equal("Nothing to send", text("MailworthyMailSend"))
+            -- Something mailable turns up with no event the window listens to (item data arriving late).
+            WowStub.setBag(0, 4, WowStub.item(2771, "Tin Ore", { count = 20, sell = 5 }))
+            prices[WowStub.link(2771, "Tin Ore")] = 300
+            local watcher = _G.MailworthyTabWatcher
+            watcher.scripts.OnUpdate(watcher, 0.2)
+            assert.equal("Nothing to send", text("MailworthyMailSend"), "not on every tick")
+            for _ = 1, 10 do watcher.scripts.OnUpdate(watcher, 0.2) end
+            assert.equal("Send to Roknua", text("MailworthyMailSend"))
+            assert.is_true(send:IsEnabled())
+            assert.is_false(ns.MailWindow.RecheckEmpty(5), "a list with something on it is left alone")
+        end)
+
+        it("a run stopped with a mail still with the game: its late answer is counted and logged (Codex review)", function()
+            local function logged()
+                local n = 0
+                for _, e in ipairs(ns.Ledger.Store().log) do if e.dir == "sent" then n = n + 1 end end
+                return n
+            end
+            send:Click()
+            WowStub.runTimers()
+            ns.Fire("PLAYER_REGEN_DISABLED") -- combat: the run stops, the mail is already on its way
+            assert.is_false(ns.Mailer.Busy())
+            assert.equal(0, ns.Mailer.Receipt().sent)
+            ns.Fire("MAIL_SEND_SUCCESS")
+            assert.equal(1, logged(), "in the mail log")
+            assert.truthy(MailworthyDB.mailed[2770], "and remembered as mailed")
+            assert.equal(1, ns.Mailer.Receipt().sent)
+            assert.equal("combat", ns.Mailer.Receipt().stopped)
+            assert.equal("Stopped after 1 of 1 mail(s): combat.", ns.Mailer.Status())
+            ns.Fire("MAIL_SEND_SUCCESS") -- some other mail of the player's: not ours
+            assert.equal(1, logged())
+        end)
+
+        it("a stopped run's mail the game then refuses is not counted", function()
+            send:Click()
+            WowStub.runTimers()
+            ns.Fire("PLAYER_REGEN_DISABLED")
+            ns.Fire("MAIL_FAILED")
+            ns.Fire("MAIL_SEND_SUCCESS")
+            assert.equal(0, ns.Mailer.Receipt().sent)
+            for _, e in ipairs(ns.Ledger.Store().log) do assert.are_not.equal("sent", e.dir) end
+        end)
+
+        it("the receipt's gain for part of an item is valued by its stacks, not by its share of units (Codex review)", function()
+            WowStub.setBag(0, 4, WowStub.item(2770, "Copper Ore", { count = 1, sell = 5 }))
+            ns.MailWindow.Refresh()
+            local ore = ns.MailWindow.Result().mail[1]
+            assert.equal(21, ore.count)
+            assert.equal(2, ore.stacks)
+            assert.equal(ore.result.gain, ns.Mailer.GainOf(ore, 21, 2), "all of it: the scan's own figure")
+            local one = ns.Valuation.Evaluate(setmetatable({ count = 1, stacks = 1 }, { __index = ore }), ore.price,
+                ns.Bags.CurrentSettings()).gain
+            assert.equal(one, ns.Mailer.GainOf(ore, 1, 1))
+            assert.are_not.equal(math.floor(ore.result.gain / 21 + 0.5), ns.Mailer.GainOf(ore, 1, 1) or 0,
+                "one unit in its own stack pays a whole stack's postage")
+            assert.is_nil(ns.Mailer.GainOf({ count = 5, stacks = 1, result = { gain = 100, to = "Bob" } }, 5, 1),
+                "a binding's share isn't in the total either")
+            assert.is_nil(ns.Mailer.GainOf({ count = 5, stacks = 1, result = {} }, 5, 1), "no price: no gain")
+        end)
+
         it("short on postage: Send is greyed out with the postage, the note says what is missing; money brings it back", function()
             WowStub.state.gold = 10
             ns.MailWindow.Refresh()

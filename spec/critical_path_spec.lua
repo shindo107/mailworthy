@@ -915,6 +915,23 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
     end)
 
+    it("combat with a mail on its way: the run stops, and the mail the game then confirms is in the log", function()
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        _G.MailworthyMailSend:Click()
+        WowStub.runTimers()
+        assert.equal(1, #WowStub.state.sent)
+        ns.Fire("PLAYER_REGEN_DISABLED")
+        assert.is_false(ns.Mailer.Busy())
+        ns.Fire("MAIL_SEND_SUCCESS")
+        for _ = 1, 3 do
+            WowStub.runTimers()
+            ns.Fire("MAIL_SEND_SUCCESS")
+        end
+        assertSafeSoFar(preview, { [BANK_ALT] = true }, 1)
+    end)
+
     it("Stop before the first mail leaves (controller): everything attached goes back, nothing is mailed or logged", function()
         WowStub.state.gamepadUI = true
         WowStub.state.activeFrame = MailFrame

@@ -626,6 +626,28 @@ function UI.Create()
     return frame
 end
 
+-- The mail list as it stood when a run's receipt first showed ({ [link] = count }), per receipt.
+local receiptLists = setmetatable({}, { __mode = "k" })
+local function receiptList(receipt)
+    if not receiptLists[receipt] then
+        local list = {}
+        for _, item in ipairs(result and result.mail or {}) do
+            local key = item.link or item.itemID
+            list[key] = (list[key] or 0) + (tonumber(item.count) or 0)
+        end
+        receiptLists[receipt] = list
+    end
+    return receiptLists[receipt]
+end
+
+--- Pure: has the mail list `now` anything the list `before` ({ [link] = count }) didn't hold?
+function UI.Grew(before, now)
+    for _, item in ipairs(now or {}) do
+        if (tonumber(item.count) or 0) > (before[item.link or item.itemID] or 0) then return true end
+    end
+    return false
+end
+
 --- Fill the shown rows of a list from its page; returns how many show.
 local function fillList(rows, items, page, perPage, fill)
     local first = (page - 1) * perPage
@@ -857,6 +879,13 @@ function UI.Refresh(keepScan)
     -- headline to the list still waiting.
     local busy = ns.Mailer.Busy()
     local receipt = ns.Mailer.Receipt()
+    -- Something new on the list since the run ended (looted, taken from the mailbox): the total
+    -- is the list's again, the receipt has had its say (Codex review, 2026-11-09).
+    if receipt and UI.Grew(receiptList(receipt), result.mail) then
+        ns.Mailer.Dismiss()
+        receipt = nil
+        totalNote:SetText(note)
+    end
     if receipt then
         local head, notes = ns.Mailer.ReceiptText(receipt, UI.VendorLeft(result))
         if receipt.stopped then
@@ -1119,6 +1148,23 @@ function UI.CheckTab()
     return true
 end
 
+--- The watcher's fourth job: with nothing on the list Send is greyed out, so no press re-reads the
+--- bags as Send does. The list is read again every RECHECK seconds while it is empty (item data
+--- that arrived late, a quest abandoned: Codex review, 2026-11-09). Returns true when it re-read.
+UI.RECHECK = 2
+local emptyFor = 0
+function UI.RecheckEmpty(dt)
+    if not (frame and frame:IsVisible()) or ns.Mailer.Busy() or not result or #result.mail > 0 then
+        emptyFor = 0
+        return false
+    end
+    emptyFor = emptyFor + (dt or 0)
+    if emptyFor < UI.RECHECK then return false end
+    emptyFor = 0
+    UI.Refresh()
+    return true
+end
+
 local sendWasVisible = false
 --- The watcher's third job: the Send Mail tab just showed and the window is closed: open it
 --- (operator, 2026-11-08). Once per showing: closed there, it stays closed until the tab shows
@@ -1182,6 +1228,7 @@ ns.On("PLAYER_LOGIN", function()
         local ok, err = pcall(UI.FollowTab)
         if ok then ok, err = pcall(UI.AutoOpen) end
         if ok then ok, err = pcall(UI.CheckTab) end
+        if ok then ok, err = pcall(UI.RecheckEmpty, 0.2) end
         if not ok then ns.Log.Add("ui", "tab watcher error: %s", tostring(err)) end
     end)
     ns.Locks.OnChanged(refreshIfShown)

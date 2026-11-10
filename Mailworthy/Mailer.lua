@@ -215,7 +215,7 @@ local sendNext
 local function finish(stopped)
     local receipt = { sent = state.sent, planned = #(state.mails or {}), stacks = state.stacks, gain = 0,
         priced = false, recipients = {}, stayed = state.stayed or {}, stopped = stopped }
-    local seen = {}
+    local seen, went, order = {}, {}, {}
     for _, mail in ipairs(state.mails or {}) do
         if mail.sent then
             local to = tostring(mail.to)
@@ -224,17 +224,41 @@ local function finish(stopped)
                 receipt.recipients[#receipt.recipients + 1] = to
             end
             for _, stack in ipairs(mail.attached or {}) do
-                local item = stack.item or {}
-                local gain = item.result and tonumber(item.result.gain)
-                if gain and (tonumber(item.count) or 0) > 0 then
-                    receipt.priced = true
-                    receipt.gain = receipt.gain + gain * stack.count / item.count
+                local item = stack.item
+                if item then
+                    went[item] = went[item] or { count = 0, stacks = 0 }
+                    went[item].count, went[item].stacks = went[item].count + stack.count, went[item].stacks + 1
+                    if not order[item] then
+                        order[item] = true
+                        order[#order + 1] = item
+                    end
                 end
             end
         end
     end
-    receipt.gain = math.floor(receipt.gain + 0.5)
+    for _, item in ipairs(order) do
+        local gain = Mailer.GainOf(item, went[item].count, went[item].stacks)
+        if gain then
+            receipt.priced = true
+            receipt.gain = receipt.gain + gain
+        end
+    end
     state.receipt = receipt
+end
+
+--- The gain (over vendoring) of the `count` units in `stacks` stacks of a scan item that went, or
+--- nil when it has none to count: no price, or it went to a binding or back to its sender (the
+--- window's total leaves those out too). All of it went: the scan's own figure. Part of it (a
+--- stopped run, a skipped stack): valued again for what went, since postage and deposits go by
+--- the stack, not by the unit (Codex review, 2026-11-09).
+function Mailer.GainOf(item, count, stacks)
+    local r = item.result
+    if type(r) ~= "table" or r.to or tonumber(r.gain) == nil then return nil end
+    if count == item.count and stacks == item.stacks then return r.gain end
+    local part = setmetatable({ count = count, stacks = stacks }, { __index = item })
+    local ok, again = pcall(function() return ns.Valuation.Evaluate(part, item.price, ns.Bags.CurrentSettings()) end)
+    if ok and type(again) == "table" and tonumber(again.gain) then return again.gain end
+    return nil
 end
 
 --- The last run's receipt (see `finish`), or nil: none yet, a run is on, or it was dismissed.
@@ -411,7 +435,7 @@ function Mailer.Start(items, bankAlt)
     state.run = state.run + 1
     state.busy, state.mails, state.bankAlt = true, mails, bankAlt
     state.sent, state.stacks, state.skipped, state.waiting = 0, 0, 0, nil
-    state.stayed, state.receipt, state.stopRequested = {}, nil, nil
+    state.stayed, state.receipt, state.stopRequested, state.pending = {}, nil, nil, nil
     ns.Log.Add("mailer", "start: %d mail(s) to %s", #mails, Mailer.Recipients(mails))
     sendNext(1)
     return true
@@ -421,6 +445,8 @@ function Mailer.Stop(reason)
     if not state.busy then return end
     -- Give back what this run attached, unless a mail is already on its way.
     if not state.waiting and sendTabShown() then pcall(ClearSendMail) end
+    -- A mail still with the game may yet go: its answer is credited when it comes (MAIL_SEND_SUCCESS).
+    state.pending = state.waiting and state.mails and state.mails[state.waiting] or nil
     state.busy, state.waiting, state.stopRequested = false, nil, nil
     finish(tostring(reason))
     setStatus("Stopped after %d of %d mail(s): %s.", state.sent, #(state.mails or {}), tostring(reason))
@@ -437,11 +463,9 @@ function Mailer.RequestStop(reason)
     setStatus("Stopping after mail %d of %d...", state.waiting, #state.mails)
 end
 
-ns.On("MAIL_SEND_SUCCESS", function()
-    if not state.busy or not state.waiting then return end
-    local index = state.waiting
-    local mail = state.mails[index]
-    state.waiting = nil
+-- A mail the game confirmed: counted, remembered (`mailed`), logged (the mail ledger) and, for a
+-- guild rule's, counted for the guild.
+local function credit(mail)
     state.sent = state.sent + 1
     state.stacks = state.stacks + #mail.attached
     mail.sent = true
@@ -465,6 +489,28 @@ ns.On("MAIL_SEND_SUCCESS", function()
         local okCount, err = pcall(ns.Contributions.Count, mail.to, guild)
         if not okCount then ns.Log.Add("mailer", "contributions error: %s", tostring(err)) end
     end
+end
+
+ns.On("MAIL_SEND_SUCCESS", function()
+    if not state.busy then
+        -- The run was stopped (combat, the mailbox closed, no answer in time) while a mail was
+        -- with the game, and the game now says it went: it is counted and logged like any other,
+        -- and the receipt corrected (Codex review, 2026-11-09: before, it went unrecorded).
+        local mail = state.pending
+        if not mail then return end
+        state.pending = nil
+        credit(mail)
+        ns.Log.Add("mailer", "MAIL_SEND_SUCCESS after the stop: the mail to %s is counted", tostring(mail.to))
+        local why = state.receipt and state.receipt.stopped or "stopped"
+        finish(why)
+        setStatus("Stopped after %d of %d mail(s): %s.", state.sent, #(state.mails or {}), why)
+        return
+    end
+    if not state.waiting then return end
+    local index = state.waiting
+    local mail = state.mails[index]
+    state.waiting = nil
+    credit(mail)
     ns.Log.Add("mailer", "MAIL_SEND_SUCCESS for mail %d", index)
     if state.stopRequested then
         if index >= #state.mails then return sendNext(index + 1) end -- it was the last one: all sent
@@ -474,6 +520,7 @@ ns.On("MAIL_SEND_SUCCESS", function()
     after(Mailer.DELAY, function() sendNext(index + 1) end)
 end)
 ns.On("MAIL_FAILED", function()
+    state.pending = nil -- the mail a stopped run left with the game didn't go
     if state.busy then
         pcall(ClearSendMail)
         Mailer.Stop("the game refused the mail (MAIL_FAILED)")
@@ -486,5 +533,5 @@ ns.On("MAIL_CLOSED", function() Mailer.Stop("the mailbox closed") end)
 ns.On("PLAYER_REGEN_DISABLED", function() Mailer.Stop("combat") end)
 ns.On("PLAYER_LOGIN", function() Mailer.Prune() end)
 ns.On("MAIL_SHOW", function()
-    if not state.busy then state.status, state.receipt = nil, nil end
+    if not state.busy then state.status, state.receipt, state.pending = nil, nil, nil end
 end)
