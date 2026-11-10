@@ -466,11 +466,15 @@ them) then I just keep going to the AH. Same methodology for all crafting materi
 - On `MAIL_CLOSED`: close the preview.
 - Anything the game blocks is recorded (`ADDON_ACTION_FORBIDDEN/BLOCKED`, as
   in LedgerLink) and shown by `/mw report`.
-- **ForeverMail compatibility:** ForeverMail replaces the standard mailbox
-  window, so a button anchored to `MailFrame` may never show for its users.
-  Anchor to whichever mail window is visible (ForeverMail's frame if present,
-  found via the probe) and fall back to a free-floating button near the
-  mailbox UI.
+- **ForeverMail and Kerzo Postal Suite: not supported** (operator, 2026-11-09: "we dont need
+  to support them. lets out compete them instead"). Both replace the mailbox window. Their
+  code was read (ForeverMail 1.0.46, Kerzo Postal Suite 3.6): each keeps `MailFrame` shown
+  at alpha 0 with the mouse off and shows its own window on `UIParent`, so Mailworthy's
+  button and window, children of `InboxFrame` / `SendMailFrame`, are invisible beside them.
+  No anchoring to their frames and no second attach path for them. Not checked in game, and
+  open as a Mailworthy bug rather than as support: when either addon shows `SendMailFrame`
+  (ForeverMail's Send tab, Kerzo's compose window), auto-open would open the window
+  invisibly with Send enabled.
 
 ## Item locks
 
@@ -686,7 +690,7 @@ realm+faction, name history, settings, blocked actions) and
 | **0 - Discovery** | LedgerLink `/rl probe` S5 (ledger-link PR #28, released in v1.3.0) and S6 (PR #29); repo, CI, packaging | the S5 + S6 report is back and its answers are in README "Beta unknowns" |
 | **1 - Prices + valuation** | `Prices`, `Valuation`, `Bags`; `/mw scan` shows what would be mailed and why, with the numbers (sends nothing). **Built**, in-game check pending | `/mw scan` agrees with a hand calculation on real bags |
 | **2 - Settings + characters** | settings panel, minimap button, bank alt picker with history and auto-complete, disenchant checkbox default, thresholds, fees | bank alt survives `/reload` and relog (the beta's SavedVariables bug), and every settings control works with the gamepad alone. **Built**, in-game check pending |
-| **3 - Mailbox + mailing** | mailbox button (opens settings when not set up), preview with recipient + Settings button, one press sends every batch (chained). **Built**, in-game check pending | 30+ items reach the bank alt in under 3 presses, with nothing locked, bound or unpriced sent; works with ForeverMail installed |
+| **3 - Mailbox + mailing** | mailbox button (opens settings when not set up), preview with recipient + Settings button, one press sends every batch (chained). **Built**, in-game check pending | 30+ items reach the bank alt in under 3 presses, with nothing locked, bound or unpriced sent |
 | **4 - Item locks** | **done** in alpha5 (Alt+click, L3, blue glow; rows in the Mailworthy window since Phase 3); no never-mail list (operator, 2026-10-13: locks cover it) | locked items never appear in the preview's mail list |
 | **4c - Bank alt view** | tags on the bank alt's bag slots (recomputed with fresh prices), tooltip lines with the original reason, summary window | tags match a hand calculation with fresh prices; a changed verdict shows both. **Built** (`BankAlt.lua`), in-game check pending |
 | **5 - Polish** | self-test removed, `/mw report` instead; blocked-action chat line once per session; tooltip lines on every character via the "tags everywhere" setting; description matches what shipped. **Built**; v1.0 check pending | tagged release installs cleanly |
@@ -722,7 +726,8 @@ it, is in [DISCOVERY-SESSION-2.md](DISCOVERY-SESSION-2.md) (U1-U20).
 
 | Addon | Overlap | Difference |
 |---|---|---|
-| [ForeverMail](https://www.curseforge.com/wow/addons/forevermail) (Forever, active) | rule-based auto-mailing with a queue | rules per item, not by value; no disenchant, slot locks or controller; replaces the mailbox window |
+| [ForeverMail](https://www.curseforge.com/wow/addons/forevermail) (Forever, active) | rule-based auto-mailing with a queue | rules per item, not by value; no disenchant or slot locks; its own controller navigation; replaces the mailbox window (not supported beside Mailworthy) |
+| [Kerzo Postal Suite](https://www.curseforge.com/wow/addons/kerzo-postal-suite) (Retail + Forever, active) | rule-based auto-mailing offered when the mailbox opens | rules per item or category, not by value; no disenchant, locks or controller; replaces the mailbox window (not supported beside Mailworthy) |
 | [Larlen Mail Mule](https://www.curseforge.com/wow/addons/larlen-mail-mule) (Retail) | mails Auctionator-priced items to bank alts, queues mails | Retail only; no vendor/fee comparison, disenchant, locks or controller |
 | [MuleMate](https://www.curseforge.com/wow/addons/mulemate) (Classic Era) | AH-after-cut vs 110% of vendor, prepares one mail for a bank alt | Classic Era only; player clicks Send per mail; no disenchant, locks or controller |
 | [AuctionWorthy](https://www.curseforge.com/wow/addons/auctionworthy) (Classic Era) | vendor vs AH (deposit + cut) on tooltips | tooltips only, no mailing; similar name, `/worthy` |

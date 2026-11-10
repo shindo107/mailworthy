@@ -3,7 +3,7 @@
 # and the in-game AddOns-list icon (Mailworthy/Textures/Icon.tga: 64x64,
 # uncompressed 32-bit, the TGA variant the WoW client loads reliably), and
 # media/ui-prototype.html, media/bank-alt-prototype.html, media/bindings-prototype.html and
-# media/ux-pass-prototype.html, media/guild-template-prototype.html, media/qol-prototype.html and media/compat-prototype.html to PNGs, and the CurseForge gallery (media/gallery/*.html,
+# media/ux-pass-prototype.html, media/guild-template-prototype.html and media/qol-prototype.html to PNGs, and the CurseForge gallery (media/gallery/*.html,
 # authored at 1280x720 and rendered at 1.25x = 1600x900).
 # Needs Google Chrome (headless rendering) and Python 3 with Pillow.
 # Usage: tools/build-icons.sh
@@ -38,8 +38,7 @@ render media/bindings-prototype.html 1180 850 media/bindings-prototype.png
 render media/ux-pass-prototype.html 1580 1290 media/ux-pass-prototype.png
 render media/guild-template-prototype.html 1760 1300 media/guild-template-prototype.png
 render media/qol-prototype.html 1660 2100 media/qol-prototype.png
-render media/compat-prototype.html 1600 2040 media/compat-prototype.png
-echo "media/ui-prototype.png, media/bank-alt-prototype.png, media/bindings-prototype.png, media/ux-pass-prototype.png, media/guild-template-prototype.png, media/qol-prototype.png, media/compat-prototype.png"
+echo "media/ui-prototype.png, media/bank-alt-prototype.png, media/bindings-prototype.png, media/ux-pass-prototype.png, media/guild-template-prototype.png, media/qol-prototype.png"
 for page in media/gallery/*.html; do
   render "$page" 1280 720 "${page%.html}.png" 1.25
 done
