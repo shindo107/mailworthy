@@ -37,6 +37,7 @@ must never break the game.
 | **Bindings UI** (binding rows in the mail window, the friends window) | [media/bindings-prototype.html](../media/bindings-prototype.html) -> [.png](../media/bindings-prototype.png) |
 | **UX pass** (current layout of the mailbox, settings and friends windows, 2026-11-06) | [media/ux-pass-prototype.html](../media/ux-pass-prototype.html) -> [.png](../media/ux-pass-prototype.png) |
 | **Guild template UI** (member and guild master views, 2026-11-07) | [media/guild-template-prototype.html](../media/guild-template-prototype.html) -> [.png](../media/guild-template-prototype.png) |
+| **Quality-of-life pass** (prototype only, nothing built; operator's picks 2026-11-09: controller reach to Send (chosen: D-pad Up from the top row jumps to Send), Stop and a receipt, postage check, Choose bank alt on the To line, two-way pagers, locked items window, settings redraw the list, own-crafter binding offer, mailbox-trip line, button names by controller: Xbox and Steam Deck) | [media/qol-prototype.html](../media/qol-prototype.html) -> [.png](../media/qol-prototype.png) |
 | **CurseForge gallery** (5 images of the shipped UI, 2026-11-07; keep them in step when a window changes) | [media/gallery/](../media/gallery/) (`*.html` -> `*.png`, 1600x900) |
 | CurseForge description (paste into the project page) | [media/curseforge-description.html](../media/curseforge-description.html) |
 | Wiki pages carried with a PR (copied into the GitHub wiki after merge) | [docs/wiki/](wiki/README.md) |
