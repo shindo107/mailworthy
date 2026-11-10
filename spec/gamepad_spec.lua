@@ -139,6 +139,21 @@ describe("controller names", function()
         end)
     end
 
+    it("redraws the Inbox hint and the bag hint when the input device changes with the mailbox open (Codex review)", function()
+        WowStub.state.gamepadUI = true
+        ns.Fire("MAIL_SHOW")
+        ns.PadKey.RefreshHint()
+        assert.equal("[R1] to Send Mail, then [Triangle]", ns.MailButton.InboxHint())
+        WowStub.state.labelStyle = "Letters"
+        ns.Fire("INPUT_DEVICE_INTERFACE_TRANSITION")
+        assert.equal("[RB] to Send Mail, then [Y]", ns.MailButton.InboxHint())
+        assert.equal("Mailworthy [Y]", _G.MailworthyMailButton.text)
+        assert.equal("[LS] Mailworthy: lock / unlock item", ns.PadKey.BagHint())
+        WowStub.state.gamepadUI = false
+        ns.Fire("INPUT_DEVICE_INTERFACE_TRANSITION")
+        assert.equal("", ns.MailButton.InboxHint(), "back to the mouse: no hint")
+    end)
+
     it("mouse / keyboard: no controller hint beside the Inbox button", function()
         ns.Fire("MAIL_SHOW")
         assert.equal("", ns.MailButton.InboxHint())

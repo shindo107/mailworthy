@@ -119,3 +119,5 @@ ns.On("ADDON_LOADED", function(name)
     if name == "Blizzard_MailFrame" then MailButton.Create() end
 end)
 ns.On("MAIL_SHOW", function() MailButton.Refresh() end)
+-- Mouse to controller (or another controller's icons) with the mailbox open: redraw the symbols.
+ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", function() MailButton.Refresh() end)
