@@ -41,6 +41,8 @@ local function showTooltip(self)
     GameTooltip:AddLine("Mailworthy")
     GameTooltip:AddLine("Click: settings. Drag: move this button.", 1, 1, 1)
     GameTooltip:AddLine("Bank alt: " .. tostring(ns.Config.BankAlt() or "none"), 1, 1, 1)
+    local trip = ns.Trip.TooltipText() -- bags nearly full and something would be mailed (Trip.lua)
+    if trip then GameTooltip:AddLine(trip, 0.4, 1, 0.4) end
     GameTooltip:Show()
 end
 
