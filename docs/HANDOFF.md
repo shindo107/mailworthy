@@ -58,11 +58,11 @@ must never break the game.
 | `Log.lua` | account-wide diagnostics log (300 lines, trimmed 50 at a time; each line dated `MM-DD HH:MM:SS` since rl-companion reads it from the SavedVariables file) |
 | `Blocked.lua` | records `ADDON_ACTION_FORBIDDEN/BLOCKED` blamed on Mailworthy, with the last command; chat line |
 | `Characters.lua` | known characters (name "First Surname", realm, faction, class, level, professions); `Mailable()` = same realm+faction; SavedVariables marker per login/reload |
-| `Gamepad.lua` | read-only helpers: button symbols (`labelStyle`, `CreateAtlasMarkup`), API presence |
+| `Gamepad.lua` | read-only helpers: button symbols (`Glyph`: `CreateAtlasMarkup` of Blizzard's icon for the active controller), button names for chat by `labelStyle` (`Name` / `NameFor` / `Fill` with `{PADRSHOULDER}` marks: R1 / L3 / Triangle for "Shapes", R / LS / X for "Reverse", RB / LS / Y otherwise), API presence |
 | `Locks.lua` | **item locks** (by item ID, per character; follow the item; slot locks migrate); Alt+click via `hooksecurefunc("HandleModifiedItemClick")`; L3 via read-only `SmartNavigation:GetCurrentButton()` |
 | `Border.lua` | blue glow on locked items: Blizzard's quest border texture tinted blue, on bag buttons via `hooksecurefunc(frame, "UpdateItems")` on combined + individual bag frames (`RefreshAll` skips closed frames: opening one runs `UpdateItems`); shown only while the Mailworthy window is open (`Border.WindowOpen`: the window's `IsVisible`; `MailWindow` refreshes it from the window's `OnShow` / `OnHide`; operator, 2026-11-07) unless the `glowEverywhere` flag is set; a glowing item's tooltip says why (`Border.TooltipLine`, `TooltipDataProcessor`, switch `slotBorder`); a fresh lock flashes `Border.FLASH` (3 s) anywhere, via `Locks.OnChanged(itemID, locked)`; Forever's `EnumerateValidItems` yields nil buttons up to `GetBagSize()` (v0.22.0 errored on them), so `RefreshFrame` skips them. **The one drawing helper** for any item button: `RefreshButton(button, bag, slot, itemID, wanted, link)` (glow + decorators; decorators get `(button, bag, slot, itemID, link)`), `Clear(button)`, `DrawBagSlot(button, bag, slot, shownID)` (a bag addon's live slot: draws what is in it now, clears it when empty or showing another item), `AddRefresher(fn)` (run by `RefreshAll`) |
 | `BagAddons.lua` | tags + lock glow in **Baganator** (corner widget `mailworthy_lock`: the tag sits on it, so it follows the player's corner; out of every corner = off; "ViewComplete"; legend under its backpack frame, never in its button row, where Baganator calls SetFrameLevel), **Bagnon** (`Bagnon.ContainerItem.Update` post-hook, installed at our ADDON_LOADED: BagBrother copies class methods into buttons when it builds them) **ArkInventory** (`ArkInventory.API.ItemFrameUpdated`) and **BetterBags** (its Events module's `item/Updated` / `item/Clearing` messages, drawn on the decoration button); live slots only (another character's bags cleared), legend under each bag window; switches `baganatorTags`, `bagnonTags`, `arkInventoryTags`, `betterBagsTags`; `/mw report` "bag addon: ..." lines. Picked by CurseForge downloads with a Forever build (2026-11-08) |
-| `MailButton.lua` | "Mailworthy" button under the mail window on both tabs (children of InboxFrame / SendMailFrame, created at login); `Activate` toggles the window; controller on the Inbox gets an "R1 first" hint (we never switch tabs) |
+| `MailButton.lua` | "Mailworthy" button under the mail window on both tabs (children of InboxFrame / SendMailFrame, created at login); `Activate` toggles the window; controller on the Inbox gets an "R1 first" hint in its own controller's names (`InboxHintLine`; we never switch tabs) |
 | `Nav.lua` | Mailworthy's **own** controller navigation for its window: nearest button within 45 degrees, top-left start, gold highlight; `Nav.Follow` (PadKey's watcher, every tick) keeps the highlight on the window on top and returns to the opener's button when that window closes (`Resume`) |
 | `PadKey.lua` | Mailworthy's **own override bindings** (watcher every 0.1 s, re-apply when replaced, clear on focus loss, at `PLAYER_REGEN_DISABLED` and when the interface hides, Alt+Z): set `mail` (Triangle), `window` (Triangle, D-pad, Cross, Circle), `bags` (L3 lock) |
 | `Prices.lua` | Auctionator adapter (`Lookup`: AH price per unit, age in days, exact, disenchant; nil without a price source), TradeSkillMaster adapter (`Source()`: "Auctionator" wins, else "TSM", else nil; `LookupTSM`: `TSM_API.GetCustomPriceValue` DBMinBuyout capped by DBMarket, no age / history; `SourceText()` for settings and `/mw report`), disenchant value from Siz DisenchantValue (`DisenchantValueOf`: `DisenchantValueAPI.GetValue(link)`, else Auctionator's call; `deSource`), vendor price (`GetItemInfo` 11th return), class ID, `DisenchantAddon()` / `DisenchantAddonInstalled()` (Siz DisenchantValue by its API table, Disenchantry by `DisenchantryDB`) |
@@ -541,6 +541,18 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   Later the same day the operator ruled "Yes, share in hellos": each character tells its guild its own
   counts (G2, GUILD only), and the export carries heard guildmates too, each giver with `asOf` (Raid
   Ledger keeps the freshest). Raid Ledger ruled that an empty template exports `rules = []`.
+- **Controller names follow the controller** (QoL pass, package C, item 13; operator, 2026-11-09:
+  "Yes, add it"). Mailworthy typed PlayStation words. Now a window or tooltip draws the game's
+  icon (`Gamepad.Glyph`: the Inbox hint's shoulder button, the lock glow tooltip's left stick
+  press) and a chat line (`/mw help`, the Inbox hint line) names the key by `Gamepad.LabelStyle()`:
+  R1 / L3 / Triangle for "Shapes", RB / LS / Y otherwise. A Steam Deck gets the Xbox names (asked,
+  not answered: the default stands; the game has no Deck icon set). "Reverse" (Switch) gets
+  R / LS / X, not Y: Blizzard draws a Switch's top button as X (`gamepad-switch-128x-face-x`), so
+  "Y" would name the wrong button. Key strings from Blizzard's `GamepadConstants.lua`. No callback
+  on `InputDeviceIconSetManager` (a registration on a Blizzard object): hints pick the new icons up
+  at their next redraw (`MAIL_SHOW`, `INPUT_DEVICE_INTERFACE_TRANSITION`). Log lines and the
+  `padTriangle` switch keep their words (identifiers, not button prompts). Left for package B:
+  `UI.InboxSendText` in `MailWindow.lua` still says "Send Mail tab: R1". Only "Shapes" seen in game.
 
 ## 7. State right now
 

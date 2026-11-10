@@ -193,7 +193,12 @@ end
 function PadKey.RefreshHint()
     if not PadKey.bagHint then return end
     PadKey.bagHint:SetText(ns.MailButton.GamepadUI()
-        and (ns.Gamepad.Glyph("PADLSTICK", 14) .. " Mailworthy: lock / unlock item") or "")
+        and (ns.Gamepad.Glyph(ns.Gamepad.STICK_LEFT_PRESS, 14) .. " Mailworthy: lock / unlock item") or "")
+end
+
+--- The hint under the bags as drawn ("" for mouse / keyboard, or with padLock off).
+function PadKey.BagHint()
+    return PadKey.bagHint and PadKey.bagHint:GetText() or ""
 end
 
 function PadKey.Report()

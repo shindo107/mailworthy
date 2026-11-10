@@ -602,7 +602,13 @@ _G.GameTooltip = newWidget("GameTooltip", "GameTooltip")
 _G.SmartNavigation = { GetCurrentButton = function() return s().navButton end }
 _G.C_GamePad = {
     GetActiveDeviceID = function() return 5 end,
-    GetDeviceMappedState = function() return { labelStyle = "Shapes" } end,
+    -- state.labelStyle: "Shapes" (PlayStation, the default: the one seen in game), "Letters" /
+    -- "Generic" (Xbox), "Reverse" (Switch); false = no mapped device.
+    GetDeviceMappedState = function()
+        local style = s().labelStyle
+        if style == false then return nil end
+        return { labelStyle = style or "Shapes" }
+    end,
 }
 
 WowStub.reset()
