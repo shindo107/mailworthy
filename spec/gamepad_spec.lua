@@ -1,7 +1,8 @@
 -- Controller button names follow the player's controller (QoL pass, package C): a window or a
 -- tooltip draws the game's own icon (Gamepad.Glyph), a chat line names the key by the active
 -- device's label style (Gamepad.Name): "Shapes" = PlayStation, "Letters" / "Generic" = Xbox,
--- "Reverse" = Switch. No controller, an unknown style and a Steam Deck get the Xbox names.
+-- "Reverse" = Switch. A Switch controller (operator, 2026-11-09: "Use Xbox names"), no controller,
+-- an unknown style and a Steam Deck get the Xbox names.
 local loadAddon = require("spec.support.load_addon")
 
 -- style (false = no mapped device) -> right shoulder, top face, left stick press
@@ -9,7 +10,7 @@ local STYLES = {
     { style = "Shapes", shoulder = "R1", top = "Triangle", stick = "L3" },
     { style = "Letters", shoulder = "RB", top = "Y", stick = "LS" },
     { style = "Generic", shoulder = "RB", top = "Y", stick = "LS" },
-    { style = "Reverse", shoulder = "R", top = "X", stick = "LS" },
+    { style = "Reverse", shoulder = "RB", top = "Y", stick = "LS" },
     { style = "SomethingNew", shoulder = "RB", top = "Y", stick = "LS" },
     { style = false, shoulder = "RB", top = "Y", stick = "LS" },
 }
@@ -36,12 +37,12 @@ describe("controller names", function()
         assert.equal("PADLSTICK", ns.Gamepad.STICK_LEFT_PRESS)
     end)
 
-    it("names the face buttons per style: a Switch controller's letters are mirrored", function()
+    it("names the face buttons per style: a Switch controller gets the Xbox letters", function()
         assert.same({ "Cross", "Circle", "Square", "Triangle" }, { ns.Gamepad.NameFor("Shapes", "PAD1"),
             ns.Gamepad.NameFor("Shapes", "PAD2"), ns.Gamepad.NameFor("Shapes", "PAD3"), ns.Gamepad.NameFor("Shapes", "PAD4") })
         assert.same({ "A", "B", "X", "Y" }, { ns.Gamepad.NameFor("Letters", "PAD1"),
             ns.Gamepad.NameFor("Letters", "PAD2"), ns.Gamepad.NameFor("Letters", "PAD3"), ns.Gamepad.NameFor("Letters", "PAD4") })
-        assert.same({ "B", "A", "Y", "X" }, { ns.Gamepad.NameFor("Reverse", "PAD1"),
+        assert.same({ "A", "B", "X", "Y" }, { ns.Gamepad.NameFor("Reverse", "PAD1"),
             ns.Gamepad.NameFor("Reverse", "PAD2"), ns.Gamepad.NameFor("Reverse", "PAD3"), ns.Gamepad.NameFor("Reverse", "PAD4") })
         assert.equal("PADSOCIAL", ns.Gamepad.NameFor("Shapes", "PADSOCIAL"), "a key without a name: the key itself")
     end)

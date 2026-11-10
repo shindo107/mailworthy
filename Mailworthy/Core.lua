@@ -94,7 +94,7 @@ ns.On("PLAYER_LOGIN", function()
 end)
 
 -- {KEY} marks become the names on the player's own controller when the list is printed
--- (R1 / Triangle / L3, RB / Y / LS, R / X / LS: Gamepad.Fill).
+-- (R1 / Triangle / L3 or RB / Y / LS: Gamepad.Fill).
 local HELP = {
     "At a mailbox: open the Send Mail tab and the Mailworthy window opens (the Mailworthy button under the mail window"
         .. " toggles it). Controller: Send Mail tab ({PADRSHOULDER}); {PAD4} closes and reopens it.",

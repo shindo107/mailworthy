@@ -32,7 +32,7 @@ function MailButton.GamepadUI()
 end
 
 --- Pure but for the controller read: the chat line for a controller on the Inbox, in the names
---- of the player's own controller (R1 / Triangle, RB / Y, R / X: Gamepad.Name).
+--- of the player's own controller (R1 / Triangle or RB / Y: Gamepad.Name).
 function MailButton.InboxHintLine(autoOpen)
     return ns.Gamepad.Fill(autoOpen and "Switch to the Send Mail tab ({PADRSHOULDER}): Mailworthy opens there."
         or "Switch to the Send Mail tab ({PADRSHOULDER}), then press {PAD4} or the Mailworthy button.")
