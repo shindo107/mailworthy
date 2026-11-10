@@ -91,6 +91,12 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   `/mw feature comms off` stops them), and the mail goes to **whichever of their characters
   has the profession**: the friend when they do, their crafter alt when they don't, and the
   friend when nothing is known. Never their bank alt. The window names the recipient.
+- **A crafter of your own:** when your bags hold what another character of yours crafts with (cloth
+  for your tailor, green gear for your enchanter) and no binding takes it, the mailbox window offers
+  one: "Sadie Ember is your enchanter (skill 140). Send them the 3 items that disenchant instead?"
+  **Bind** makes an ordinary binding, and the list shows the items going to them before you press
+  Send; **Not for Sadie** stops the offer for that character and profession. Never your bank alt, and
+  never a profession this character has itself. `/mw feature crafterOffer off` turns it off.
 - **Who runs Mailworthy:** wherever Mailworthy's windows name a player (the friends and guild
   windows, the "To:" lines at the mailbox, the ledger, the bank alt picker), the Mailworthy icon
   follows the name when that player runs Mailworthy too (their Mailworthy said hello, one of

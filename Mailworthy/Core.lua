@@ -27,7 +27,7 @@ end
 -- can be isolated with /mw feature <name> off + /reload instead of a new build.
 ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
-    minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
+    minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true, crafterOffer = true,
     tiers = true, tierCheck = true, guildTemplate = true, ledger = true, questNeeds = true, autoOpen = true,
     returnToSender = true, bankAltMail = true, peerMark = true, versionNotice = true, tripNudge = true,
     baganatorTags = true, bagnonTags = true, arkInventoryTags = true, betterBagsTags = true, auctionatorTags = true,
@@ -115,7 +115,7 @@ local HELP = {
     "/mw summary - on your bank alt (or without one): what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
         .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail"
-        .. "|peerMark|versionNotice|tripNudge"
+        .. "|peerMark|versionNotice|tripNudge|crafterOffer"
         .. "|baganatorTags|bagnonTags|arkInventoryTags|betterBagsTags|auctionatorTags> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",

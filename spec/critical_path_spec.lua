@@ -1002,6 +1002,93 @@ describe("critical path: mailing", function()
         assert.truthy(ns.Mailer.Status():find("postage for mail 2", 1, true), ns.Mailer.Status())
     end)
 
+    -- A crafter of your own (QoL pass F, 2026-11-09): the window offers a binding to a known
+    -- character of this account. A new way a recipient gets added, so: only once the player
+    -- pressed Bind, only as previewed after that, and never when the offer was left or declined.
+    local SADIE = "Sadie Ember"
+    local function ownEnchanter()
+        MailworthyDB.characters[ns.Characters.Key(SADIE, "Classic Beta PvP", "Alliance")] = {
+            name = SADIE, realm = "Classic Beta PvP", faction = "Alliance", class = "MAGE", level = 30,
+            professions = { { name = "Enchanting", skillLine = ENCHANTING, rank = 140 } },
+        }
+    end
+    local function sentTo(name)
+        local n = 0
+        for _, mail in ipairs(WowStub.state.sent) do if mail.name == name then n = n + 1 end end
+        return n
+    end
+
+    it("an own-crafter offer accepted (mouse): previewed to that character, then exactly that is sent", function()
+        ownEnchanter()
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local offer = ns.MailWindow.Offer()
+        assert.truthy(offer, "the green robes would go to this account's enchanter")
+        assert.equal(SADIE, offer.name)
+        for _, to in pairs(previewed(ns)) do assert.are_not.equal(SADIE, to, "offered, not bound: nothing goes there yet") end
+        _G.MailworthyMailOfferBind:Click()
+        local preview = previewed(ns)
+        assert.equal(SADIE, preview[6515], "the list shows the robes going to her before anything is sent")
+        for _, item in ipairs(offer.items) do assert.equal(SADIE, preview[item.itemID]) end
+        local toSadie = 0
+        for _, to in pairs(preview) do if to == SADIE then toSadie = toSadie + 1 end end
+        assert.equal(offer.count, toSadie, "Bind took what the offer said, no more")
+        assert.truthy(table.concat(ns.MailWindow.Texts().to, "\n"):find(SADIE, 1, true), "named on a To: line")
+        assert.is_nil(ns.MailWindow.Offer(), "bound: no second offer for the same profession")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [SADIE] = true })
+        assert.is_true(sentTo(SADIE) >= 1)
+    end)
+
+    it("an own-crafter offer accepted (controller): Cross on Bind, then Send mails as previewed", function()
+        ownEnchanter()
+        WowStub.state.gamepadUI = true
+        WowStub.state.activeFrame = MailFrame
+        mailbox()
+        local watcher = _G.MailworthyPadWatcher
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        _G.MailworthyPadTriangle:Click()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        assert.is_true(_G.MailworthyMailOfferBind:IsShown())
+        ns.Nav.Select(_G.MailworthyMailOfferBind)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        local preview = previewed(ns)
+        assert.equal(SADIE, preview[6515])
+        ns.Nav.Select(_G.MailworthyMailSend)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [SADIE] = true })
+    end)
+
+    it("an own-crafter offer left alone, or declined: nothing ever goes to that character", function()
+        ownEnchanter()
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.truthy(ns.MailWindow.Offer())
+        local preview = previewed(ns)
+        _G.MailworthyMailSend:Click() -- the offer is on screen and was not pressed
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+        assert.equal(0, sentTo(SADIE))
+        assert.equal(0, ns.Routes.Count(), "no binding was made")
+        -- Declined: gone for good for that character and profession, and still nothing goes there.
+        WowStub.setBag(0, 8, WowStub.item(6515, "Spellbinder Robes", { quality = 2, sell = 300, class = 4, level = 20 }))
+        ns.Fire("BAG_UPDATE_DELAYED")
+        assert.truthy(ns.MailWindow.Offer())
+        _G.MailworthyMailOfferNot:Click()
+        assert.is_nil(ns.MailWindow.Offer())
+        assert.is_false(_G.MailworthyMailOfferBind:IsShown())
+        preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[6515])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assert.equal(0, sentTo(SADIE))
+        assert.equal(0, ns.Routes.Count())
+    end)
+
     it("bags that change after the preview: Send re-reads them, and a slot that changes mid-run is skipped", function()
         local pants = function() return WowStub.item(6125, "Brawler's Pants", { bound = true, quality = 2, sell = 300, class = 4 }) end
         mailbox()
