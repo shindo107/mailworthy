@@ -74,6 +74,7 @@ end
 local function pageOf(list, rows, key)
     local count = math.max(1, math.ceil(#list / rows))
     if pages[key] > count then pages[key] = 1 end
+    if pages[key] < 1 then pages[key] = count end -- back from the first page: the last
     return pages[key], count
 end
 
@@ -155,6 +156,10 @@ local function createBindingRows()
         pages.bind = pages.bind + 1
         UI.Refresh()
     end, "MailworthyFriendsBindPage")
+    W.PagerBack(frame, bindPage, "MailworthyFriendsBindPageBack", function()
+        pages.bind = pages.bind - 1
+        UI.Refresh()
+    end)
     addButton = W.Button(frame, "Add a binding...", 140, function()
         target = view == "guild" and "guild" or "me"
         view, picked = "add", nil
@@ -215,6 +220,10 @@ local function createAdd()
         pages.cand = pages.cand + 1
         UI.Refresh()
     end, "MailworthyFriendsPage")
+    W.PagerBack(frame, candPage, "MailworthyFriendsPageBack", function()
+        pages.cand = pages.cand - 1
+        UI.Refresh()
+    end)
     candPage:SetPoint("TOPRIGHT", -130, -42)
     chosenLabel = W.Label(frame, "GameFontHighlightSmall")
     chosenLabel:SetPoint("TOPLEFT", 28, LIST_TOP - 2)

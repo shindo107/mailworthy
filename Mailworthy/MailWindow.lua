@@ -43,7 +43,7 @@ local renderedInbox
 local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, stayHead, stayCount, mailPage, stayPage
 local guildButton
 local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine, owedLine, owedButton, skipAltButton
-local returnButton, summaryButton
+local returnButton, summaryButton, chooseAltButton
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
@@ -192,7 +192,7 @@ function UI.Recipients(totals, bankAlt, isBankAlt, skipped)
     local several = #recipients > 1
     local lines = {}
     local function bankLine(each)
-        local note = isBankAlt and "sell it here" or (bankAlt and "your bank alt" or "optional: Settings")
+        local note = isBankAlt and "sell it here" or (bankAlt and "your bank alt" or "optional")
         if skipped and bankAlt and not isBankAlt then note = "your bank alt · skipped this time" end
         if several and each and bankAlt and not isBankAlt then note = note .. " · " .. mailsText(each.mails) end
         local name = isBankAlt and "|cffaaaaaaThis is your bank alt: what's worth selling stays|r"
@@ -441,6 +441,11 @@ local function createRouteRows()
         UI.Refresh()
     end, "MailworthyMailSkipBankAlt")
     skipAltButton:Hide()
+    -- No bank alt yet: the way to pick one, where Skip once would sit (QoL pass, 2026-11-09).
+    chooseAltButton = W.Button(frame, "Choose bank alt...", 150, function()
+        ns.SettingsUI.Show(frame, "pick")
+    end, "MailworthyMailChooseAlt")
+    chooseAltButton:Hide()
     for i = 1, UI.ROUTE_ROWS do
         local row = {}
         row.text = W.Label(frame, "GameFontHighlightSmall")
@@ -528,15 +533,19 @@ local function fillRoutes()
     return shown
 end
 
+-- A list's pager: "<" and "2/5  >", each a button (QoL pass, 2026-11-09: two-way; forward-only
+-- before). Past the last page comes the first, before the first the last.
 local function pageButton(name, list)
-    local b = W.Button(frame, "", 70, function()
+    local function turn(by)
         local rows = list == "mail" and UI.MAIL_ROWS or UI.STAY_ROWS
         local items = result and result[list == "mail" and "mail" or "keep"] or {}
         local count = math.max(1, math.ceil(#items / rows))
-        pages[list] = pages[list] % count + 1
+        pages[list] = (pages[list] - 1 + by) % count + 1
         UI.Refresh(true)
-    end, name)
+    end
+    local b = W.Button(frame, "", 70, function() turn(1) end, name)
     b:Hide()
+    W.PagerBack(frame, b, name .. "Back", function() turn(-1) end)
     return b
 end
 
@@ -622,6 +631,16 @@ function UI.Create()
     frame:HookScript("OnHide", hideTooltip)
     ns.Nav.Attach(frame)
     ns.Nav.OnSelect(onNavSelect)
+    -- The controller's shortcut to Send: Up from the top row lands on it (operator, 2026-11-09:
+    -- "B: Up jumps"), and Down from the bottom row goes back to the top.
+    -- Only from the window's own top and bottom rows (Nav.AtEdge): a button in the middle with
+    -- nothing straight above it stays where it is, so a stray Up never lands on Send or Stop.
+    ns.Nav.SetWrap(frame, function(dir)
+        if not ns.Nav.AtEdge(dir) then return nil end
+        if dir == "up" and sendButton:IsShown() and sendButton:IsEnabled() then return sendButton end
+        if dir == "down" then return true end
+        return nil
+    end)
     ns.Log.Add("ui", "mail window created%s", type(send) == "table" and " under SendMailFrame" or "")
     return frame
 end
@@ -816,7 +835,10 @@ function UI.Refresh(keepScan)
     at(skipAltButton, -20, -44, "TOPRIGHT")
     if isBankAlt then summaryButton:Show() else summaryButton:Hide() end
     at(summaryButton, -20, -44, "TOPRIGHT")
-    at(toNote, (canSkip or isBankAlt) and -112 or -26, -52, "TOPRIGHT")
+    local canChoose = recipients[1].bank and bankAlt == nil and not isBankAlt and not ns.Mailer.Busy()
+    if canChoose then chooseAltButton:Show() else chooseAltButton:Hide() end
+    at(chooseAltButton, -20, -44, "TOPRIGHT")
+    at(toNote, canChoose and -178 or (canSkip or isBankAlt) and -112 or -26, -52, "TOPRIGHT")
     local more, foldRows = 0, 1
     for i, line in ipairs(toLines) do
         local r = recipients[i + 1]
@@ -868,12 +890,18 @@ function UI.Refresh(keepScan)
     pageLabel(stayPage, result.keep, UI.STAY_ROWS)
     -- The hint gives way to the pager on a long list (they share the heading line).
     if shown.mail > 0 and not mailPage:IsShown() then mailHint:Show() else mailHint:Hide() end
+    mailEmpty:SetText(UI.EmptyText(bankAlt ~= nil or isBankAlt))
     if shown.mail > 0 then mailEmpty:Hide() else mailEmpty:Show() end
     for _, w in ipairs({ stayHead, stayCount }) do
         if shown.stay > 0 then w:Show() else w:Hide() end
     end
 
     local line, note = UI.TotalText(result)
+    -- No bank alt and nothing going: what one would get, and how to get there.
+    if bankAlt == nil and not isBankAlt and #result.mail == 0 then
+        local heldLine, heldNote = UI.NoAltText(result.keep, ns.Config.Flag("tagsEverywhere") == true)
+        if heldLine then line, note = heldLine, heldNote end
+    end
     totalLine:SetText(line)
     totalNote:SetText(note)
     -- While sending (and after), the mailer's progress or problem takes the fees line.
@@ -1016,9 +1044,33 @@ function UI.Changed(shown, fresh, previewAlt, freshAlt, stayed)
     return changed
 end
 
---- Pure: the greyed-out Send button's text on the Inbox (the controller reaches Send Mail with R1).
+--- The greyed-out Send button's text on the Inbox (the controller reaches Send Mail with its
+--- right shoulder button: R1 / RB, by the player's controller).
 function UI.InboxSendText(pad)
-    return pad and "Send Mail tab: R1" or "Click Send Mail"
+    return pad and ("Send Mail tab: " .. ns.Gamepad.Name(ns.Gamepad.SHOULDER_RIGHT)) or "Click Send Mail"
+end
+
+--- Pure: the line under "Mailing" when nothing goes.
+function UI.EmptyText(hasBankAlt)
+    return hasBankAlt and "Nothing worth mailing in your bags right now."
+        or "Nothing to mail without a bank alt or a binding."
+end
+
+--- Pure: the total box with no bank alt, when a bank alt would get something (`keep`: the scan's
+--- Staying list; the held share has result.held): "+79s 61c would go to a bank alt" and what to
+--- do. nil when nothing is held. `tags`: the bags carry the tags on this character.
+function UI.NoAltText(keep, tags)
+    local items, gain = 0, 0
+    for _, item in ipairs(keep or {}) do
+        if item.result and item.result.held then
+            items, gain = items + 1, gain + (tonumber(item.result.gain) or 0)
+        end
+    end
+    if items == 0 then return nil end
+    local head = gain > 0 and ("+" .. money(gain) .. " would go to a bank alt")
+        or string.format("%d item%s would go to a bank alt", items, items == 1 and "" or "s")
+    return head, "Pick one and this list is ready to send"
+        .. (tags and "; until then your bags carry the AH / DE / V tags." or ".")
 end
 
 --- Pure: the Send button's text and whether it can be pressed (media/qol-prototype.png). `s`:

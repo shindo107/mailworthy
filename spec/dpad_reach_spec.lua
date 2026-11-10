@@ -102,7 +102,63 @@ describe("D-pad reach in every view", function()
         WowStub.state.numSlots[1] = 16
         ns.MailWindow.Refresh()
         assert.is_true(_G.MailworthyMailPage:IsVisible(), "the Mailing list's page button")
-        assertNavigable("mailbox window, several pages", 10)
+        assert.is_true(_G.MailworthyMailPageBack:IsVisible(), "and its way back")
+        assertNavigable("mailbox window, several pages", 11)
+        -- No bank alt: Choose bank alt... sits on the To line.
+        ns.Config.ClearBankAlt()
+        ns.MailWindow.Refresh()
+        assert.is_true(_G.MailworthyMailChooseAlt:IsVisible())
+        assertNavigable("mailbox window, no bank alt", 5)
+        ns.Routes.Remove(ns.Routes.List()[1].key)
+        ns.Routes.Remove(ns.Routes.List()[1].key)
+        ns.MailWindow.Refresh()
+        assert.is_true(_G.MailworthyMailChooseAlt:IsVisible())
+        assertNavigable("mailbox window, no bank alt, no bindings", 3)
+    end)
+
+    it("the Send shortcut: Up from the top row lands on Send, Down from the bottom row leads back, the middle stays put", function()
+        MailFrame:Show()
+        SendMailFrame:Show()
+        WowStub.state.activeFrame = MailFrame
+        ns.Routes.Add(BOB, ENCHANTING)
+        ns.Routes.Add("Ann Other", 197)
+        ns.MailWindow.Show("send")
+        tick()
+        local send = _G.MailworthyMailSend
+        assert.is_true(send:IsEnabled())
+        local candidates = ns.Nav.Candidates()
+        local start = ns.Nav.TopLeft(candidates).button
+        local top, bottom = -math.huge, math.huge
+        for _, c in ipairs(candidates) do top, bottom = math.max(top, c.y), math.min(bottom, c.y) end
+        local jumped, stayed = 0, 0
+        for _, c in ipairs(candidates) do
+            local name = tostring(c.button:GetName())
+            if not ns.Nav.Pick(c, candidates, "up") then
+                ns.Nav.Select(c.button)
+                ns.Nav.Move("up")
+                if c.y >= top - 2 then
+                    assert.equal(send, ns.Nav.Current(), "Up from the top row: " .. name)
+                    jumped = jumped + 1
+                else -- nothing in its cone above, but not the top row (Codex review): no jump to Send
+                    assert.equal(c.button, ns.Nav.Current(), "Up from the middle: " .. name)
+                    stayed = stayed + 1
+                end
+            end
+            if not ns.Nav.Pick(c, candidates, "down") then
+                ns.Nav.Select(c.button)
+                ns.Nav.Move("down")
+                if c.y <= bottom + 2 then
+                    assert.equal(start, ns.Nav.Current(), "Down from the bottom row: " .. name)
+                else
+                    assert.equal(c.button, ns.Nav.Current(), "Down from the middle: " .. name)
+                end
+            end
+        end
+        assert.is_true(jumped >= 1, "no top-row button was tried")
+        -- The binding rows' Skip once (right-hand, mid-window) is the case Codex found.
+        ns.Nav.Select(_G.MailworthyMailSkip1)
+        ns.Nav.Move("up")
+        assert.are_not.equal(send, ns.Nav.Current(), "Up from a binding's Skip once never lands on Send")
     end)
 
     it("the mailbox window opened on the Inbox, and the report box", function()
@@ -133,6 +189,10 @@ describe("D-pad reach in every view", function()
         ns.RoutesUI.Show()
         tick()
         assertNavigable("friends list", 6)
+        for i, prof in ipairs({ 164, 165, 171, 186 }) do ns.Routes.Add("Friend Number" .. i, prof) end
+        ns.RoutesUI.Refresh()
+        assert.is_true(_G.MailworthyFriendsBindPageBack:IsVisible(), "the bindings list's two-way pager")
+        assertNavigable("friends list, several pages", 7)
         _G.MailworthyFriendsAdd:Click()
         tick()
         assertNavigable("friends add, step 1", 3)
@@ -153,6 +213,12 @@ describe("D-pad reach in every view", function()
         ns.LedgerUI.Show()
         tick()
         assertNavigable("ledger", 2)
+        for i = 1, 8 do
+            store.players["friend " .. i] = { name = "Friend " .. i, received = 100 * i, sent = 0, inItems = {}, outItems = {}, at = 1 }
+        end
+        ns.LedgerUI.Refresh()
+        assert.is_true(_G.MailworthyLedgerPageBack:IsVisible(), "the ledger's two-way pager")
+        assertNavigable("ledger, several pages", 4)
         ns.LedgerUI.Frame():Hide()
         ns.BankAlt.ShowWindow()
         tick()

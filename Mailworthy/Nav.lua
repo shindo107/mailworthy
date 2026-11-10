@@ -124,12 +124,40 @@ function Nav.Reset()
     Nav.Select(first and first.button or nil)
 end
 
+--- Is the highlighted button on the window's edge that way: no button at all further up (or
+--- down, left, right), whatever the angle? Nav.Pick finding nothing is not that: a button in the
+--- middle of a window can have none inside its 45-degree cone (Codex review, 2026-11-09).
+function Nav.AtEdge(dir)
+    local d = Nav.DIRECTIONS[dir]
+    local candidates = Nav.Candidates()
+    local from = current and entryFor(current, candidates)
+    if not d or not from then return false end
+    for _, c in ipairs(candidates) do
+        if (c.x - from.x) * d[1] + (c.y - from.y) * d[2] > 2 then return false end
+    end
+    return true
+end
+
+local wraps = setmetatable({}, { __mode = "k" })
+--- Where the highlight goes in `frame` when a D-pad press finds no button that way:
+--- `fn(dir, button)` returns a button of the window (taken only while it shows), true for the
+--- top-left one, or nil to stay put (QoL pass, 2026-11-09: in the mail window Up from the top
+--- row lands on Send, Down from the bottom row goes back to the top).
+function Nav.SetWrap(frame, fn) wraps[frame] = fn end
+
 function Nav.Move(dir)
     local candidates = Nav.Candidates()
     local from = current and entryFor(current, candidates)
     if not from then return Nav.Reset() end
     local nextEntry = Nav.Pick(from, candidates, dir)
-    if nextEntry then Nav.Select(nextEntry.button) end
+    if nextEntry then return Nav.Select(nextEntry.button) end
+    local root = Nav.Root()
+    local wrap = root and wraps[root]
+    if not wrap then return end
+    local ok, target = pcall(wrap, dir, current)
+    if not ok then return ns.Log.Add("nav", "wrap error: %s", tostring(target)) end
+    if target == true then return Nav.Reset() end
+    if type(target) == "table" and target ~= current and entryFor(target, candidates) then Nav.Select(target) end
 end
 
 function Nav.Press()

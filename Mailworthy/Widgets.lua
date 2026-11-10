@@ -181,3 +181,14 @@ function Widgets.Footer(pad, marked, sep)
     if pad then parts[#parts + 1] = Widgets.Legend() end
     return table.concat(parts, sep or "    ")
 end
+
+--- The "<" of a two-way pager (QoL pass, 2026-11-09): a small button left of a list's page button
+--- (`nextButton`, whose text is "2/5  >"), shown and hidden with it. Create it at login.
+function Widgets.PagerBack(parent, nextButton, name, onClick)
+    local b = Widgets.Button(parent, "<", 26, onClick, name)
+    b:SetPoint("RIGHT", nextButton, "LEFT", -4, 0)
+    b:Hide()
+    nextButton:HookScript("OnShow", function() b:Show() end)
+    nextButton:HookScript("OnHide", function() b:Hide() end)
+    return b
+end

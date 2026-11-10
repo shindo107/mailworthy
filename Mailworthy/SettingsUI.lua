@@ -91,6 +91,7 @@ function UI.Choose(name)
         setView("main")
     end
     UI.Refresh()
+    if saved and ns.MailWindow then ns.MailWindow.RefreshIfShown() end -- the list now has somewhere to go
 end
 
 --- "This character is my bank alt": the character receiving the mail says so itself
@@ -213,17 +214,24 @@ end
 
 -- Main view: what gets mailed, in your bags, more -------------------------------------
 
+-- A setting changed: this window, and the mail list beside it, which it decides (QoL pass,
+-- 2026-11-09; before, the list only followed when Settings closed).
+local function changed()
+    UI.Refresh()
+    if ns.MailWindow then ns.MailWindow.RefreshIfShown() end
+end
+
 local function stepper(y, key, name)
     local text = add(mainWidgets, W.Label(frame, "GameFontHighlight"))
     text:SetPoint("TOPLEFT", 28, y - 4)
     local minus = add(mainWidgets, W.Button(frame, "-", 32, function()
         ns.Config.Step(key, -1)
-        UI.Refresh()
+        changed()
     end, "MailworthySettings" .. name .. "Down"))
     minus:SetPoint("TOPLEFT", 302, y)
     local plus = add(mainWidgets, W.Button(frame, "+", 32, function()
         ns.Config.Step(key, 1)
-        UI.Refresh()
+        changed()
     end, "MailworthySettings" .. name .. "Up"))
     plus:SetPoint("TOPLEFT", 340, y)
     return text
@@ -232,7 +240,7 @@ end
 local function toggle(width, name, onClick)
     return add(mainWidgets, W.Button(frame, "", width, function()
         onClick()
-        UI.Refresh()
+        changed()
     end, "MailworthySettings" .. name))
 end
 
@@ -246,7 +254,7 @@ local function createRule()
     for i, hours in ipairs(ns.Valuation.DURATION_HOURS) do
         local b = add(mainWidgets, W.Button(frame, hours .. "h", 56, function()
             ns.Config.Set("duration", i)
-            UI.Refresh()
+            changed()
         end, "MailworthySettingsDuration" .. i))
         b:SetPoint("TOPLEFT", 196 + (i - 1) * 60, -180)
         durationButtons[i] = b
@@ -460,10 +468,11 @@ end
 
 --- Opens on the settings (a bank alt is optional: Choose... picks one).
 --- `opener`: the Mailworthy window whose button opened it (placed beside that), or nil (centred).
-function UI.Show(opener)
+--- `startView`: "pick" opens on choosing the bank alt (the mail window's Choose bank alt...).
+function UI.Show(opener, startView)
     if not frame then UI.Create() end
     W.PlaceBeside(frame, opener)
-    setView("main")
+    setView(startView == "pick" and "pick" or "main")
     UI.Refresh()
     frame:Show()
     frame:Raise()
