@@ -171,7 +171,10 @@ end
 function UI.Show(opener)
     if not frame then UI.Create() end
     W.PlaceBeside(frame, opener)
-    page, unlocked, busyNote = 1, {}, false
+    -- Pressed again while open (Settings' button): the rows unlocked here stay, with their Lock
+    -- buttons (Codex review: the undo for an item that is not in the bags went with them).
+    if not frame:IsShown() then page, unlocked = 1, {} end
+    busyNote = false
     UI.Refresh()
     frame:Show()
     frame:Raise()
@@ -185,6 +188,8 @@ end
 ns.On("PLAYER_LOGIN", function()
     UI.Create()
     ns.Locks.OnChanged(UI.RefreshIfShown)
+    -- A send ended: the "locks can't change" hint goes at once (Codex review), not at the next press.
+    ns.Mailer.OnChanged(UI.RefreshIfShown)
 end)
 -- The counts follow the bags (an item banked, looted or used while the window is open).
 ns.On("BAG_UPDATE_DELAYED", UI.RefreshIfShown)
