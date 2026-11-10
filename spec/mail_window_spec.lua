@@ -934,7 +934,9 @@ describe("mail window", function()
         it("the offer's words", function()
             local T = ns.MailWindow.OfferText
             assert.equal("|cffffd100Sadie Ember is your enchanter|r (skill 140). Send them the 3 items that disenchant instead?",
-                T({ name = SADIE, profession = 333, skill = 140, count = 3 }))
+                T({ name = SADIE, profession = 333, skill = 140, count = 3, gearOnly = true }))
+            assert.equal("|cffffd100Sadie Ember is your enchanter|r. Send them the 2 items they craft with instead?",
+                T({ name = SADIE, profession = 333, count = 2, gearOnly = false }), "dust isn't disenchanted (Codex review)")
             assert.equal("|cffffd100Sadie Ember is your blacksmith|r. Send them the 1 item they craft with instead?",
                 T({ name = SADIE, profession = 164, count = 1 }))
             assert.equal("|cffffd100Sadie Ember has First Aid|r (skill 75). Send them the 2 items they craft with instead?",
@@ -987,6 +989,64 @@ describe("mail window", function()
             _G.MailworthyMailButton:Click()
             assert.is_nil(ns.MailWindow.Offer())
             assert.is_false(_G.MailworthyMailOfferBind:IsShown())
+        end)
+
+        describe("counts what Bind would really do (Codex review)", function()
+            local function offered() return ns.Routes.Offer(ns.Bags.Evaluate(), ns.Config.BankAlt()) end
+            local function rowsTo(name)
+                local n = 0
+                for _, it in ipairs(ns.Bags.Evaluate().mail) do if it.result.to == name then n = n + 1 end end
+                return n
+            end
+
+            it("an item staying today that the binding would take is counted, so the offer never understates", function()
+                _G.Auctionator = nil -- no price source: the green robes stay, a binding still takes them
+                character(SADIE, { { name = "Enchanting", skillLine = 333, rank = 140 } })
+                WowStub.setBag(0, 4, WowStub.item(10940, "Strange Dust", { count = 5, sell = 5, class = 7, subclass = 12 }))
+                WowStub.setBag(0, 5, WowStub.item(6515, "Spellbinder Robes", { quality = 2, sell = 300, class = 4, level = 20 }))
+                local offer = offered()
+                assert.equal(SADIE, offer.name)
+                assert.is_false(offer.gearOnly)
+                assert.truthy(ns.Routes.Add(offer.name, offer.profession))
+                assert.equal(offer.count, rowsTo(SADIE), "what Bind diverts is what the offer said")
+            end)
+
+            it("a binding in force that wins the item leaves nothing to offer", function()
+                local skill = ns.Routes.Skill
+                ns.Routes.Skill = function(route) return route.to == SADIE and 40 or 10 end -- Bob the engineer is lower
+                ns.Routes.Add("Bob Surname", 202)
+                assert.is_nil(offered(), "lowest skill first: the ore is Bob's")
+                ns.Routes.Skill = skill
+            end)
+
+            it("the crafter's real skill decides, not only the saved rank", function()
+                local skill = ns.Routes.Skill
+                assert.truthy(offered())
+                ns.Routes.Skill = function() return 300 end -- the roster knows better: long past copper
+                local past = offered()
+                ns.Routes.Skill = skill
+                assert.is_nil(past)
+            end)
+
+            it("a binding that would be redirected to another character isn't offered", function()
+                local recipient = ns.Routes.Recipient
+                ns.Routes.Recipient = function() return "Roknua Themicrulah", true end
+                local redirected = offered()
+                ns.Routes.Recipient = recipient
+                assert.is_nil(redirected)
+            end)
+
+            it("a bank alt saved with its realm is still the bank alt", function()
+                character("Roknua Themicrulah", { { skillLine = 164, rank = 10 } })
+                MailworthyDB.characters[ns.Characters.Key(SADIE, "Classic Beta PvP", "Alliance")] = nil
+                assert.is_nil(ns.Routes.Offer(ns.Bags.Evaluate(), "Roknua Themicrulah-Classic Beta PvP"))
+            end)
+
+            it("a full list of this character's own bindings doesn't stop an account one being offered", function()
+                for i = 1, ns.Routes.MAX do ns.Routes.Add("Friend Number" .. i, "MAGE", { scope = "character" }) end
+                assert.equal(ns.Routes.MAX, ns.Routes.Count())
+                assert.truthy(offered())
+            end)
         end)
 
         it("one at a time, the one that takes the most rows; hidden while a send runs", function()

@@ -1030,6 +1030,9 @@ describe("critical path: mailing", function()
         local preview = previewed(ns)
         assert.equal(SADIE, preview[6515], "the list shows the robes going to her before anything is sent")
         for _, item in ipairs(offer.items) do assert.equal(SADIE, preview[item.itemID]) end
+        local toSadie = 0
+        for _, to in pairs(preview) do if to == SADIE then toSadie = toSadie + 1 end end
+        assert.equal(offer.count, toSadie, "Bind took what the offer said, no more")
         assert.truthy(table.concat(ns.MailWindow.Texts().to, "\n"):find(SADIE, 1, true), "named on a To: line")
         assert.is_nil(ns.MailWindow.Offer(), "bound: no second offer for the same profession")
         _G.MailworthyMailSend:Click()

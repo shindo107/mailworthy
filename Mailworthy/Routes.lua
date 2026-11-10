@@ -642,13 +642,23 @@ function Routes.DismissOffer(name, profession) dismissals()[offerKey(name, profe
 function Routes.OfferDismissed(name, profession) return dismissals()[offerKey(name, profession)] == true end
 
 --- The binding to offer for a scan (Bags.Evaluate's result), or nil: { name, profession, skill,
---- count (list rows it would take), items }. One at a time: the one that takes the most rows.
+--- count (list rows it would take), items, gearOnly }. One at a time: the one that takes the most.
 --- Never this character, the bank alt (`bankAlt`), a profession this character has itself (it
---- keeps those materials), a profession any binding already names, or a dismissed pair; only
---- items no binding takes today (the bank alt's share, mailed or held), by the same rule a real
---- binding follows (Routes.Divert: hard keeps, the price cap, the crafter's skill).
+--- keeps those materials), a profession any binding already names, or a dismissed pair.
+---
+--- The count is what Bind would really do (Codex review, 2026-11-09): every item of the scan is
+--- run through Routes.Divert with the bindings in force plus the offered one, as the next scan
+--- will, so another binding that wins the item (lower skill, its cap), the crafter's real skill
+--- (Routes.Skill: the roster's or their Mailworthy's, not only the saved rank), the price cap and
+--- the hard keeps all count; and an item staying today that the binding would take counts too.
+--- A binding whose mail would be redirected to another character (Routes.Recipient) isn't offered.
 function Routes.Offer(scan, bankAlt)
-    if type(scan) ~= "table" or #Routes.Personal() >= Routes.MAX then return nil end
+    if type(scan) ~= "table" then return nil end
+    local account = 0
+    for _, r in ipairs(Routes.Personal()) do
+        if r.scope == "account" then account = account + 1 end
+    end
+    if account >= Routes.MAX then return nil end -- Bind adds an account binding: its own limit
     local settings = scan.settings or {}
     local taken = {}
     for _, p in ipairs(type(settings.professions) == "table" and settings.professions or {}) do
@@ -657,15 +667,18 @@ function Routes.Offer(scan, bankAlt)
     for _, r in ipairs(Routes.List()) do
         if r.profession then taken[tonumber(r.profession)] = true end
     end
+    -- Each item with the verdict it has before any binding (a held or diverted one is valued again).
     local items = {}
-    for _, item in ipairs(scan.mail or {}) do
-        if item.result and not item.result.to then items[#items + 1] = item end
-    end
-    for _, item in ipairs(scan.keep or {}) do
-        if item.result and item.result.held then items[#items + 1] = item end
+    for _, list in ipairs({ scan.mail or {}, scan.keep or {} }) do
+        for _, item in ipairs(list) do
+            local ok, verdict = pcall(ns.Valuation.Evaluate, item, item.price, settings)
+            if ok and type(verdict) == "table" then items[#items + 1] = { item = item, verdict = verdict } end
+        end
     end
     if #items == 0 then return nil end
-    local me, alt = tostring(ns.PlayerName()):lower(), bankAlt and tostring(bankAlt):lower() or nil
+    local me = tostring(ns.PlayerName()):lower()
+    local alt = tostring(Routes.Clean(bankAlt) or ""):lower()
+    local active = Routes.Active()
     local best
     for _, entry in ipairs(ns.Characters.Mailable()) do
         local name = Routes.Clean(entry.name)
@@ -674,18 +687,26 @@ function Routes.Offer(scan, bankAlt)
             for _, p in ipairs(entry.professions or {}) do
                 local id = tonumber(p.skillLine)
                 if id and Routes.ProfessionName(id) and not taken[id] and not Routes.OfferDismissed(name, id) then
-                    local route = { to = name, profession = id, skill = tonumber(p.rank), cap = Routes.DEFAULT_CAP,
-                        scope = "account" }
-                    local offer = { name = name, profession = id, skill = tonumber(p.rank), count = 0, items = {} }
-                    for _, item in ipairs(items) do
-                        local ok, verdict = pcall(Routes.Divert, item, item.result, item.price, settings, { route })
-                        if ok and verdict then
+                    local route = { to = name, profession = id, cap = Routes.DEFAULT_CAP, scope = "account" }
+                    route.key = Routes.KeyOf(route)
+                    route.skill = Routes.Skill(route) or tonumber(p.rank)
+                    local routes = { route }
+                    for _, r in ipairs(active) do routes[#routes + 1] = r end
+                    local offer = { name = name, profession = id, skill = route.skill, count = 0, items = {}, gearOnly = true }
+                    local redirected = false
+                    for _, it in ipairs(items) do
+                        local ok, verdict = pcall(Routes.Divert, it.item, it.verdict, it.item.price, settings, routes)
+                        if ok and verdict and verdict.key == route.key then
+                            if tostring(verdict.to):lower() ~= lower then redirected = true end
                             offer.count = offer.count + 1
-                            offer.items[#offer.items + 1] = item
+                            offer.items[#offer.items + 1] = it.item
+                            local class = tonumber(it.item.classID)
+                            if class ~= 2 and class ~= 4 then offer.gearOnly = false end
                         end
                     end
-                    if offer.count > 0 and (not best or offer.count > best.count or (offer.count == best.count
-                            and (offer.name < best.name or (offer.name == best.name and id < best.profession)))) then
+                    if offer.count > 0 and not redirected and (not best or offer.count > best.count
+                            or (offer.count == best.count
+                                and (offer.name < best.name or (offer.name == best.name and id < best.profession)))) then
                         best = offer
                     end
                 end

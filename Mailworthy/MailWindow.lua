@@ -1088,7 +1088,8 @@ function UI.OfferText(o)
     local who = craft and string.format("%s is your %s", o.name, craft)
         or string.format("%s has %s", o.name, tostring(ns.Routes.ProfessionName(o.profession)))
     local what = string.format("%d item%s %s", o.count, o.count == 1 and "" or "s",
-        o.profession == ns.Routes.ENCHANTING and (o.count == 1 and "that disenchants" or "that disenchant")
+        -- "that disenchant" only when every one is gear: dust and recipes are not disenchanted.
+        o.profession == ns.Routes.ENCHANTING and o.gearOnly and (o.count == 1 and "that disenchants" or "that disenchant")
             or "they craft with")
     return string.format("|cffffd100%s|r%s. Send them the %s instead?", who,
         o.skill and string.format(" (skill %d)", o.skill) or "", what)
