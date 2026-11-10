@@ -116,6 +116,26 @@ describe("D-pad reach in every view", function()
         assertNavigable("mailbox window, no bank alt, no bindings", 3)
     end)
 
+    it("the mailbox window with an own-crafter offer: Bind and Not for <name>", function()
+        MailworthyDB.characters[ns.Characters.Key("Sadie Ember", "Classic Beta PvP", "Alliance")] = {
+            name = "Sadie Ember", realm = "Classic Beta PvP", faction = "Alliance", class = "MAGE", level = 30,
+            professions = { { name = "Tailoring", skillLine = 197, rank = 60 } },
+        }
+        WowStub.setBag(0, 3, WowStub.item(2592, "Wool Cloth", { count = 10, sell = 5, class = 7, subclass = 5 }))
+        MailFrame:Show()
+        SendMailFrame:Show()
+        WowStub.state.activeFrame = MailFrame
+        ns.MailWindow.Show("send")
+        tick()
+        assert.is_true(_G.MailworthyMailOfferBind:IsVisible(), "the offer shows (cloth for this account's tailor)")
+        assert.is_true(_G.MailworthyMailOfferNot:IsVisible())
+        assertNavigable("mailbox window with an offer", 6)
+        ns.Routes.Add(BOB, ENCHANTING)
+        ns.MailWindow.Refresh()
+        assert.is_true(_G.MailworthyMailOfferBind:IsVisible())
+        assertNavigable("mailbox window with an offer and a binding", 8)
+    end)
+
     it("the Send shortcut: Up from the top row lands on Send, Down from the bottom row leads back, the middle stays put", function()
         MailFrame:Show()
         SendMailFrame:Show()
