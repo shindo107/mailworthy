@@ -93,10 +93,12 @@ ns.On("PLAYER_LOGIN", function()
     if ns.Log then ns.Log.Add("feature", "at login: %s", ns.Features.Describe()) end
 end)
 
+-- {KEY} marks become the names on the player's own controller when the list is printed
+-- (R1 / Triangle / L3, RB / Y / LS, R / X / LS: Gamepad.Fill).
 local HELP = {
     "At a mailbox: open the Send Mail tab and the Mailworthy window opens (the Mailworthy button under the mail window"
-        .. " toggles it). Controller: Send Mail tab (R1); Triangle (Y) closes and reopens it.",
-    "Lock an item (it stays locked wherever it moves): Alt+click it, or L3 in your bags (controller).",
+        .. " toggles it). Controller: Send Mail tab ({PADRSHOULDER}); {PAD4} closes and reopens it.",
+    "Lock an item (it stays locked wherever it moves): Alt+click it, or {PADLSTICK} in your bags (controller).",
     "Locked items glow blue while the Mailworthy window is open (settings: always); a new lock glows a moment anywhere."
         .. " In the Mailworthy window, pressing an item locks or unlocks it.",
     "/mw or /mw settings - bank alt, minimum gain, disenchant, listing length, keep your professions' materials"
@@ -120,7 +122,7 @@ local HELP = {
 
 local function showHelp()
     ns.Print("v" .. ns.VERSION .. " - commands (/mw or /mailworthy):")
-    for _, line in ipairs(HELP) do print("  " .. line) end
+    for _, line in ipairs(HELP) do print("  " .. ns.Gamepad.Fill(line)) end
 end
 
 function ns.HandleSlash(msg)

@@ -17,8 +17,23 @@ Gamepad.FACE_BOTTOM = "PAD1" -- Cross / A
 Gamepad.FACE_RIGHT = "PAD2" -- Circle / B
 Gamepad.FACE_LEFT = "PAD3" -- Square / X
 Gamepad.FACE_TOP = "PAD4" -- Triangle / Y
+Gamepad.SHOULDER_RIGHT = "PADRSHOULDER" -- R1 / RB
+Gamepad.STICK_LEFT_PRESS = "PADLSTICK" -- L3 / LS
 
-local NAMES = { PAD1 = "Cross/A", PAD2 = "Circle/B", PAD3 = "Square/X", PAD4 = "Triangle/Y", PADLSTICK = "L3" }
+-- What each controller calls a key, for chat lines (a window or tooltip draws the game's icon:
+-- Gamepad.Glyph). The key strings are Blizzard's (Blizzard_SharedXML/Shared/GamepadConstants.lua:
+-- GAMEPAD_FACE_*, GAMEPAD_SHOULDER_RIGHT, GAMEPAD_STICK_LEFT_PRESS); the styles are its four icon
+-- sets (InputIcons/InputIconTexture.lua), which it picks by the active device's labelStyle
+-- (InputDeviceIconSetManager.lua): "Shapes" = PlayStation, "Letters" / "Generic" = Xbox,
+-- "Reverse" = Switch, whose face letters are mirrored (Blizzard draws its top button as X,
+-- "gamepad-switch-128x-face-x", and its right shoulder as R).
+local XBOX = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y", PADRSHOULDER = "RB", PADLSTICK = "LS" }
+local NAMES = {
+    Shapes = { PAD1 = "Cross", PAD2 = "Circle", PAD3 = "Square", PAD4 = "Triangle", PADRSHOULDER = "R1", PADLSTICK = "L3" },
+    Letters = XBOX,
+    Generic = XBOX,
+    Reverse = { PAD1 = "B", PAD2 = "A", PAD3 = "Y", PAD4 = "X", PADRSHOULDER = "R", PADLSTICK = "LS" },
+}
 
 local function get(path)
     local v = _G
@@ -40,8 +55,26 @@ function Gamepad.LabelStyle()
     return ok2 and type(state) == "table" and state.labelStyle or nil
 end
 
+--- Pure: the name of a key on a controller with this label style. Any style Mailworthy doesn't
+--- know, and no style at all (no controller, a Steam Deck, which the game gives no icon set of
+--- its own), gets the Xbox names.
+function Gamepad.NameFor(style, key)
+    local names = NAMES[style] or XBOX
+    return names[key] or XBOX[key] or tostring(key)
+end
+
+--- The name of a key on the player's controller, for a chat line: "R1" / "RB" / "R".
+function Gamepad.Name(key)
+    return Gamepad.NameFor(Gamepad.LabelStyle(), key)
+end
+
+--- Pure: a chat line with its {KEY} marks ("{PADRSHOULDER}") replaced by the controller's names.
+function Gamepad.Fill(text)
+    return (tostring(text):gsub("{(%u[%u%d]*)}", function(key) return Gamepad.Name(key) end))
+end
+
 --- The controller's symbol for a key as inline text (a texture markup string;
---- nothing is registered), or "[Triangle/Y]" if the game can't draw it.
+--- nothing is registered), or its name in brackets ("[Triangle]") if the game can't draw it.
 function Gamepad.Glyph(key, size)
     size = size or 16
     local atlasFor = get("InputIconTextureSetUtility.GetNormalActiveInputIconButtonTexture")
@@ -52,7 +85,7 @@ function Gamepad.Glyph(key, size)
             if ok2 and markup then return markup end
         end
     end
-    return "[" .. (NAMES[key] or key) .. "]"
+    return "[" .. Gamepad.Name(key) .. "]"
 end
 
 Gamepad.API = {

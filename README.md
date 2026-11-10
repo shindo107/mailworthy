@@ -15,14 +15,14 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - **Preview first:** it shows the recipient, what goes and why, what stays and
   why, and a **Settings** button to fix anything before you press Send.
 - **Keyboard/mouse first, controller too:** everything works with keyboard and mouse, and with a gamepad alone.
-- **Lock items** you never want mailed: Alt+click (mouse) or L3 in your bags (controller); the lock follows the item.
+- **Lock items** you never want mailed: Alt+click (mouse) or L3 / LS (press the left stick) in your bags (controller); the lock follows the item.
 - **Every bag counts:** backpack, bags 1-4 (profession bags too) and the reagent bag.
 
 ## Using it
 
 - **At a mailbox:** click the **Send Mail** tab and the Mailworthy window opens beside it
-  (or click **Mailworthy** under the mail window; controller: R1 to the Send Mail tab opens
-  it, Triangle closes and reopens it). Opened on the Inbox, its Send button is greyed out and says "Click Send Mail". The window shows who gets the mail, what goes and why,
+  (or click **Mailworthy** under the mail window; controller: R1 (RB on an Xbox controller) to the Send Mail tab opens
+  it, Triangle (Y) closes and reopens it; Mailworthy's own hints draw your controller's buttons). Opened on the Inbox, its Send button is greyed out and says "Click Send Mail". The window shows who gets the mail, what goes and why,
   what stays and why, and the total gain. **Send** mails it all in one press, 12 stacks
   per mail. Pressing an item locks it, so it stays. **Skip once** beside your bank alt keeps
   its share in the bags for this visit (bindings still go). Hovering an item says what the
@@ -40,7 +40,7 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - **Quests come first:** an item an active quest asks for (Crisp Spider Meat for Redridge
   Goulash, not only "quest items") stays in your bags, is never tagged for the vendor, and
   its tooltip names the quest.
-- **Lock items** you never want mailed: Alt+click (mouse), L3 in your bags (controller),
+- **Lock items** you never want mailed: Alt+click (mouse), L3 / LS in your bags (controller),
   or press the item in the Mailworthy window. Locked items glow blue while the Mailworthy
   window is open at the mailbox (a setting keeps the glow on everywhere), and hovering one
   says why; elsewhere a new lock glows for a moment so you see it took. Locks stay
@@ -315,6 +315,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Guild contributions shared in hellos: `G2\|<asOf>\|<i>/<n>\|<total>\|<since>\|<days back>:<units>;...` on `SendAddonMessage(prefix, text, "GUILD")` only, right after the hello and at `MAIL_CLOSED` after a counted mail; this character's own counts only | two guild members with Mailworthy, one mails a guild rule's materials and closes the mailbox: the other's `/mw report` "guild export: ..., 2 giver(s)" (theirs and the guildmate's) | open (2026-11-08) |
 | Guild contributions' peer list at logout: the guild roster (`C_Club.GetClubMembers` / `GetMemberInfo`, `GetGuildRosterInfo` fallback) read every time the API is called, and on `GUILD_ROSTER_UPDATE` (at most every 10 seconds, with one more read after a burst); at `PLAYER_LOGOUT` the roster and `GetGuildInfo` may already be gone, so the last read of this session stands in for the name passed | log out with LedgerLink: its export carries `mailworthy.peers`; `/mw report` "guild contributions: this guild, N character(s), M unit(s) counted" after a guild rule's mail | open (2026-11-08) |
 | The Mailworthy mark: the addon icon inline after a name (`\|TInterface\AddOns\Mailworthy\Textures\Icon:0\|t`, the same file as the minimap button; a texture escape in our own font strings, no frame) | `/mw friends` with a guild member who runs Mailworthy: the icon after their name, the footer "(icon) runs Mailworthy"; the bank alt's "To:" line at the mailbox | open (2026-11-08) |
+| Controller names that follow the controller (`Gamepad.Name` / `Gamepad.Glyph`): `C_GamePad.GetDeviceMappedState(id).labelStyle` (the value Blizzard's `InputDeviceIconSetManager` picks its icon set by) "Letters" / "Generic" (Xbox: RB, LS, Y in chat) and "Reverse" (Switch: R, LS, X); the icons for `PADRSHOULDER` and `PADLSTICK` from `InputIconTextureSetUtility.GetNormalActiveInputIconButtonTexture` (in every set in Forever's `InputIconTexture.lua`) drawn in the Inbox hint and in the lock glow's tooltip line; what a Steam Deck reports (Mailworthy gives anything else the Xbox names) | with an Xbox or Switch controller, or on a Steam Deck: `/mw help` names RB / LS / Y (R / LS / X on a Switch controller), the Inbox hint under the mail window and a locked item's tooltip show that controller's buttons; `/mw report` gives the label style | open (only "Shapes", a PlayStation controller, has been seen in game: R1, L3, Triangle) |
 
 ## Picking up the work
 

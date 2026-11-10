@@ -61,7 +61,7 @@ describe("mail button", function()
         assert.equal("Mailworthy", _G.MailworthyMailButton.text)
         WowStub.state.gamepadUI = true
         ns.Fire("MAIL_SHOW")
-        assert.equal("Mailworthy [Triangle/Y]", _G.MailworthyMailButton.text)
+        assert.equal("Mailworthy [Triangle]", _G.MailworthyMailButton.text)
     end)
 
     it("can be switched off", function()
