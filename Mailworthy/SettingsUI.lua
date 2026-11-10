@@ -3,7 +3,7 @@
 --     (minimum gain, listing length, disenchant, profession materials, sell what I
 --     gather), "In your
 --     bags" (tags, lock glow) and "More" (friends, guild, bank alt summary, mail ledger,
---     minimap button);
+--     minimap button, locked items);
 --   pick view (Change... / Choose...; a bank alt is optional since 2026-11-08): the known
 --     characters, "This character is my bank alt" (a main on another WoW account),
 --     an optional typed name, Back. Picking saves and returns to the main view.
@@ -27,7 +27,7 @@ local WIDTH, MAIN_HEIGHT, ROW, VERSION_ROW = 420, 522, 26, 20
 local frame, nameBox, nameHint, current, emptyHint, legend, pricesLine, versionLine, changeButton
 local choiceRows = {}
 local amountLabel, pctLabel, disenchantButton, minimapButton, tagsButton, glowButton, matsButton, hereButton, friendsButton
-local gatherButton, guildButton
+local gatherButton, guildButton, locksButton
 local durationButtons = {}
 local mainWidgets, pickWidgets = {}, {}
 local typedLabel, useNameButton, backButton
@@ -305,6 +305,10 @@ local function createBagsAndMore()
         if ns.MinimapButton then ns.MinimapButton.Refresh() end
     end)
     minimapButton:SetPoint("TOPLEFT", 24, -430)
+    -- QoL pass D (2026-11-09): the locked items window; the count is in the label.
+    locksButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.LocksUI.Show(frame) end,
+        "MailworthySettingsLocks"))
+    locksButton:SetPoint("TOPLEFT", 214, -430)
     pricesLine = add(mainWidgets, W.Label(frame, "GameFontDisableSmall"))
     pricesLine:SetPoint("TOPLEFT", 28, -472)
     pricesLine:SetWidth(270)
@@ -434,6 +438,7 @@ local function fillMain(bankAlt, here, choices)
     friendsButton:SetText(bindings == 0 and "Friends..."
         or string.format("Friends (%d binding%s)...", bindings, bindings == 1 and "" or "s"))
     guildButton:SetText(UI.GuildButtonText(ns.Guild.On() and ns.Guild.Mine() ~= nil, ns.Guild.On() and ns.Guild.Template()))
+    locksButton:SetText(ns.LocksUI.ButtonText(ns.Locks.Count()))
     minimapButton:SetText("Minimap button: " .. (ns.Config.MinimapShown() and "shown" or "hidden"))
     W.SetToggled(minimapButton, ns.Config.MinimapShown() == true)
     pricesLine:SetText(UI.PricesText())
@@ -489,5 +494,9 @@ ns.Comms.OnMarksChanged(function()
     if frame and frame:IsShown() then UI.Refresh() end
 end)
 ns.Version.OnChanged(function()
+    if frame and frame:IsShown() then UI.Refresh() end
+end)
+-- The "Locked items (N)..." button counts the locks.
+ns.Locks.OnChanged(function()
     if frame and frame:IsShown() then UI.Refresh() end
 end)

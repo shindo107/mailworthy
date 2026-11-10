@@ -106,7 +106,7 @@ local HELP = {
     "/mw friends - send a profession's materials to a guild member, party member or one of your characters"
         .. " (bindings; the Mailworthy window shows them with Skip once)",
     "/mw guild - your guild's template: turn the guild rules on or off; the guild master and officers edit it",
-    "/mw locks - list this character's locked items",
+    "/mw locks - this character's locked items, each with Unlock (also for an item no longer in your bags)",
     "/mw scan - what Mailworthy would mail and why (sends nothing)",
     "Away from a mailbox: with 4 or fewer bag slots left, one chat line a session says what is worth mailing"
         .. " (the minimap button's tooltip too; /mw feature tripNudge off)",
@@ -135,7 +135,7 @@ function ns.HandleSlash(msg)
     elseif cmd == "feature" then
         featureCommand(rest)
     elseif cmd == "locks" then
-        ns.Locks.PrintList()
+        ns.LocksUI.Show()
     elseif cmd == "friends" or cmd == "bindings" then
         ns.RoutesUI.Show()
     elseif cmd == "guild" then
