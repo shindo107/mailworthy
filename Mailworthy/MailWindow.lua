@@ -44,6 +44,8 @@ local frame, title, toName, toNote, mailHead, mailHint, mailCount, mailEmpty, st
 local guildButton
 local routesHead, totalLine, totalNote, sendButton, settingsButton, legend, staleLine, owedLine, owedButton, skipAltButton
 local returnButton, summaryButton, chooseAltButton
+local offerLine, offerBind, offerNot
+local offer -- the own-crafter binding on offer (Routes.Offer), or nil
 local mailRows, stayRows, routeRows, toLines = {}, {}, {}, {}
 local friendsButton
 local result
@@ -585,6 +587,15 @@ function UI.Create()
     owedLine:Hide()
     owedButton = W.Button(frame, "Ledger...", 90, function() ns.LedgerUI.Show(frame) end, "MailworthyMailLedger")
     owedButton:Hide()
+    -- A crafter of your own (Routes.Offer): the binding on offer, Bind, and "Not for <name>".
+    offerLine = W.Label(frame, "GameFontHighlightSmall")
+    offerLine:SetWidth(WIDTH - 48 - 216)
+    offerLine:SetJustifyH("LEFT")
+    offerLine:Hide()
+    offerBind = W.Button(frame, "Bind", 60, function() UI.AcceptOffer() end, "MailworthyMailOfferBind")
+    offerBind:Hide()
+    offerNot = W.Button(frame, "Not for them", 140, function() UI.DeclineOffer() end, "MailworthyMailOfferNot")
+    offerNot:Hide()
     createRouteRows()
 
     mailHead = W.Label(frame, "GameFontNormal")
@@ -751,6 +762,12 @@ function UI.Layout(n)
         at(owedButton, -24, y + 4, "TOPRIGHT")
         y = y - 30
     end
+    if n.offer then
+        at(offerLine, 24, y + 2)
+        at(offerNot, -24, y + 2, "TOPRIGHT")
+        at(offerBind, -168, y + 2, "TOPRIGHT")
+        y = y - 40
+    end
     if n.routes > 0 then
         at(routesHead, 24, y)
         at(friendsButton, -24, y + 4, "TOPRIGHT")
@@ -877,11 +894,25 @@ function UI.Refresh(keepScan)
     for _, w in ipairs({ owedLine, owedButton }) do
         if owedText then w:Show() else w:Hide() end
     end
+    -- The own-crafter offer: not while a send runs, nor with the switch off.
+    offer = nil
+    if ns.Features.On("crafterOffer") and not ns.Mailer.Busy() then
+        local okOffer, found = pcall(ns.Routes.Offer, result, bankAlt)
+        if okOffer then offer = found else ns.Log.Add("ui", "offer error: %s", tostring(found)) end
+    end
+    if offer then
+        offerLine:SetText(UI.OfferText(offer))
+        offerNot:SetText("Not for " .. firstName(offer.name))
+    end
+    for _, w in ipairs({ offerLine, offerBind, offerNot }) do
+        if offer then w:Show() else w:Hide() end
+    end
     local shown = {
         to = more,
         toRows = foldRows - 1,
         stale = staleText ~= nil,
         owed = owedText ~= nil,
+        offer = offer ~= nil,
         routes = fillRoutes(),
         mail = fillList(mailRows, result.mail, pages.mail, UI.MAIL_ROWS, fillMailRow),
         stay = fillList(stayRows, result.keep, pages.stay, UI.STAY_ROWS, fillStayRow),
@@ -1049,6 +1080,47 @@ end
 function UI.InboxSendText(pad)
     return pad and ("Send Mail tab: " .. ns.Gamepad.Name(ns.Gamepad.SHOULDER_RIGHT)) or "Click Send Mail"
 end
+
+--- Pure: the own-crafter offer's line (Routes.Offer): "Sadie Ember is your enchanter (skill 140).
+--- Send them the 3 items that disenchant instead?"
+function UI.OfferText(o)
+    local craft = ns.Routes.CRAFTER[o.profession]
+    local who = craft and string.format("%s is your %s", o.name, craft)
+        or string.format("%s has %s", o.name, tostring(ns.Routes.ProfessionName(o.profession)))
+    local what = string.format("%d item%s %s", o.count, o.count == 1 and "" or "s",
+        o.profession == ns.Routes.ENCHANTING and (o.count == 1 and "that disenchants" or "that disenchant")
+            or "they craft with")
+    return string.format("|cffffd100%s|r%s. Send them the %s instead?", who,
+        o.skill and string.format(" (skill %d)", o.skill) or "", what)
+end
+
+--- Bind (mouse, or Cross on it): the offer becomes an ordinary personal binding, and the list
+--- redraws with its items going "to <name>" before anything is sent.
+function UI.AcceptOffer()
+    if not offer or ns.Mailer.Busy() then return end
+    ns.lastCommand = "Mailworthy offer Bind"
+    local o = offer
+    local route, why = ns.Routes.Add(o.name, o.profession)
+    if route then
+        ns.Print(string.format("Bound: %s to %s. Check the list, then press Send. Remove it under Bindings or Friends...",
+            ns.Routes.What(route), o.name))
+    else
+        ns.Print("Not bound: " .. tostring(why) .. ".")
+    end
+    ns.Mailer.Dismiss()
+    UI.Refresh()
+end
+
+--- "Not for <name>": this character and profession are never offered again.
+function UI.DeclineOffer()
+    if not offer then return end
+    ns.Routes.DismissOffer(offer.name, offer.profession)
+    ns.Log.Add("ui", "offer declined: %s for %s", tostring(offer.profession), tostring(offer.name))
+    UI.Refresh(true)
+end
+
+--- The binding on offer right now, for specs and the report.
+function UI.Offer() return offer end
 
 --- Pure: the line under "Mailing" when nothing goes.
 function UI.EmptyText(hasBankAlt)

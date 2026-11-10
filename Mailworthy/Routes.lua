@@ -620,6 +620,81 @@ function Routes.Candidates()
     return list
 end
 
+-- A crafter of your own (QoL pass F, operator 2026-11-09: "8"; media/qol-prototype.png) ------
+-- When the scan holds what a known character of this account crafts with, and no binding takes
+-- it, the mail window offers the binding: "Sadie Ember is your enchanter (skill 140). ...". Bind
+-- is an ordinary personal binding (Routes.Add), so the list redraws with "to Sadie" before
+-- anything is sent; "Not for Sadie" is remembered for that character and profession.
+
+Routes.CRAFTER = { [164] = "blacksmith", [202] = "engineer", [165] = "leatherworker", [197] = "tailor",
+    [171] = "alchemist", [333] = "enchanter", [185] = "cook" }
+
+local function dismissals()
+    MailworthyDB.crafterOffers = type(MailworthyDB.crafterOffers) == "table" and MailworthyDB.crafterOffers or {}
+    local key = realmKey()
+    MailworthyDB.crafterOffers[key] = type(MailworthyDB.crafterOffers[key]) == "table" and MailworthyDB.crafterOffers[key] or {}
+    return MailworthyDB.crafterOffers[key]
+end
+local function offerKey(name, profession) return tostring(name):lower() .. "|" .. tostring(tonumber(profession)) end
+
+--- "Not for <name>": never offer this character this profession's materials again.
+function Routes.DismissOffer(name, profession) dismissals()[offerKey(name, profession)] = true end
+function Routes.OfferDismissed(name, profession) return dismissals()[offerKey(name, profession)] == true end
+
+--- The binding to offer for a scan (Bags.Evaluate's result), or nil: { name, profession, skill,
+--- count (list rows it would take), items }. One at a time: the one that takes the most rows.
+--- Never this character, the bank alt (`bankAlt`), a profession this character has itself (it
+--- keeps those materials), a profession any binding already names, or a dismissed pair; only
+--- items no binding takes today (the bank alt's share, mailed or held), by the same rule a real
+--- binding follows (Routes.Divert: hard keeps, the price cap, the crafter's skill).
+function Routes.Offer(scan, bankAlt)
+    if type(scan) ~= "table" or #Routes.Personal() >= Routes.MAX then return nil end
+    local settings = scan.settings or {}
+    local taken = {}
+    for _, p in ipairs(type(settings.professions) == "table" and settings.professions or {}) do
+        taken[tonumber(p.skillLine) or -1] = true
+    end
+    for _, r in ipairs(Routes.List()) do
+        if r.profession then taken[tonumber(r.profession)] = true end
+    end
+    local items = {}
+    for _, item in ipairs(scan.mail or {}) do
+        if item.result and not item.result.to then items[#items + 1] = item end
+    end
+    for _, item in ipairs(scan.keep or {}) do
+        if item.result and item.result.held then items[#items + 1] = item end
+    end
+    if #items == 0 then return nil end
+    local me, alt = tostring(ns.PlayerName()):lower(), bankAlt and tostring(bankAlt):lower() or nil
+    local best
+    for _, entry in ipairs(ns.Characters.Mailable()) do
+        local name = Routes.Clean(entry.name)
+        local lower = name and name:lower()
+        if name and lower ~= me and lower ~= alt then
+            for _, p in ipairs(entry.professions or {}) do
+                local id = tonumber(p.skillLine)
+                if id and Routes.ProfessionName(id) and not taken[id] and not Routes.OfferDismissed(name, id) then
+                    local route = { to = name, profession = id, skill = tonumber(p.rank), cap = Routes.DEFAULT_CAP,
+                        scope = "account" }
+                    local offer = { name = name, profession = id, skill = tonumber(p.rank), count = 0, items = {} }
+                    for _, item in ipairs(items) do
+                        local ok, verdict = pcall(Routes.Divert, item, item.result, item.price, settings, { route })
+                        if ok and verdict then
+                            offer.count = offer.count + 1
+                            offer.items[#offer.items + 1] = item
+                        end
+                    end
+                    if offer.count > 0 and (not best or offer.count > best.count or (offer.count == best.count
+                            and (offer.name < best.name or (offer.name == best.name and id < best.profession)))) then
+                        best = offer
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
 --- This character as a candidate, for a guild template rule naming its author (2026-11-07: "I
 --- should be able to set routing to me in the guild template as well"): a binding to yourself
 --- means nothing, but the guild's other members (and this account's other characters) mail you.

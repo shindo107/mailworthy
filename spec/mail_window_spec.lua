@@ -917,6 +917,94 @@ describe("mail window", function()
         end)
     end)
 
+    describe("a crafter of your own (QoL pass F, operator 2026-11-09)", function()
+        local SADIE = "Sadie Ember"
+        local function character(name, professions)
+            MailworthyDB.characters[ns.Characters.Key(name, "Classic Beta PvP", "Alliance")] = {
+                name = name, realm = "Classic Beta PvP", faction = "Alliance", class = "MAGE", level = 30,
+                professions = professions,
+            }
+        end
+        before_each(function()
+            -- Copper Ore is on the Mailing list (before_each above); here as metal, a blacksmith's material.
+            WowStub.setBag(0, 1, WowStub.item(2770, "Copper Ore", { count = 20, sell = 5, class = 7, subclass = 7 }))
+            character(SADIE, { { name = "Blacksmithing", skillLine = 164, rank = 40 } })
+        end)
+
+        it("the offer's words", function()
+            local T = ns.MailWindow.OfferText
+            assert.equal("|cffffd100Sadie Ember is your enchanter|r (skill 140). Send them the 3 items that disenchant instead?",
+                T({ name = SADIE, profession = 333, skill = 140, count = 3 }))
+            assert.equal("|cffffd100Sadie Ember is your blacksmith|r. Send them the 1 item they craft with instead?",
+                T({ name = SADIE, profession = 164, count = 1 }))
+            assert.equal("|cffffd100Sadie Ember has First Aid|r (skill 75). Send them the 2 items they craft with instead?",
+                T({ name = SADIE, profession = 129, skill = 75, count = 2 }))
+        end)
+
+        it("shows with Bind and Not for <name>; Bind makes an ordinary binding and the row goes to them", function()
+            _G.MailworthyMailButton:Click()
+            local offer = ns.MailWindow.Offer()
+            assert.equal(SADIE, offer.name)
+            assert.equal(164, offer.profession)
+            assert.equal(1, offer.count)
+            assert.is_true(_G.MailworthyMailOfferBind:IsShown())
+            assert.equal("Not for Sadie", text("MailworthyMailOfferNot"))
+            assert.is_nil(ns.MailWindow.Result().mail[1].result.to, "offered only: still to the bank alt")
+            _G.MailworthyMailOfferBind:Click()
+            assert.equal(SADIE, ns.MailWindow.Result().mail[1].result.to)
+            assert.equal(1, ns.Routes.Count())
+            assert.equal("account", ns.Routes.List()[1].scope)
+            assert.is_false(_G.MailworthyMailOfferBind:IsShown())
+            assert.equal("Send to Sadie", text("MailworthyMailSend"))
+        end)
+
+        it("Not for <name> is remembered for that character and profession", function()
+            _G.MailworthyMailButton:Click()
+            _G.MailworthyMailOfferNot:Click()
+            assert.is_nil(ns.MailWindow.Offer())
+            assert.equal(0, ns.Routes.Count())
+            assert.is_true(ns.Routes.OfferDismissed(SADIE, 164))
+            assert.is_false(ns.Routes.OfferDismissed(SADIE, 333), "another profession of theirs can still be offered")
+            ns.MailWindow.Refresh()
+            assert.is_nil(ns.MailWindow.Offer())
+        end)
+
+        it("never offers the bank alt, this character's own profession, a profession already bound, or with the switch off", function()
+            local scan = function() return ns.Routes.Offer(ns.Bags.Evaluate(), ns.Config.BankAlt()) end
+            assert.truthy(scan())
+            character("Roknua Themicrulah", { { skillLine = 164, rank = 10 } })
+            MailworthyDB.characters[ns.Characters.Key(SADIE, "Classic Beta PvP", "Alliance")] = nil
+            assert.is_nil(scan(), "the bank alt sells: it isn't offered its own mail")
+            character(SADIE, { { skillLine = 164, rank = 40 } })
+            WowStub.state.professions[1] = { index = 5, name = "Blacksmithing", rank = 20, maxRank = 75, skillLine = 164 }
+            assert.is_nil(scan(), "this character is a blacksmith: it keeps its metal")
+            WowStub.state.professions[1] = nil
+            assert.truthy(scan())
+            ns.Routes.Add("Bob Surname", 164)
+            assert.is_nil(scan(), "Blacksmithing is bound already")
+            ns.Routes.Remove(ns.Routes.List()[1].key)
+            MailworthyDB.features = { crafterOffer = false }
+            _G.MailworthyMailButton:Click()
+            assert.is_nil(ns.MailWindow.Offer())
+            assert.is_false(_G.MailworthyMailOfferBind:IsShown())
+        end)
+
+        it("one at a time, the one that takes the most rows; hidden while a send runs", function()
+            character("Anna Bolt", { { skillLine = 197, rank = 60 } }) -- a tailor: nothing of hers is on the list
+            WowStub.setBag(0, 4, WowStub.item(2771, "Tin Ore", { count = 20, sell = 5, class = 7, subclass = 7 }))
+            prices[WowStub.link(2771, "Tin Ore")] = 300
+            _G.MailworthyMailButton:Click()
+            local offer = ns.MailWindow.Offer()
+            assert.equal(SADIE, offer.name)
+            _G.MailworthyMailSend:Click()
+            assert.is_true(ns.Mailer.Busy())
+            assert.is_false(_G.MailworthyMailOfferBind:IsShown())
+            ns.MailWindow.AcceptOffer()
+            assert.equal(0, ns.Routes.Count(), "no binding is made mid-send")
+            WowStub.runTimers()
+        end)
+    end)
+
     it("controller: Triangle opens it, Cross on Send sends, Circle closes it", function()
         WowStub.state.gamepadUI = true
         WowStub.state.activeFrame = MailFrame
