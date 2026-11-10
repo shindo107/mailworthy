@@ -11,6 +11,8 @@
 --   * controller: L3 while the bags have focus (PadKey: our own binding; the
 --     selected slot is read from SmartNavigation, read-only), or pressing the
 --     item's row in the Mailworthy window.
+--   * either: Unlock in the locked items window (LocksUI.lua; /mw locks, Settings > More),
+--     the only way for an item that is no longer in the bags.
 --
 -- Not the gamepad Triangle "More" menu: adding an entry there (Menu.ModifyMenu
 -- on MORE_CONTEXT_ACTIONS) taints the gamepad UI by design; jumping, targeting
@@ -73,6 +75,59 @@ function Locks.PrintList()
     for itemID, entry in pairs(items()) do list[#list + 1] = tostring(entry.link or itemID) end
     table.sort(list)
     ns.Print(#list == 0 and "No locked items." or ("Locked items: " .. table.concat(list, ", ")))
+end
+
+--- How many items are locked on this character.
+function Locks.Count()
+    local n = 0
+    for _ in pairs(items()) do n = n + 1 end
+    return n
+end
+
+--- Pure: an item's name out of its link ("|cff..|Hitem:2770..|h[Copper Ore]|h|r" -> "Copper Ore"),
+--- or "item 2770" without one.
+function Locks.NameOf(itemID, link)
+    local name = type(link) == "string" and link:match("%[(.-)%]") or nil
+    return name and name ~= "" and name or ("item " .. tostring(itemID))
+end
+
+--- itemID -> how many of it the bags hold now (backpack, bags 1-4, reagent bag; every stack).
+function Locks.BagCounts()
+    local counts = {}
+    local numSlots = C_Container and C_Container.GetContainerNumSlots
+    if type(numSlots) ~= "function" then return counts end
+    for bag = 0, ns.Bags.LastBag() do
+        local ok, n = pcall(numSlots, bag)
+        for slot = 1, ok and tonumber(n) or 0 do
+            local info = itemAt(bag, slot)
+            if info and info.itemID then
+                counts[info.itemID] = (counts[info.itemID] or 0) + (tonumber(info.stackCount) or 1)
+            end
+        end
+    end
+    return counts
+end
+
+--- The locked items, by name: { { itemID, link, name, count, locked = true } }, `count` = how many
+--- the bags hold now (0: banked, used up, sold; the lock is still there and can be removed in
+--- the locked items window, LocksUI.lua). `also` (itemID -> link): items to list too though
+--- they aren't locked (the window keeps a row it just unlocked, so the press can be undone).
+function Locks.List(also)
+    local counts, list = Locks.BagCounts(), {}
+    local function add(itemID, link, locked)
+        link = type(link) == "string" and link or nil
+        list[#list + 1] = { itemID = itemID, link = link, name = Locks.NameOf(itemID, link),
+            count = counts[itemID] or 0, locked = locked }
+    end
+    for itemID, entry in pairs(items()) do add(itemID, type(entry) == "table" and entry.link, true) end
+    for itemID, link in pairs(also or {}) do
+        if not Locks.IsItemLocked(itemID) then add(itemID, link, false) end
+    end
+    table.sort(list, function(a, b)
+        if a.name:lower() ~= b.name:lower() then return a.name:lower() < b.name:lower() end
+        return tostring(a.itemID) < tostring(b.itemID)
+    end)
+    return list
 end
 
 function Locks.Describe()
