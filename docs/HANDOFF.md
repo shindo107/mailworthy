@@ -595,8 +595,7 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
   (DISCOVERY-SESSION-2.md "v1.0 check"), then tag `v1.0.0` when the operator says so.
 - Still open: AH cut (needs a sale mail; the invoice reader in `Report.lua` logs it),
   disenchant prices for green items (Siz DisenchantValue, or the era tables with
-  Disenchantry: see either in game), ForeverMail compatibility (replaces the mailbox
-  window), the in-game checks of bindings and of the Disenchantry value (item 7 below), of
+  Disenchantry: see either in game), the in-game checks of bindings and of the Disenchantry value (item 7 below), of
   the UX pass (item 8) of the stale-prices nudge (item 9), of the material tiers (item 10) and of
   the tier check (item 12), and README "Beta unknowns".
 
@@ -616,7 +615,9 @@ call `SendMail` anyway. Every Mailer timer checks the run id and `busy`.
    `/mw scan` and the window, and mailed again with the setting off;
    the AH cut from a sale mail (`[invoice]` lines in `/mw report`), a green item's DE verdict
    with Siz DisenchantValue installed (`/mw scan` "disenchant Xc each" against its tooltip,
-   `/mw report` "Siz DisenchantValue installed"), ForeverMail compatibility.
+   `/mw report` "Siz DisenchantValue installed").
+   Not planned: ForeverMail / Kerzo Postal Suite compatibility (operator, 2026-11-09: "we dont need to
+   support them. lets out compete them instead"; see PLAN "ForeverMail and Kerzo Postal Suite").
 6. README "Beta unknowns" table and PLAN's "Still open" list kept current after each report.
 7. In-game check of bindings (2026-10-26): `/mw friends` lists guild members with "online" and
    professions (C_Club on Forever) and party members; a binding's materials show "to <first
