@@ -467,6 +467,12 @@ local function attachItem(item)
 end
 _G.C_Container = {
     GetContainerNumSlots = function(bag) return s().numSlots[bag] or 0 end,
+    -- numFreeSlots, bagFamily (0 = any item; state.bagFamily[bag] for a profession bag)
+    GetContainerNumFreeSlots = function(bag)
+        local used = 0
+        for _ in pairs(s().bags[bag] or {}) do used = used + 1 end
+        return math.max(0, (s().numSlots[bag] or 0) - used), (s().bagFamily or {})[bag] or 0
+    end,
     GetContainerItemInfo = function(bag, slot) return at(bag, slot) end,
     GetContainerItemQuestInfo = function(bag, slot)
         local item = at(bag, slot)
@@ -606,7 +612,13 @@ _G.GameTooltip = newWidget("GameTooltip", "GameTooltip")
 _G.SmartNavigation = { GetCurrentButton = function() return s().navButton end }
 _G.C_GamePad = {
     GetActiveDeviceID = function() return 5 end,
-    GetDeviceMappedState = function() return { labelStyle = "Shapes" } end,
+    -- state.labelStyle: "Shapes" (PlayStation, the default: the one seen in game), "Letters" /
+    -- "Generic" (Xbox), "Reverse" (Switch); false = no mapped device.
+    GetDeviceMappedState = function()
+        local style = s().labelStyle
+        if style == false then return nil end
+        return { labelStyle = style or "Shapes" }
+    end,
 }
 
 WowStub.reset()

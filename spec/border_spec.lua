@@ -224,11 +224,11 @@ describe("why a locked item glows: the tooltip line", function()
         local rowLines = hover(2770) -- the row's own lines (MailWindow's post-call), not Border's
         assert.equal(3, #rowLines)
         assert.equal("Click to unlock.", rowLines[3][1])
-        for _, line in ipairs(rowLines) do assert.are_not.equal(ns.Border.TOOLTIP, line[1]) end
+        for _, line in ipairs(rowLines) do assert.are_not.equal(ns.Border.Tooltip(), line[1]) end
         -- The controller's highlight is still on the row, and the mouse hovers the ore in a bag: the
         -- tooltip is the bag button's now (Codex review).
         GameTooltip:SetOwner(_G.MailworthyMailSend)
-        assert.equal(ns.Border.TOOLTIP, hover(2770)[1][1], "in the bags it still says why it glows")
+        assert.equal(ns.Border.Tooltip(), hover(2770)[1][1], "in the bags it still says why it glows")
         assert.equal(1, #lines)
         GameTooltip:SetOwner(row)
         row.scripts.OnLeave(row)
@@ -239,13 +239,13 @@ describe("why a locked item glows: the tooltip line", function()
         openWindow(ns)
         local got = hover(2770)
         assert.equal(1, #got)
-        assert.equal(ns.Border.TOOLTIP, got[1][1])
+        assert.equal(ns.Border.Tooltip(), got[1][1])
         assert.matches("never mailed", got[1][1])
         assert.matches("Alt%+click", got[1][1])
-        assert.matches("L3", got[1][1])
+        assert.matches("%[L3%] on a controller", got[1][1])
         assert.same(ns.Border.COLOR, { got[1][2], got[1][3], got[1][4] })
         for _, line in ipairs(hover(2589)) do
-            assert.is_not.equal(ns.Border.TOOLTIP, line[1], "an unlocked item: no glow line")
+            assert.is_not.equal(ns.Border.Tooltip(), line[1], "an unlocked item: no glow line")
         end
     end)
 

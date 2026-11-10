@@ -29,7 +29,7 @@ ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true,
     tiers = true, tierCheck = true, guildTemplate = true, ledger = true, questNeeds = true, autoOpen = true,
-    returnToSender = true, bankAltMail = true, peerMark = true, versionNotice = true,
+    returnToSender = true, bankAltMail = true, peerMark = true, versionNotice = true, tripNudge = true,
     baganatorTags = true, bagnonTags = true, arkInventoryTags = true, betterBagsTags = true, auctionatorTags = true,
 } }
 
@@ -93,10 +93,12 @@ ns.On("PLAYER_LOGIN", function()
     if ns.Log then ns.Log.Add("feature", "at login: %s", ns.Features.Describe()) end
 end)
 
+-- {KEY} marks become the names on the player's own controller when the list is printed
+-- (R1 / Triangle / L3, RB / Y / LS, R / X / LS: Gamepad.Fill).
 local HELP = {
     "At a mailbox: open the Send Mail tab and the Mailworthy window opens (the Mailworthy button under the mail window"
-        .. " toggles it). Controller: Send Mail tab (R1); Triangle (Y) closes and reopens it.",
-    "Lock an item (it stays locked wherever it moves): Alt+click it, or L3 in your bags (controller).",
+        .. " toggles it). Controller: Send Mail tab ({PADRSHOULDER}); {PAD4} closes and reopens it.",
+    "Lock an item (it stays locked wherever it moves): Alt+click it, or {PADLSTICK} in your bags (controller).",
     "Locked items glow blue while the Mailworthy window is open (settings: always); a new lock glows a moment anywhere."
         .. " In the Mailworthy window, pressing an item locks or unlocks it.",
     "/mw or /mw settings - bank alt, minimum gain, disenchant, listing length, keep your professions' materials"
@@ -106,12 +108,14 @@ local HELP = {
     "/mw guild - your guild's template: turn the guild rules on or off; the guild master and officers edit it",
     "/mw locks - list this character's locked items",
     "/mw scan - what Mailworthy would mail and why (sends nothing)",
+    "Away from a mailbox: with 4 or fewer bag slots left, one chat line a session says what is worth mailing"
+        .. " (the minimap button's tooltip too; /mw feature tripNudge off)",
     "/mw ledger - what other players mailed you beyond what you sent back, and Export log (every mail sent"
         .. " and received)",
     "/mw summary - on your bank alt (or without one): what to list, disenchant or vendor",
     "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|minimapButton|bankAltTags"
         .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail"
-        .. "|peerMark|versionNotice"
+        .. "|peerMark|versionNotice|tripNudge"
         .. "|baganatorTags|bagnonTags|arkInventoryTags|betterBagsTags|auctionatorTags> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",
@@ -120,7 +124,7 @@ local HELP = {
 
 local function showHelp()
     ns.Print("v" .. ns.VERSION .. " - commands (/mw or /mailworthy):")
-    for _, line in ipairs(HELP) do print("  " .. line) end
+    for _, line in ipairs(HELP) do print("  " .. ns.Gamepad.Fill(line)) end
 end
 
 function ns.HandleSlash(msg)

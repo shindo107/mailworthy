@@ -107,14 +107,18 @@ function Border.OnLockChanged(itemID, locked)
     Border.RefreshAll()
 end
 
-Border.TOOLTIP = "Locked in Mailworthy: it stays in your bags and is never mailed. "
-    .. "Alt+click it (L3 on a controller) to unlock."
+--- Why an item glows. The controller's key is the game's own icon for the left stick press, so
+--- it reads L3 on a PlayStation controller and LS on an Xbox one (Gamepad.Glyph).
+function Border.Tooltip()
+    return "Locked in Mailworthy: it stays in your bags and is never mailed. "
+        .. "Alt+click it (" .. ns.Gamepad.Glyph(ns.Gamepad.STICK_LEFT_PRESS, 14) .. " on a controller) to unlock."
+end
 
---- Pure: the tooltip line that says why an item glows, or nil when it doesn't glow.
+--- The tooltip line that says why an item glows, or nil when it doesn't glow.
 function Border.TooltipLine(itemID)
     if itemID == nil or not ns.Features.On("slotBorder") or not ns.Locks.IsItemLocked(itemID) then return nil end
     if not (Border.Wanted() or Border.Flashing(itemID)) then return nil end
-    return Border.TOOLTIP
+    return Border.Tooltip()
 end
 
 local function onTooltip(tooltip, data)

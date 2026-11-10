@@ -15,14 +15,14 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - **Preview first:** it shows the recipient, what goes and why, what stays and
   why, and a **Settings** button to fix anything before you press Send.
 - **Keyboard/mouse first, controller too:** everything works with keyboard and mouse, and with a gamepad alone.
-- **Lock items** you never want mailed: Alt+click (mouse) or L3 in your bags (controller); the lock follows the item.
+- **Lock items** you never want mailed: Alt+click (mouse) or L3 / LS (press the left stick) in your bags (controller); the lock follows the item.
 - **Every bag counts:** backpack, bags 1-4 (profession bags too) and the reagent bag.
 
 ## Using it
 
 - **At a mailbox:** click the **Send Mail** tab and the Mailworthy window opens beside it
-  (or click **Mailworthy** under the mail window; controller: R1 to the Send Mail tab opens
-  it, Triangle closes and reopens it). Opened on the Inbox, its Send button is greyed out and says "Click Send Mail". The window shows who gets the mail, what goes and why,
+  (or click **Mailworthy** under the mail window; controller: R1 (RB on an Xbox controller) to the Send Mail tab opens
+  it, Triangle (Y) closes and reopens it; Mailworthy's own hints draw your controller's buttons). Opened on the Inbox, its Send button is greyed out and says "Click Send Mail". The window shows who gets the mail, what goes and why,
   what stays and why, and the total gain. **Send** mails it all in one press, 12 stacks
   per mail; while it runs the button is **Stop** (the mail already on its way arrives, the rest
   stays). When it is done the window and chat say what went, to whom, for how much, and what
@@ -42,7 +42,7 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - **Quests come first:** an item an active quest asks for (Crisp Spider Meat for Redridge
   Goulash, not only "quest items") stays in your bags, is never tagged for the vendor, and
   its tooltip names the quest.
-- **Lock items** you never want mailed: Alt+click (mouse), L3 in your bags (controller),
+- **Lock items** you never want mailed: Alt+click (mouse), L3 / LS in your bags (controller),
   or press the item in the Mailworthy window. Locked items glow blue while the Mailworthy
   window is open at the mailbox (a setting keeps the glow on everywhere), and hovering one
   says why; elsewhere a new lock glows for a moment so you see it took. Locks stay
@@ -134,6 +134,13 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   you at the mailbox. Only the day of each player's scan is shared (with the addon messages
   above), never prices, and it never changes what gets mailed. `/mw feature staleNudge off`
   hides it.
+- **Worth a mailbox trip**: away from a mailbox, when you have 4 or fewer bag slots left and
+  something in your bags would be mailed, one chat line a session says so ("2 bag slots left.
+  14 items are worth mailing: +2g 10s more than vendoring."), and the minimap button's tooltip
+  carries "Worth mailing now: 14 items, +2g 10s" while it holds. The count is the one on the
+  backpack button (profession bags and the reagent bag don't count). Your bags are only
+  valued at or under 4 free slots, out of combat, when something in them changed. Without a bank alt it speaks up only when a
+  binding would mail. Nothing is sent. `/mw feature tripNudge off` hides it.
 - **Mail ledger** (`/mw ledger`, Settings > Mail ledger, Friends): Mailworthy logs every mail
   your characters send (its own and Blizzard's Send button) and every item or gold you take
   out of the mailbox: date, both names, subject, each item with its count and value. **Export
@@ -271,6 +278,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | API / behaviour | What to check | Status |
 |---|---|---|
 | Send path (QoL pass, 2026-11-09): `GetMoney()` and `GetSendMailPrice()` (both in Forever's `MailFrame.lua`, its own Send check), the `PLAYER_MONEY` event (standard, not found in Forever's source; registered in `pcall`, without it the postage note updates at the next redraw), `PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)` (the kit `MailFrame.lua` plays; `pcall`) | at a mailbox: Send, then Stop mid-run: the mail on its way arrives, the rest stays, the note says "Stopped after 1 of N"; a full send ends with "Sent N mails to ...: +gain" in the window and one chat line, and one click sound; with less money than the postage Send reads "Postage: ..." greyed out, and looting or selling a little brings it back | open (2026-11-09) |
+| Trip line (2026-11-09): `C_Container.GetContainerNumFreeSlots(bag)` -> `numFreeSlots, bagFamily` (in Forever's `ContainerDocumentation.lua`; pcall'd, one bag without an answer = nothing scanned or said) summed over bags 0..`NUM_BAG_SLOTS` where `bagFamily` is 0, on `BAG_UPDATE_DELAYED` (and `PLAYER_REGEN_ENABLED`). Assumed, not measured: general bags report family 0 and a profession bag a non-zero one; a bag change always follows the loot that fills the bags; the scan at login has item data ready (a scan is repeated only when the bags, settings or bindings change, not when prices or item data arrive later) | away from a mailbox, fill the bags to 4 free slots (the backpack button's number) with something Mailworthy would mail: one chat line "N bag slots left. M items are worth mailing: +X more than vendoring.", the same N as the backpack button; hover the minimap button: "Worth mailing now: ..."; no second chat line until `/reload`; `/mw report` log lines `trip` show each scan. Off: `/mw feature tripNudge off` | open (2026-11-09) |
 | Row tooltips from the controller (2026-11-09): the D-pad highlight on an item row of the Mailworthy window calls `GameTooltip:SetOwner` / `SetBagItem` / `AddLine` / `Show` from addon code (as the mouse path always has), `Hide` when it moves off; `NumLines` and `SetHyperlink(link)` (pcall'd) when the row's item already left its bag slot mid-send | with a controller at the mailbox: D-pad onto a Mailing row shows the item tooltip beside the window, ending "Press to lock: ..."; it goes when the highlight reaches Send; jumping, targeting and item use still work after closing the mailbox; `/mw report` "N row tooltip(s) shown" above 0. Off: `/mw feature tooltipLines off` | open (2026-11-09) |
 | `## Interface: 16001` | addon loads without "out of date" | confirmed for LedgerLink (build 1.60.1.70205) |
 | Auctionator `API.v1` on Forever | S5 | **confirmed** (Auctionator 340; price, age, exactness, disenchant calls) |
@@ -318,6 +326,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 | Guild contributions shared in hellos: `G2\|<asOf>\|<i>/<n>\|<total>\|<since>\|<days back>:<units>;...` on `SendAddonMessage(prefix, text, "GUILD")` only, right after the hello and at `MAIL_CLOSED` after a counted mail; this character's own counts only | two guild members with Mailworthy, one mails a guild rule's materials and closes the mailbox: the other's `/mw report` "guild export: ..., 2 giver(s)" (theirs and the guildmate's) | open (2026-11-08) |
 | Guild contributions' peer list at logout: the guild roster (`C_Club.GetClubMembers` / `GetMemberInfo`, `GetGuildRosterInfo` fallback) read every time the API is called, and on `GUILD_ROSTER_UPDATE` (at most every 10 seconds, with one more read after a burst); at `PLAYER_LOGOUT` the roster and `GetGuildInfo` may already be gone, so the last read of this session stands in for the name passed | log out with LedgerLink: its export carries `mailworthy.peers`; `/mw report` "guild contributions: this guild, N character(s), M unit(s) counted" after a guild rule's mail | open (2026-11-08) |
 | The Mailworthy mark: the addon icon inline after a name (`\|TInterface\AddOns\Mailworthy\Textures\Icon:0\|t`, the same file as the minimap button; a texture escape in our own font strings, no frame) | `/mw friends` with a guild member who runs Mailworthy: the icon after their name, the footer "(icon) runs Mailworthy"; the bank alt's "To:" line at the mailbox | open (2026-11-08) |
+| Controller names that follow the controller (`Gamepad.Name` / `Gamepad.Glyph`): `C_GamePad.GetDeviceMappedState(id).labelStyle` (the value Blizzard's `InputDeviceIconSetManager` picks its icon set by) "Letters" / "Generic" (Xbox: RB, LS, Y in chat) and "Reverse" (Switch: R, LS, X); the icons for `PADRSHOULDER` and `PADLSTICK` from `InputIconTextureSetUtility.GetNormalActiveInputIconButtonTexture` (in every set in Forever's `InputIconTexture.lua`) drawn in the Inbox hint and in the lock glow's tooltip line; what a Steam Deck reports (Mailworthy gives anything else the Xbox names) | with an Xbox or Switch controller, or on a Steam Deck: `/mw help` names RB / LS / Y (R / LS / X on a Switch controller), the Inbox hint under the mail window and a locked item's tooltip show that controller's buttons; `/mw report` gives the label style | open (only "Shapes", a PlayStation controller, has been seen in game: R1, L3, Triangle) |
 
 ## Picking up the work
 

@@ -6,7 +6,7 @@
 -- tab. With the controller UI, the mail window's smart navigation only searches
 -- the active tab's group ("Inbox" / "Send Mail"), so the D-pad reaches the
 -- button on either tab and the window on Send Mail; on the Inbox the controller
--- gets a hint to press R1. We never switch tabs ourselves (see Activate).
+-- gets a hint to press R1 (RB). We never switch tabs ourselves (see Activate).
 --
 -- Everything is created at login: creating frames while a gamepad panel is open
 -- trips SmartNavigation's CreateFrame hook in our context. Nothing is written
@@ -31,6 +31,13 @@ function MailButton.GamepadUI()
     return ok and on == true
 end
 
+--- Pure but for the controller read: the chat line for a controller on the Inbox, in the names
+--- of the player's own controller (R1 / Triangle, RB / Y, R / X: Gamepad.Name).
+function MailButton.InboxHintLine(autoOpen)
+    return ns.Gamepad.Fill(autoOpen and "Switch to the Send Mail tab ({PADRSHOULDER}): Mailworthy opens there."
+        or "Switch to the Send Mail tab ({PADRSHOULDER}), then press {PAD4} or the Mailworthy button.")
+end
+
 --- Mail button click or Triangle: toggle the Mailworthy window, on the bank alt too (it keeps
 --- what it sells, and bindings and Return to sender mail from it). A bank alt is optional
 --- (operator, 2026-11-08): without one the window shows what would go and keeps it in the
@@ -52,8 +59,7 @@ function MailButton.Activate(source)
     end
     if tab == "inbox" and MailButton.GamepadUI() then
         ns.Log.Add("mailbutton", "%s on the Inbox (controller UI): hint shown", tostring(source))
-        ns.Print(ns.Features.On("autoOpen") and "Switch to the Send Mail tab (R1): Mailworthy opens there."
-            or "Switch to the Send Mail tab (R1), then press Triangle or the Mailworthy button.")
+        ns.Print(MailButton.InboxHintLine(ns.Features.On("autoOpen")))
         return
     end
     ns.Log.Add("mailbutton", "%s on the %s tab (%s UI)", tostring(source), tab,
@@ -89,7 +95,8 @@ function MailButton.Create()
     return sendButton
 end
 
---- Controller players get the Triangle symbol and the R1 hint; mouse players a plain button.
+--- Controller players get their controller's symbols (Triangle / Y and the R1 / RB hint: the
+--- game's own icons); mouse players a plain button.
 function MailButton.Refresh()
     if not sendButton then return end
     local pad = MailButton.GamepadUI()
@@ -99,7 +106,12 @@ function MailButton.Refresh()
     local mark = (ok and nudge) and (nudge.level == "peer" and " |cffff8040!|r" or " |cffaaaaaa!|r") or ""
     sendButton:SetText((pad and ("Mailworthy " .. glyph) or "Mailworthy") .. mark)
     inboxButton:SetText("Mailworthy" .. mark)
-    inboxHint:SetText(pad and ("R1 to Send Mail, then " .. glyph) or "")
+    inboxHint:SetText(pad and (ns.Gamepad.Glyph(ns.Gamepad.SHOULDER_RIGHT, 14) .. " to Send Mail, then " .. glyph) or "")
+end
+
+--- The hint beside the Inbox button as drawn ("" for mouse / keyboard), for specs and the report.
+function MailButton.InboxHint()
+    return inboxHint and inboxHint:GetText() or ""
 end
 
 ns.On("PLAYER_LOGIN", function() MailButton.Create() end)
@@ -107,3 +119,5 @@ ns.On("ADDON_LOADED", function(name)
     if name == "Blizzard_MailFrame" then MailButton.Create() end
 end)
 ns.On("MAIL_SHOW", function() MailButton.Refresh() end)
+-- Mouse to controller (or another controller's icons) with the mailbox open: redraw the symbols.
+ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", function() MailButton.Refresh() end)
