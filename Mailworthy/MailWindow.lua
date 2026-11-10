@@ -626,24 +626,29 @@ function UI.Create()
     return frame
 end
 
--- The mail list as it stood when a run's receipt first showed ({ [link] = count }), per receipt.
-local receiptLists = setmetatable({}, { __mode = "k" })
-local function receiptList(receipt)
-    if not receiptLists[receipt] then
-        local list = {}
-        for _, item in ipairs(result and result.mail or {}) do
-            local key = item.link or item.itemID
-            list[key] = (list[key] or 0) + (tonumber(item.count) or 0)
-        end
-        receiptLists[receipt] = list
+--- Pure: a mail list as { [link] = units }, every row of an item added up (one item can be
+--- several rows: some back to a sender, the rest to the bank alt).
+function UI.ListCounts(items)
+    local list = {}
+    for _, item in ipairs(items or {}) do
+        local key = item.link or item.itemID
+        list[key] = (list[key] or 0) + (tonumber(item.count) or 0)
     end
+    return list
+end
+
+-- The mail list as it stood when a run ended (UI.ListCounts), per receipt: taken at the first
+-- redraw or chat line after the run, whichever comes first, window open or not.
+local receiptLists = setmetatable({}, { __mode = "k" })
+local function receiptList(receipt, scan)
+    if not receiptLists[receipt] then receiptLists[receipt] = UI.ListCounts(scan and scan.mail) end
     return receiptLists[receipt]
 end
 
---- Pure: has the mail list `now` anything the list `before` ({ [link] = count }) didn't hold?
+--- Pure: has the mail list `now` more of anything than the list `before` (UI.ListCounts) held?
 function UI.Grew(before, now)
-    for _, item in ipairs(now or {}) do
-        if (tonumber(item.count) or 0) > (before[item.link or item.itemID] or 0) then return true end
+    for key, count in pairs(UI.ListCounts(now)) do
+        if count > (before[key] or 0) then return true end
     end
     return false
 end
@@ -881,7 +886,7 @@ function UI.Refresh(keepScan)
     local receipt = ns.Mailer.Receipt()
     -- Something new on the list since the run ended (looted, taken from the mailbox): the total
     -- is the list's again, the receipt has had its say (Codex review, 2026-11-09).
-    if receipt and UI.Grew(receiptList(receipt), result.mail) then
+    if receipt and UI.Grew(receiptList(receipt, result), result.mail) then
         ns.Mailer.Dismiss()
         receipt = nil
         totalNote:SetText(note)
@@ -1064,6 +1069,7 @@ local function printReceipt()
         local ok, fresh = pcall(ns.Bags.Evaluate)
         scan = ok and fresh or nil
     end
+    receiptList(receipt, scan) -- the list as the run left it, even with the window closed
     local _, _, chat = ns.Mailer.ReceiptText(receipt, UI.VendorLeft(scan))
     ns.Print(chat)
 end
@@ -1090,7 +1096,7 @@ function UI.Send()
         totalNote:SetText("|cffff8040" .. text .. "|r")
         return
     end
-    ns.Mailer.Start(result.mail, ns.Config.BankAlt())
+    ns.Mailer.Start(result.mail, ns.Config.BankAlt(), result.settings)
     UI.Refresh(true)
 end
 

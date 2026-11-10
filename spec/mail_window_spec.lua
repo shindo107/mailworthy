@@ -488,6 +488,49 @@ describe("mail window", function()
             for _, e in ipairs(ns.Ledger.Store().log) do assert.are_not.equal("sent", e.dir) end
         end)
 
+        it("a mail the game refuses is never credited by a later answer (Codex review)", function()
+            send:Click()
+            WowStub.runTimers() -- waiting for the game's answer
+            ns.Fire("MAIL_FAILED")
+            assert.is_false(ns.Mailer.Busy())
+            ns.Fire("MAIL_SEND_SUCCESS") -- a note the player then sends by hand
+            assert.equal(0, ns.Mailer.Receipt().sent)
+            assert.is_nil((MailworthyDB.mailed or {})[2770])
+            for _, e in ipairs(ns.Ledger.Store().log) do assert.are_not.equal("sent", e.dir) end
+        end)
+
+        it("the receipt's baseline: an item split over rows is added up, and a closed window still takes it (Codex review)", function()
+            local ore = WowStub.link(2770, "Copper Ore")
+            local before = ns.MailWindow.ListCounts({ { link = ore, count = 20 }, { link = ore, count = 20 } })
+            assert.same({ [ore] = 40 }, before)
+            assert.is_false(ns.MailWindow.Grew(before, { { link = ore, count = 20 }, { link = ore, count = 20 } }))
+            assert.is_true(ns.MailWindow.Grew(before, { { link = ore, count = 20 }, { link = ore, count = 30 } }),
+                "50 in all: neither row is past 40, the item is")
+            -- The window closed during the run: the list is taken when the run ends, not at the reopen.
+            send:Click()
+            WowStub.runTimers()
+            ns.MailWindow.Frame():Hide()
+            ns.Fire("MAIL_SEND_SUCCESS")
+            WowStub.runTimers()
+            assert.is_false(ns.Mailer.Busy())
+            WowStub.setBag(0, 4, WowStub.item(2771, "Tin Ore", { count = 20, sell = 5 }))
+            prices[WowStub.link(2771, "Tin Ore")] = 300
+            ns.MailWindow.Show("send")
+            assert.is_nil(ns.Mailer.Receipt(), "the new ore is news: the receipt gives way")
+            assert.truthy(ns.MailWindow.Texts().total:find("more than vendoring", 1, true))
+        end)
+
+        it("the receipt's figures use the settings the list was scanned with (Codex review)", function()
+            WowStub.setBag(0, 4, WowStub.item(2770, "Copper Ore", { count = 1, sell = 5 }))
+            ns.MailWindow.Refresh()
+            local ore = ns.MailWindow.Result().mail[1]
+            send:Click()
+            assert.equal(ns.MailWindow.Result().settings, ns.Mailer.state.settings)
+            local dear = setmetatable({ postage = 100000 }, { __index = ns.Bags.CurrentSettings() })
+            assert.are_not.equal(ns.Mailer.GainOf(ore, 1, 1), ns.Mailer.GainOf(ore, 1, 1, dear),
+                "the settings handed in decide, not the current ones")
+        end)
+
         it("the receipt's gain for part of an item is valued by its stacks, not by its share of units (Codex review)", function()
             WowStub.setBag(0, 4, WowStub.item(2770, "Copper Ore", { count = 1, sell = 5 }))
             ns.MailWindow.Refresh()

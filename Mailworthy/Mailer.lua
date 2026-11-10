@@ -237,7 +237,7 @@ local function finish(stopped)
         end
     end
     for _, item in ipairs(order) do
-        local gain = Mailer.GainOf(item, went[item].count, went[item].stacks)
+        local gain = Mailer.GainOf(item, went[item].count, went[item].stacks, state.settings)
         if gain then
             receipt.priced = true
             receipt.gain = receipt.gain + gain
@@ -250,13 +250,15 @@ end
 --- nil when it has none to count: no price, or it went to a binding or back to its sender (the
 --- window's total leaves those out too). All of it went: the scan's own figure. Part of it (a
 --- stopped run, a skipped stack): valued again for what went, since postage and deposits go by
---- the stack, not by the unit (Codex review, 2026-11-09).
-function Mailer.GainOf(item, count, stacks)
+--- the stack, not by the unit (Codex review, 2026-11-09), with the settings the list was scanned
+--- with (`settings`: a listing length changed mid-run doesn't move the figure).
+function Mailer.GainOf(item, count, stacks, settings)
     local r = item.result
     if type(r) ~= "table" or r.to or tonumber(r.gain) == nil then return nil end
     if count == item.count and stacks == item.stacks then return r.gain end
     local part = setmetatable({ count = count, stacks = stacks }, { __index = item })
-    local ok, again = pcall(function() return ns.Valuation.Evaluate(part, item.price, ns.Bags.CurrentSettings()) end)
+    local ok, again = pcall(function() return ns.Valuation.Evaluate(part, item.price, settings or ns.Bags.CurrentSettings())
+    end)
     if ok and type(again) == "table" and tonumber(again.gain) then return again.gain end
     return nil
 end
@@ -425,7 +427,8 @@ function Mailer.Recipients(mails, sentOnly)
 end
 
 --- One press: send every mail in the plan: the bank alt's, then each binding's.
-function Mailer.Start(items, bankAlt)
+--- `settings`: the scan's (Bags.Evaluate's result.settings), for the receipt's figures.
+function Mailer.Start(items, bankAlt, settings)
     local mails = Mailer.Plan(items or {}, bankAlt)
     local blocker = Mailer.Blocker(bankAlt, mails)
     if blocker then
@@ -433,7 +436,7 @@ function Mailer.Start(items, bankAlt)
         return false
     end
     state.run = state.run + 1
-    state.busy, state.mails, state.bankAlt = true, mails, bankAlt
+    state.busy, state.mails, state.bankAlt, state.settings = true, mails, bankAlt, settings
     state.sent, state.stacks, state.skipped, state.waiting = 0, 0, 0, nil
     state.stayed, state.receipt, state.stopRequested, state.pending = {}, nil, nil, nil
     ns.Log.Add("mailer", "start: %d mail(s) to %s", #mails, Mailer.Recipients(mails))
@@ -523,6 +526,9 @@ ns.On("MAIL_FAILED", function()
     state.pending = nil -- the mail a stopped run left with the game didn't go
     if state.busy then
         pcall(ClearSendMail)
+        -- The game answered: no mail is on its way, so Stop keeps none to credit later (a mail the
+        -- player then sends by hand must not count as this one: Codex review, 2026-11-09).
+        state.waiting = nil
         Mailer.Stop("the game refused the mail (MAIL_FAILED)")
     end
 end)
