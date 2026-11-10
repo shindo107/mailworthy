@@ -114,3 +114,6 @@ publishes a tag only after all of CI passes.
   subagent, review only, no edits), check each finding against the code, fix the real ones
   with a spec each, and list in the PR description what Codex found and what was fixed or why
   not. Commits pushed to an open PR that change behaviour get the same review.
+  **Not for a docs-only PR** (operator, 2026-11-09: "theres no reason to codex review a docs
+  only pr"): a PR that changes no Lua, spec, `.toc` / packaging or CI workflow (markdown,
+  prototype sheets and images under `media/`) skips it; its description says "docs only".
