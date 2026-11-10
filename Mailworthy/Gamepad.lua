@@ -25,14 +25,15 @@ Gamepad.STICK_LEFT_PRESS = "PADLSTICK" -- L3 / LS
 -- GAMEPAD_FACE_*, GAMEPAD_SHOULDER_RIGHT, GAMEPAD_STICK_LEFT_PRESS); the styles are its four icon
 -- sets (InputIcons/InputIconTexture.lua), which it picks by the active device's labelStyle
 -- (InputDeviceIconSetManager.lua): "Shapes" = PlayStation, "Letters" / "Generic" = Xbox,
--- "Reverse" = Switch, whose face letters are mirrored (Blizzard draws its top button as X,
--- "gamepad-switch-128x-face-x", and its right shoulder as R).
+-- "Reverse" = Switch. A Switch controller gets the Xbox names in chat (operator, 2026-11-09:
+-- "Use Xbox names"), though Blizzard's icons for it draw the top button as X and the right
+-- shoulder as R ("gamepad-switch-128x-face-x").
 local XBOX = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y", PADRSHOULDER = "RB", PADLSTICK = "LS" }
 local NAMES = {
     Shapes = { PAD1 = "Cross", PAD2 = "Circle", PAD3 = "Square", PAD4 = "Triangle", PADRSHOULDER = "R1", PADLSTICK = "L3" },
     Letters = XBOX,
     Generic = XBOX,
-    Reverse = { PAD1 = "B", PAD2 = "A", PAD3 = "Y", PAD4 = "X", PADRSHOULDER = "R", PADLSTICK = "LS" },
+    Reverse = XBOX,
 }
 
 local function get(path)
@@ -57,13 +58,13 @@ end
 
 --- Pure: the name of a key on a controller with this label style. Any style Mailworthy doesn't
 --- know, and no style at all (no controller, a Steam Deck, which the game gives no icon set of
---- its own), gets the Xbox names.
+--- its own), gets the Xbox names, and so does a Switch controller.
 function Gamepad.NameFor(style, key)
     local names = NAMES[style] or XBOX
     return names[key] or XBOX[key] or tostring(key)
 end
 
---- The name of a key on the player's controller, for a chat line: "R1" / "RB" / "R".
+--- The name of a key on the player's controller, for a chat line: "R1" / "RB".
 function Gamepad.Name(key)
     return Gamepad.NameFor(Gamepad.LabelStyle(), key)
 end
