@@ -292,7 +292,7 @@ describe("bag scan", function()
             .. "AH net 10s 27c (cut 5%, deposit 2s counted 1s, postage 60c); gain 9s 2c (needs 5s)")
         has("KEEP [Linen Cloth] x20: not worth it - vendor 10c each = 2s; AH 40c each, 0 days old; "
             .. "AH net 6s 70c (cut 5%, deposit 1s 20c counted 60c, postage 30c); gain 4s 70c (needs 5s)")
-        has("NOT MAILABLE (soulbound or quest, not listed in the window): [Hearthstone] x1, [Quest Thing] x1")
+        has("NOT MAILABLE (soulbound, quest or conjured, not listed in the window): [Hearthstone] x1, [Quest Thing] x1")
         assert.same({}, WowStub.state.attached)
         assert.same({}, WowStub.state.sent)
         assert.same({}, WowStub.state.used)

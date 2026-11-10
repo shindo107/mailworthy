@@ -47,7 +47,7 @@ Routes.ROUTE = "friend"     -- the verdict route of a diverted item
 -- nothing the game wouldn't let us attach).
 Routes.HARD_KEEPS = {
     locked = true, soulbound = true, ["quest item"] = true, ["a quest needs it"] = true, ["in use"] = true,
-    ["profession tool"] = true, ["item info not loaded yet"] = true,
+    ["profession tool"] = true, ["item info not loaded yet"] = true, ["conjured item"] = true,
 }
 
 -- Verdicts a class binding doesn't override either: AGENTS safety keeps anything but white items

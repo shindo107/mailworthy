@@ -34,10 +34,11 @@ local HARD_KEEPS = {
     [1081] = "an active quest's objective (Crisp Spider Meat for Redridge Goulash)",
     [7976] = "locked by the player, no auction price (Plans: Locked Recipe)",
     [7977] = "soulbound, no auction price (Bound Recipe)",
+    [5512] = "conjured (Minor Healthstone: white, no auction price; operator, 2026-11-10)",
 }
 
 --- A level-20ish character's bags on a fresh realm: trade goods, a BoE green, junk,
---- a quest item, soulbound gear, a tool, a locked item, the reagent bag in use, and
+--- a quest item, soulbound gear, a tool, a locked item, a conjured item, the reagent bag in use, and
 --- enough priced stacks for two mails. Returns the Auctionator price table.
 local function fillBags()
     local S, item = WowStub.state, WowStub.item
@@ -63,6 +64,8 @@ local function fillBags()
     -- A plain trade good an active quest asks for (operator, 2026-11-08): worth listing, never mailed.
     put(0, 12, item(1081, "Crisp Spider Meat", { count = 5, sell = 250, class = 7, subclass = 8 }), 9000)
     S.quests = { { title = "Redridge Goulash", objectives = { { text = "Crisp Spider Meat: 5/5", type = "item" } } } }
+    -- A warlock's Healthstone (operator, 2026-11-10: it was on the list for the bank alt): conjured, never mailed.
+    put(0, 15, item(5512, "Minor Healthstone", { sell = 0, class = 0 }))
     put(5, 1, item(2592, "Wool Cloth", { count = 20, sell = 33, class = 7, subclass = 5 }), 9000)
     for i = 1, 10 do -- bags 1 and 2: ten priced stacks, so the run needs a second mail
         local bag, slot = i <= 4 and 1 or 2, i <= 4 and i or i - 4

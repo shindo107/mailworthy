@@ -31,6 +31,9 @@ local function defaultState()
         inbox = {}, invoices = {}, takes = {},
         quests = {}, -- the quest log: { { title, header = true?, objectives = { { text, type } } } }
         itemClasses = {}, -- itemID -> "Mage" / "Mage, Warlock": the tooltip's "Classes: ..." line
+        conjured = {}, -- itemID -> true: the tooltip's "Conjured Item" line
+        uncached = {}, -- itemID -> true: its data hasn't loaded (a name line alone, IsItemDataCachedByID false)
+        tooltipReads = 0, -- C_TooltipInfo.GetItemByID calls
         mods = {}, bindings = {}, bindingOwners = {}, activeFrame = nil, now = 1000, gamepadUI = false,
         navButton = nil,
         -- bindings: guild = nil (not in one) or { clubId, name, rank (this character's 0-based rank index, default 3),
@@ -522,17 +525,25 @@ _G.SendMail = function(name, subject, body)
         cod = s().cod })
 end
 _G.C_Mail = { IsCommandPending = function() return false end }
--- Item tooltip data (TooltipInfoDocumentation.lua): a name line, and a "Classes: ..." line
+-- Item tooltip data (TooltipInfoDocumentation.lua): a name line, a "Conjured Item" line (no line
+-- type of its own: None = 0) for a conjured item, and a "Classes: ..." line
 -- (TooltipDataLineType.UsageRequirement = 43) for a class-only item.
 _G.ITEM_CLASSES_ALLOWED = "Classes: %s"
+_G.ITEM_CONJURED = "Conjured Item"
 _G.C_TooltipInfo = {
     GetItemByID = function(id)
+        s().tooltipReads = s().tooltipReads + 1
         local lines = { { type = 22, leftText = "Item " .. tostring(id) } }
+        if s().uncached[id] then return { id = id, lines = lines } end
+        if s().conjured[id] then lines[#lines + 1] = { type = 0, leftText = "Conjured Item" } end
         local classes = s().itemClasses[id]
         if classes then lines[#lines + 1] = { type = 43, leftText = "Classes: " .. classes } end
         return { id = id, lines = lines }
     end,
 }
+-- Item data (ItemDocumentation.lua): IsItemDataCachedByID(itemInfo) -> isCached. The item info
+-- calls stay the globals (GetItemInfo, GetItemInfoInstant), as Prices.lua falls back to them.
+_G.C_Item = { IsItemDataCachedByID = function(id) return s().uncached[id] ~= true end }
 -- The quest log (QuestLogDocumentation.lua): numShownEntries, GetInfo -> { title, questID, isHeader },
 -- GetQuestObjectives(questID) -> { { text, type, ... } }.
 _G.C_QuestLog = {

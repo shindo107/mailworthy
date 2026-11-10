@@ -224,10 +224,10 @@ local function ageText(age)
     return string.format(" (scanned %d day%s ago)", age, age == 1 and "" or "s")
 end
 
--- Kept for a reason the tooltip doesn't repeat: the game's own lines (soulbound, quest item), the
--- lock glow's line (Border), or nothing to say yet.
-BankAlt.QUIET_KEEPS = { soulbound = true, ["quest item"] = true, locked = true, ["in use"] = true,
-    ["item info not loaded yet"] = true }
+-- Kept for a reason the tooltip doesn't repeat: the game's own lines (soulbound, quest item,
+-- conjured item), the lock glow's line (Border), or nothing to say yet.
+BankAlt.QUIET_KEEPS = { soulbound = true, ["quest item"] = true, ["conjured item"] = true, locked = true,
+    ["in use"] = true, ["item info not loaded yet"] = true }
 
 --- Pure: the label and the line for an item with no verdict tag: where the Mailworthy window
 --- mails it, or why it stays in the bags. nil when there's nothing to add. `noBankAlt`: the bank

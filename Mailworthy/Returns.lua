@@ -13,7 +13,7 @@
 -- counted: system mail (the auction house, GMs), COD mail (a purchase), returned mail (our own
 -- items coming back). Several senders of one item: the latest first. Whole stacks only (the
 -- mailer never splits a stack): a stack bigger than what is still owed stays and follows the
--- normal rule. Hard keeps (locked, soulbound, quest, in use, a profession tool) never go.
+-- normal rule. Hard keeps (locked, soulbound, quest, conjured, in use, a profession tool) never go.
 -- Switch: /mw feature returnToSender off (no button).
 local _, ns = ...
 

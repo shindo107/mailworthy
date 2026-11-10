@@ -120,7 +120,7 @@ end
 --- (Returns.Owed, Return to sender on): stacks another character mailed this one go back to them
 --- (route "return"), whatever the rule says, except hard keeps. Returns { settings, priced,
 --- mail = {items}, keep = {items},
---- unmailable = {items} (soulbound / quest: never listed in the window), totals }.
+--- unmailable = {items} (soulbound / quest / conjured: never listed in the window), totals }.
 function Bags.Evaluate(settings)
     settings = settings or Bags.CurrentSettings()
     if settings.serverDay == nil then settings.serverDay = ns.Config.ServerDay() end
@@ -147,6 +147,7 @@ function Bags.Evaluate(settings)
         item.locked = ns.Locks.IsItemLocked(item.itemID)
         if classRoutes then item.classes, item.myClass = ns.Classes.Of(item.itemID), mine end
         item.questFor = ns.Quests.For(item.link)
+        item.conjured = ns.Conjured.Is(item.itemID)
         item.classID, item.subclassID = ns.Prices.ClassID(item.link)
         item.vendor = item.noValue and 0 or ns.Prices.Vendor(item.link)
         item.price = priced and ns.Prices.Lookup(item.link) or nil
@@ -411,7 +412,7 @@ function Bags.Report(result)
     if #result.unmailable > 0 then
         local names = {}
         for _, item in ipairs(result.unmailable) do names[#names + 1] = itemName(item) end
-        lines[#lines + 1] = "NOT MAILABLE (soulbound or quest, not listed in the window): " .. table.concat(names, ", ")
+        lines[#lines + 1] = "NOT MAILABLE (soulbound, quest or conjured, not listed in the window): " .. table.concat(names, ", ")
     end
     return table.concat(lines, "\n")
 end

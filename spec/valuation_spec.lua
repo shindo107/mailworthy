@@ -345,7 +345,7 @@ describe("valuation", function()
 
         it("the hard keeps and the profession keep come first", function()
             for _, o in ipairs({ { locked = true }, { bound = true }, { quest = true }, { questFor = "Goulash" },
-                { inUse = true } }) do
+                { inUse = true }, { conjured = true }, { itemID = 5512 } }) do
                 assert.equal("keep", V.Evaluate(potion(o), { ah = nil }, S).action)
             end
             assert.equal("profession tool", V.Evaluate(potion({ itemID = 2901 }), { ah = nil }, S).reason)
