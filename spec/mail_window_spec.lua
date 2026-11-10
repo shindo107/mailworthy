@@ -80,7 +80,7 @@ describe("mail window", function()
         assert.equal("Bob Surname", lines[1].name, "not skipped and nothing for it: the friend alone")
         lines = R({ recipients = {} }, nil, false, false)
         assert.truthy(lines[1].name:find("No bank alt", 1, true))
-        assert.equal("optional: Settings", lines[1].note)
+        assert.equal("optional", lines[1].note)
     end)
 
     it("formats item names and reasons for people", function()
@@ -785,6 +785,136 @@ describe("mail window", function()
         _G.MailworthyMailPage:Click()
         assert.equal("2/2  >", text("MailworthyMailPage"))
         assert.equal(3, #rowNames("MailworthyMailRow", ns.MailWindow.MAIL_ROWS))
+    end)
+
+    describe("the window and the controller (QoL pass B, operator 2026-11-09)", function()
+        local function longList()
+            WowStub.state.numSlots[1] = 20
+            for i = 1, 18 do
+                WowStub.setBag(1, i, WowStub.item(4000 + i, "Ore " .. i, { count = 5, sell = 5 }))
+                prices[WowStub.link(4000 + i, "Ore " .. i)] = 500
+            end
+            ns.MailWindow.Show("send")
+        end
+
+        it("pagers go both ways: back from the first page is the last", function()
+            longList()
+            local back = _G.MailworthyMailPageBack
+            assert.is_true(back:IsShown(), "shown with its page button")
+            assert.equal("1/3  >", text("MailworthyMailPage"))
+            back:Click()
+            assert.equal("3/3  >", text("MailworthyMailPage"))
+            back:Click()
+            assert.equal("2/3  >", text("MailworthyMailPage"))
+            _G.MailworthyMailPage:Click()
+            _G.MailworthyMailPage:Click()
+            assert.equal("1/3  >", text("MailworthyMailPage"), "and forward from the last is the first")
+            _G.MailworthyMailRow1:Click() -- lock one: still several pages
+            for i = 1, 18 do WowStub.setBag(1, i, nil) end
+            ns.MailWindow.Refresh()
+            assert.is_false(_G.MailworthyMailPage:IsShown())
+            assert.is_false(back:IsShown(), "hidden with it")
+        end)
+
+        it("the ledger's and the friends window's pagers go back too", function()
+            local store = ns.Ledger.Store()
+            for i = 1, 12 do
+                store.players["friend " .. i] = { name = "Friend " .. i, received = 1000 * i, sent = 0, inItems = {},
+                    outItems = {}, at = 1 }
+            end
+            ns.LedgerUI.Show()
+            assert.equal("1/3  >", text("MailworthyLedgerPage"))
+            assert.is_true(_G.MailworthyLedgerPageBack:IsShown())
+            _G.MailworthyLedgerPageBack:Click()
+            assert.equal("3/3  >", text("MailworthyLedgerPage"))
+            _G.MailworthyLedgerPage:Click()
+            assert.equal("1/3  >", text("MailworthyLedgerPage"))
+            ns.LedgerUI.Frame():Hide()
+            for i, prof in ipairs({ 333, 197, 164, 165, 171, 186 }) do ns.Routes.Add("Friend Number" .. i, prof) end
+            ns.RoutesUI.Show()
+            assert.equal("1/2  >", text("MailworthyFriendsBindPage"))
+            assert.is_true(_G.MailworthyFriendsBindPageBack:IsShown())
+            _G.MailworthyFriendsBindPageBack:Click()
+            assert.equal("2/2  >", text("MailworthyFriendsBindPage"))
+            _G.MailworthyFriendsBindPageBack:Click()
+            assert.equal("1/2  >", text("MailworthyFriendsBindPage"))
+        end)
+
+        it("controller: Up from the top row lands on Send, Down from the bottom row goes back to the top", function()
+            ns.MailWindow.Show("send")
+            ns.Nav.Reset()
+            local top = ns.Nav.Current()
+            assert.are_not.equal(_G.MailworthyMailSend, top)
+            ns.Nav.Move("up")
+            assert.equal(_G.MailworthyMailSend, ns.Nav.Current(), "one press to Send")
+            ns.Nav.Move("down")
+            assert.equal(top, ns.Nav.Current())
+            ns.Nav.Select(_G.MailworthyMailSettings)
+            ns.Nav.Move("down")
+            assert.equal(top, ns.Nav.Current(), "from anywhere on the bottom row")
+        end)
+
+        it("Up doesn't jump to a Send that can't be pressed", function()
+            ns.MailWindow.Show("send")
+            _G.MailworthyMailRow1:Click() -- locked: Nothing to send
+            assert.is_false(_G.MailworthyMailSend:IsEnabled())
+            ns.Nav.Reset()
+            local top = ns.Nav.Current()
+            ns.Nav.Move("up")
+            assert.equal(top, ns.Nav.Current())
+        end)
+
+        it("no bank alt: Choose bank alt... opens the picker, and picking one fills the list at once", function()
+            ns.Config.ClearBankAlt()
+            ns.MailWindow.Show("send")
+            local choose = _G.MailworthyMailChooseAlt
+            assert.is_true(choose:IsShown())
+            assert.is_false(_G.MailworthyMailSkipBankAlt:IsShown())
+            assert.equal(0, #ns.MailWindow.Result().mail)
+            local texts = ns.MailWindow.Texts()
+            assert.truthy(texts.total:find("would go to a bank alt", 1, true), texts.total)
+            assert.equal("Pick one and this list is ready to send.", texts.note)
+            assert.equal("Nothing to send", text("MailworthyMailSend"))
+            choose:Click()
+            assert.is_true(ns.SettingsUI.Frame():IsShown())
+            assert.equal("pick", ns.SettingsUI.View())
+            ns.SettingsUI.Choose("Roknua Themicrulah")
+            assert.equal(1, #ns.MailWindow.Result().mail, "the mail window redrew without closing Settings")
+            assert.is_false(choose:IsShown())
+            assert.equal("Send to Roknua", text("MailworthyMailSend"))
+        end)
+
+        it("the no-bank-alt words", function()
+            local W = ns.MailWindow
+            assert.equal("Nothing to mail without a bank alt or a binding.", W.EmptyText(false))
+            assert.equal("Nothing worth mailing in your bags right now.", W.EmptyText(true))
+            local keep = { { result = { held = "no bank alt", gain = 4981 } }, { result = { held = "no bank alt", gain = 2980 } },
+                { result = { reason = "locked" } } }
+            local head, note = W.NoAltText(keep, true)
+            assert.equal("+79s 61c would go to a bank alt", head)
+            assert.equal("Pick one and this list is ready to send; until then your bags carry the AH / DE / V tags.", note)
+            head = W.NoAltText({ { result = { held = "no bank alt" } } }, false)
+            assert.equal("1 item would go to a bank alt", head)
+            assert.is_nil(W.NoAltText({ { result = { reason = "locked" } } }, false))
+        end)
+
+        it("a setting changed in Settings redraws the mail list beside it", function()
+            ns.MailWindow.Show("send")
+            assert.equal(1, #ns.MailWindow.Result().mail)
+            ns.SettingsUI.Show(ns.MailWindow.Frame())
+            for _ = 1, 30 do _G.MailworthySettingsAmountUp:Click() end -- the bar goes past the ore's gain
+            assert.equal(0, #ns.MailWindow.Result().mail, "Settings is still open")
+            assert.is_true(ns.SettingsUI.Frame():IsShown())
+            for _ = 1, 30 do _G.MailworthySettingsAmountDown:Click() end
+            assert.equal(2, #ns.MailWindow.Result().mail, "the lowest bar: the cloth goes too")
+        end)
+
+        it("the Inbox's Send names the tab key of the player's own controller", function()
+            assert.equal("Send Mail tab: R1", ns.MailWindow.InboxSendText(true))
+            WowStub.state.labelStyle = "Letters"
+            assert.equal("Send Mail tab: RB", ns.MailWindow.InboxSendText(true))
+            assert.equal("Click Send Mail", ns.MailWindow.InboxSendText(false))
+        end)
     end)
 
     it("controller: Triangle opens it, Cross on Send sends, Circle closes it", function()

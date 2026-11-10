@@ -102,7 +102,42 @@ describe("D-pad reach in every view", function()
         WowStub.state.numSlots[1] = 16
         ns.MailWindow.Refresh()
         assert.is_true(_G.MailworthyMailPage:IsVisible(), "the Mailing list's page button")
-        assertNavigable("mailbox window, several pages", 10)
+        assert.is_true(_G.MailworthyMailPageBack:IsVisible(), "and its way back")
+        assertNavigable("mailbox window, several pages", 11)
+        -- No bank alt: Choose bank alt... sits on the To line.
+        ns.Config.ClearBankAlt()
+        ns.MailWindow.Refresh()
+        assert.is_true(_G.MailworthyMailChooseAlt:IsVisible())
+        assertNavigable("mailbox window, no bank alt", 5)
+        ns.Routes.Remove(ns.Routes.List()[1].key)
+        ns.Routes.Remove(ns.Routes.List()[1].key)
+        ns.MailWindow.Refresh()
+        assert.is_true(_G.MailworthyMailChooseAlt:IsVisible())
+        assertNavigable("mailbox window, no bank alt, no bindings", 3)
+    end)
+
+    it("the Send shortcut: Up from every top-row button lands on Send, Down from the bottom row leads back", function()
+        MailFrame:Show()
+        SendMailFrame:Show()
+        WowStub.state.activeFrame = MailFrame
+        ns.MailWindow.Show("send")
+        tick()
+        local send = _G.MailworthyMailSend
+        assert.is_true(send:IsEnabled())
+        local candidates = ns.Nav.Candidates()
+        local start = ns.Nav.TopLeft(candidates).button
+        for _, c in ipairs(candidates) do
+            if c.button ~= send and not ns.Nav.Pick(c, candidates, "up") then
+                ns.Nav.Select(c.button)
+                ns.Nav.Move("up")
+                assert.equal(send, ns.Nav.Current(), "Up from " .. tostring(c.button:GetName()))
+            end
+            if not ns.Nav.Pick(c, candidates, "down") then
+                ns.Nav.Select(c.button)
+                ns.Nav.Move("down")
+                assert.equal(start, ns.Nav.Current(), "Down from " .. tostring(c.button:GetName()))
+            end
+        end
     end)
 
     it("the mailbox window opened on the Inbox, and the report box", function()
@@ -133,6 +168,10 @@ describe("D-pad reach in every view", function()
         ns.RoutesUI.Show()
         tick()
         assertNavigable("friends list", 6)
+        for i, prof in ipairs({ 164, 165, 171, 186 }) do ns.Routes.Add("Friend Number" .. i, prof) end
+        ns.RoutesUI.Refresh()
+        assert.is_true(_G.MailworthyFriendsBindPageBack:IsVisible(), "the bindings list's two-way pager")
+        assertNavigable("friends list, several pages", 7)
         _G.MailworthyFriendsAdd:Click()
         tick()
         assertNavigable("friends add, step 1", 3)
@@ -153,6 +192,12 @@ describe("D-pad reach in every view", function()
         ns.LedgerUI.Show()
         tick()
         assertNavigable("ledger", 2)
+        for i = 1, 8 do
+            store.players["friend " .. i] = { name = "Friend " .. i, received = 100 * i, sent = 0, inItems = {}, outItems = {}, at = 1 }
+        end
+        ns.LedgerUI.Refresh()
+        assert.is_true(_G.MailworthyLedgerPageBack:IsVisible(), "the ledger's two-way pager")
+        assertNavigable("ledger, several pages", 4)
         ns.LedgerUI.Frame():Hide()
         ns.BankAlt.ShowWindow()
         tick()

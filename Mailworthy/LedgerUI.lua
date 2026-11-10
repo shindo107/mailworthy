@@ -88,6 +88,10 @@ function UI.Create()
         page, armed = page + 1, nil
         UI.Refresh()
     end, "MailworthyLedgerPage")
+    W.PagerBack(frame, pageButton, "MailworthyLedgerPageBack", function()
+        page, armed = page - 1, nil
+        UI.Refresh()
+    end)
     exportButton = W.Button(frame, "Export log...", 130, function() UI.Export() end, "MailworthyLedgerExport")
     doneButton = W.Button(frame, "Done", 100, function() frame:Hide() end, "MailworthyLedgerDone")
     hint = W.Label(frame, "GameFontHighlightSmall")
@@ -105,6 +109,7 @@ function UI.Refresh()
     debts = ns.Ledger.Debts()
     local pages = math.max(1, math.ceil(#debts / UI.ROWS))
     if page > pages then page = 1 end
+    if page < 1 then page = pages end -- back from the first page: the last
     local first, shown = (page - 1) * UI.ROWS, 0
     local marked = false
     for i, row in ipairs(rows) do
