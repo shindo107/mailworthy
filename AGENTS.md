@@ -21,9 +21,10 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   sender"). Never attach money.
   Never mail a locked item.
 - Never mail an item an active quest's objective names, quest item or not (operator,
-  2026-11-08). Without a bank alt (optional), or with it skipped for the visit, its share
+  2026-11-08). Never mail a conjured item (a Healthstone, a mana gem, a mage's food and water;
+  `Conjured.lua`; operator, 2026-11-10: "should always be keep as they are ephemeral items"). Without a bank alt (optional), or with it skipped for the visit, its share
   stays in the bags; only bindings mail.
-- A binding or a return never overrides a hard keep (locked, soulbound, quest, in use, tool); at or
+- A binding or a return never overrides a hard keep (locked, soulbound, quest, conjured, in use, tool); at or
   above its price cap the normal rule applies and the item goes to the bank alt.
 - Re-check each slot right before attaching it; skip anything that changed.
 - Without Auctionator (no price source), the only items mailed are unlocked, tradeable white

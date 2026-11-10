@@ -234,6 +234,9 @@ reason) when any of these hold:
 - it's locked (item lock; there's no separate never-mail list, operator 2026-10-13);
 - it's soulbound or a quest item (never listed in the window: it can't be mailed),
   or currently locked by the game;
+- it's conjured (a Healthstone, a mana gem, a mage's food and water; operator 2026-11-10, after a
+  Healthstone showed up for the bank alt; `Conjured.lua`, by item ID or the tooltip's "Conjured
+  Item" line; never listed in the window either);
 - an active quest's objective names it, quest item or not ("Redridge Goulash needs it":
   Crisp Spider Meat; operator 2026-11-08; `Quests.lua`, by item name);
 - it's a profession tool (fishing poles, Mining Pick, Blacksmith Hammer, Skinning

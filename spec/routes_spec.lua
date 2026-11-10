@@ -138,7 +138,8 @@ describe("bindings", function()
             assert.equal("Enchanting materials go to Bob Surname", v.reason)
             assert.equal(40, v.vendor)
             assert.equal(30, v.postage)
-            local hard = { "locked", "soulbound", "quest item", "in use", "profession tool", "item info not loaded yet" }
+            local hard = { "locked", "soulbound", "quest item", "conjured item", "in use", "profession tool",
+                "item info not loaded yet" }
             for _, reason in ipairs(hard) do
                 assert.is_nil(ns.Routes.Divert(item, { action = "keep", reason = reason }, nil, D, routes), reason)
             end

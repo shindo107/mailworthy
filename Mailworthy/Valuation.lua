@@ -175,8 +175,8 @@ end
 -- on the main"): with an auction price source installed but no auction price for an item, it is
 -- mailed to the bank alt (route NO_PRICE, chip "No price") to wait there for one, instead of
 -- staying in the bags. Grey junk stays for the vendor; a failed price call is never "no price
--- yet" (AGENTS safety): that item stays. The hard keeps (locked, soulbound, quest, a quest needs
--- it, in use, tools) and the profession keep come first, as for everything.
+-- yet" (AGENTS safety): that item stays. The hard keeps (locked, soulbound, quest, conjured, a
+-- quest needs it, in use, tools) and the profession keep come first, as for everything.
 Valuation.NO_PRICE = "noprice"
 Valuation.UNPRICED_GEAR = true -- unpriced green / blue weapons and armor go too (see the PR's questions)
 
@@ -328,9 +328,16 @@ function Valuation.IsTool(item)
         or (item.classID == 2 and item.subclassID == Valuation.FISHING_POLE_SUBCLASS)
 end
 
---- Soulbound and quest items can never be mailed: the window doesn't list them.
+--- Conjured items (Conjured.lua: healthstones, mana gems, a mage's food and water) never leave
+--- the bags: `item.conjured` (the bag scan's answer, which reads the tooltip too) or a known ID.
+function Valuation.IsConjured(item)
+    return item.conjured == true or ns.Conjured.Known(item.itemID)
+end
+
+--- Soulbound, quest and conjured items can never be mailed: the window doesn't list them.
 function Valuation.Unmailable(result)
-    return result.action == "keep" and (result.reason == "soulbound" or result.reason == "quest item")
+    return result.action == "keep" and (result.reason == "soulbound" or result.reason == "quest item"
+        or result.reason == ns.Conjured.REASON)
 end
 
 --- Armor (class 4) or weapon (class 2), uncommon or better.
@@ -435,8 +442,8 @@ end
 local evaluate
 
 --- item: { link, itemID, count, stacks, quality, classID, vendor (copper per unit; nil = not
----   loaded yet), bound, quest, questFor (the title of an active quest that needs it), inUse
----   (locked by the game), locked (Mailworthy lock) }
+---   loaded yet), bound, quest, conjured (Conjured.Is), questFor (the title of an active quest
+---   that needs it), inUse (locked by the game), locked (Mailworthy lock) }
 --- price: nil when there's no price source at all (no Auctionator); else
 ---   { ah = copper per unit or nil, age = days or nil, de = copper per item or nil }
 ---   history = Prices.History rows (optional), exact = true / false / nil }
@@ -451,6 +458,8 @@ function Valuation.Evaluate(item, price, settings)
     if item.locked then return keep("locked") end
     if item.bound then return keep("soulbound") end
     if item.quest then return keep("quest item") end
+    -- Conjured (a Healthstone, operator 2026-11-10): gone 15 minutes after logout, never mailed.
+    if Valuation.IsConjured(item) then return keep(ns.Conjured.REASON) end
     -- An item an active quest's objective names (Quests.lua), quest item or not: never sold.
     if item.questFor then return keep("a quest needs it", { quest = item.questFor }) end
     if item.inUse then return keep("in use") end

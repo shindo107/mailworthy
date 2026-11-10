@@ -173,6 +173,7 @@ function Mailer.StillThere(stack)
     if (tonumber(info.stackCount) or 1) ~= stack.count then return false, "count changed" end
     if info.isLocked then return false, "in use" end
     if info.isBound then return false, "soulbound" end
+    if ns.Conjured.Is(info.itemID) then return false, "conjured" end
     if ns.Locks.IsItemLocked(info.itemID) then return false, "locked" end
     -- A quest accepted mid-run (Codex review, 2026-11-08): what it asks for stays.
     if ns.Quests.For(info.hyperlink) then return false, "an active quest needs it" end
