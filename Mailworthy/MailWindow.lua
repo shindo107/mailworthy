@@ -633,7 +633,10 @@ function UI.Create()
     ns.Nav.OnSelect(onNavSelect)
     -- The controller's shortcut to Send: Up from the top row lands on it (operator, 2026-11-09:
     -- "B: Up jumps"), and Down from the bottom row goes back to the top.
+    -- Only from the window's own top and bottom rows (Nav.AtEdge): a button in the middle with
+    -- nothing straight above it stays where it is, so a stray Up never lands on Send or Stop.
     ns.Nav.SetWrap(frame, function(dir)
+        if not ns.Nav.AtEdge(dir) then return nil end
         if dir == "up" and sendButton:IsShown() and sendButton:IsEnabled() then return sendButton end
         if dir == "down" then return true end
         return nil
