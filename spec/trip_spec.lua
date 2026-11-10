@@ -93,6 +93,20 @@ describe("worth a mailbox trip", function()
             assert.equal(0, scans)
             assert.equal("", printed())
         end)
+
+        it("one bag without an answer is no count: a partial sum must not read as nearly full (Codex review)", function()
+            nearlyFull(5) -- above the threshold: bag 2 holds the 5 free slots
+            local real = C_Container.GetContainerNumFreeSlots
+            C_Container.GetContainerNumFreeSlots = function(bag)
+                if bag == 2 then error("secret") end
+                return real(bag)
+            end
+            assert.is_nil(ns.Trip.FreeSlots())
+            bagsChanged()
+            C_Container.GetContainerNumFreeSlots = real
+            assert.equal(0, scans)
+            assert.equal("", printed())
+        end)
     end)
 
     describe("the threshold", function()
@@ -115,7 +129,7 @@ describe("worth a mailbox trip", function()
             assert.equal("Worth mailing now: 14 items, +2g 24s 60c", ns.Trip.TooltipText())
         end)
 
-        it("scans again only when the free-slot count changed; room again clears the tooltip line", function()
+        it("scans again only when the bags changed; room again clears the tooltip line", function()
             nearlyFull(4)
             bagsChanged()
             bagsChanged()
@@ -159,6 +173,54 @@ describe("worth a mailbox trip", function()
             bagsChanged()
             assert.truthy(printed():find("2 bag slots left. 14 items are worth mailing: +2g 24s 60c more than vendoring.", 1, true),
                 printed())
+        end)
+    end)
+
+    describe("the cached result (Codex review)", function()
+        it("junk swapped for ore in the same slot (same free count) is seen", function()
+            junk(1, 27)
+            bagsChanged()
+            assert.equal("", printed())
+            local ore = WowStub.item(2770, "Copper Ore", { count = 14, sell = 5, class = 7, subclass = 7 })
+            prices[ore.hyperlink] = 1700
+            WowStub.setBag(0, 1, ore)
+            assert.equal(3, ns.Trip.FreeSlots())
+            bagsChanged()
+            assert.equal(2, scans)
+            assert.truthy(printed():find("3 bag slots left. 14 items are worth mailing", 1, true), printed())
+            assert.equal("Worth mailing now: 14 items, +2g 24s 60c", ns.Trip.TooltipText())
+        end)
+
+        it("a stack that grew is seen", function()
+            nearlyFull(3)
+            bagsChanged()
+            WowStub.state.bags[0][1].stackCount = 20
+            bagsChanged()
+            assert.equal(2, scans)
+            assert.truthy(ns.Trip.TooltipText():find("Worth mailing now: 20 items", 1, true))
+        end)
+
+        it("the bank alt cleared: the tooltip line goes at once, and the next bag change rescans", function()
+            nearlyFull(3)
+            bagsChanged()
+            assert.is_not_nil(ns.Trip.TooltipText())
+            MailworthyDB.bankAlts = {}
+            assert.is_nil(ns.Trip.TooltipText())
+            bagsChanged()
+            assert.equal(2, scans)
+            assert.is_nil(ns.Trip.TooltipText())
+        end)
+
+        it("a changed setting or a new binding rescans at the next bag change", function()
+            nearlyFull(3)
+            bagsChanged()
+            ns.Config.Set("minGain", 90000)
+            bagsChanged()
+            assert.equal(2, scans)
+            assert.is_nil(ns.Trip.TooltipText(), "2g 24s is under a 9g minimum gain")
+            assert.truthy(ns.Routes.Add(BOB, ENCHANTING))
+            bagsChanged()
+            assert.equal(3, scans)
         end)
     end)
 
