@@ -72,6 +72,126 @@ describe("guild template", function()
         end)
     end)
 
+    describe("the Enchanting rule's Gear switch", function()
+        -- operator, 2026-11-11: "guild master sets it per rule"
+        local GEAR = "de"
+
+        it("travels as an odd cap, which a Mailworthy from before the switch reads as an ordinary rule", function()
+            local G = ns.Guild
+            assert.equal(1001, G.WireCap({ profession = ENCHANTING, cap = 1000, gear = GEAR }))
+            assert.equal(1000, G.WireCap({ profession = ENCHANTING, cap = 1000 }))
+            assert.equal(999999999, G.WireCap({ profession = ENCHANTING, gear = GEAR }), "the switch, no cap")
+            assert.equal(0, G.WireCap({ profession = ENCHANTING }))
+            assert.equal(1000, G.WireCap({ profession = ALCHEMY, cap = 1000, gear = GEAR }), "only Enchanting has the switch")
+            assert.same({ 1000, GEAR }, { G.ReadCap(ENCHANTING, 1001) })
+            assert.same({ nil, GEAR }, { G.ReadCap(ENCHANTING, 999999999) })
+            assert.same({ 1000 }, { G.ReadCap(ENCHANTING, 1000) })
+            assert.same({}, { G.ReadCap(ENCHANTING, 0) })
+            assert.same({ 1001 }, { G.ReadCap(ALCHEMY, 1001) }, "another rule's cap is taken as it is")
+            for _, cap in ipairs(ns.Routes.CAP_STEPS) do
+                assert.same({ cap, GEAR }, { G.ReadCap(ENCHANTING, G.WireCap({ profession = ENCHANTING, cap = cap, gear = GEAR })) })
+                assert.same({ cap }, { G.ReadCap(ENCHANTING, G.WireCap({ profession = ENCHANTING, cap = cap })) })
+            end
+            local msgs = G.Encode(REV, GM, { { profession = ENCHANTING, to = BOB, cap = 1000, gear = GEAR },
+                { profession = ALCHEMY, to = ANN, gear = GEAR } })
+            assert.same({ "T2|" .. REV .. "|Guild Master|1/2|333=Bob Surname:1001",
+                "T2|" .. REV .. "|Guild Master|2/2|171=Ann Herbal:0" }, msgs)
+            -- what v0.x's Guild.DecodePart matched a rule with: the message is still a rule to it
+            local profession, name, cap = msgs[1]:match("|(%d+)=([^:]+):(%d+)$")
+            assert.same({ "333", BOB, "1001" }, { profession, name, cap })
+            assert.same({ profession = ENCHANTING, to = BOB, cap = 1000, gear = GEAR }, ns.Comms.Decode(msgs[1]).part.rule)
+            assert.same({ profession = ENCHANTING, to = BOB, gear = GEAR },
+                ns.Comms.Decode("T2|" .. REV .. "|Guild Master|1/1|333=Bob Surname:999999999").part.rule)
+            assert.same({ profession = ENCHANTING, to = BOB, cap = 50000 },
+                ns.Comms.Decode("T2|" .. REV .. "|Guild Master|1/1|333=Bob Surname:50000").part.rule, "a rule from before the switch")
+        end)
+
+        it("a member takes it with the template, mails by it, and passes it on unchanged", function()
+            publishFrom(GM, REV, { { profession = ENCHANTING, to = BOB, cap = 10000, gear = GEAR } })
+            local t = ns.Guild.Template()
+            assert.equal(GEAR, t.rules[1].gear)
+            assert.equal(10000, t.rules[1].cap)
+            assert.truthy(printed():find("Enchanting to Bob Surname (gear only when disenchanting pays more)", 1, true), printed())
+            assert.equal("1g each or more: to my bank alt; gear only when disenchanting pays more",
+                ns.RoutesUI.GuildCapText(t.rules[1]))
+            assert.equal("1g each or more: to my bank alt", ns.RoutesUI.GuildCapText({ profession = ENCHANTING, to = BOB, cap = 10000 }))
+            ns.Guild.SetUse(true)
+            assert.equal(GEAR, ns.Routes.List()[1].gear, "the guild rule is a binding with the switch on")
+            -- a member looking at the guild view has no switch to press
+            ns.RoutesUI.ShowGuild()
+            assert.is_false(_G.MailworthyFriendsGear1:IsShown())
+            ns.RoutesUI.Frame():Hide()
+            -- the scan: gloves that sell for more go the normal way, the dust still goes to Bob
+            withAuctionator()
+            local gloves = WowStub.item(5001, "Sentry's Gloves", { quality = 2, level = 18, class = 4, sell = 310 })
+            WowStub.setBag(0, 1, gloves)
+            WowStub.setBag(0, 2, dust(20))
+            prices[gloves.hyperlink], prices[WowStub.link(10940, "Strange Dust")] = 4200, 3
+            _G.DisenchantValueAPI = { GetValue = function(l) return tostring(l):find("item:5001", 1, true) and 900 or nil end }
+            finally(function() _G.DisenchantValueAPI = nil end)
+            local to = {}
+            for _, item in ipairs(ns.Bags.Evaluate().mail) do to[item.itemID] = item.result.to or "bank alt" end
+            assert.same({ [5001] = "bank alt", [10940] = BOB }, to)
+            -- any member passes the copy on: the odd cap goes out again
+            WowStub.state.addonMessages = {}
+            ns.Guild.Broadcast("spec", true)
+            assert.equal("T2|" .. REV .. "|Guild Master|1/1|333=Bob Surname:10001", WowStub.state.addonMessages[1].message)
+        end)
+
+        it("a copy an older Mailworthy saved (the odd cap, no switch field) reads as the switch on after the update", function()
+            -- Codex review, 2026-11-11: before the update the member's Mailworthy stored the rule as it
+            -- travelled; the same revision must mean the same thing on every member's side afterwards
+            local key = "Classic Beta PvP|Alliance|Bank Of Azeroth"
+            MailworthyDB.guildTemplates = { [key] = { rev = REV, from = GM, at = REV, use = true, rules = {
+                { profession = ENCHANTING, to = BOB, cap = 10001 }, { profession = ALCHEMY, to = ANN, cap = 5001 } } } }
+            MailworthyDB.guildDrafts = { [key] = { rules = { { profession = ENCHANTING, to = BOB, cap = 999999999 } } } }
+            local t = ns.Guild.Template()
+            assert.same({ profession = ENCHANTING, to = BOB, cap = 10000, gear = GEAR }, t.rules[1])
+            assert.same({ profession = ALCHEMY, to = ANN, cap = 5001 }, t.rules[2], "another profession's cap is left alone")
+            assert.equal(GEAR, ns.Routes.List()[1].gear, "the guild rule applies with the switch on")
+            WowStub.state.addonMessages = {}
+            ns.Guild.Broadcast("spec", true)
+            assert.equal("T2|" .. REV .. "|Guild Master|1/2|333=Bob Surname:10001", WowStub.state.addonMessages[1].message,
+                "and goes out again as it came")
+            WowStub.state.guild.rank = 0
+            assert.same({ profession = ENCHANTING, to = BOB, gear = GEAR }, ns.Guild.Draft()[1], "a saved draft too: no cap, the switch on")
+            -- the switch off never travels as an odd cap (a cap edited by hand)
+            assert.equal(1000, ns.Guild.WireCap({ profession = ENCHANTING, cap = 1001 }))
+        end)
+
+        it("the guild master sets it in the editor: one press on the Enchanting rule, then Publish", function()
+            WowStub.state.guild.rank = 0
+            ns.Guild.DraftAdd(BOB, ENCHANTING)
+            ns.Guild.DraftAdd(ANN, ALCHEMY)
+            ns.Guild.Publish()
+            assert.is_false(ns.Guild.DraftChanged())
+            ns.RoutesUI.ShowGuild()
+            -- the draft is sorted by profession name: Alchemy, then Enchanting
+            assert.is_false(_G.MailworthyFriendsGear1:IsShown(), "the Alchemy rule has no switch")
+            assert.is_true(_G.MailworthyFriendsGear2:IsShown())
+            assert.equal("Gear: all green and blue", _G.MailworthyFriendsGear2:GetText())
+            _G.MailworthyFriendsGear2:Click()
+            assert.equal("Gear: only when disenchanting pays more", _G.MailworthyFriendsGear2:GetText())
+            assert.is_true(ns.Widgets.IsToggled(_G.MailworthyFriendsGear2))
+            assert.equal(GEAR, ns.Guild.Draft()[2].gear)
+            assert.is_nil(ns.Guild.Template().rules[2].gear, "not published yet")
+            assert.is_true(ns.Guild.DraftChanged(), "the switch alone is a change to publish")
+            assert.equal("Publish to guild", _G.MailworthyFriendsPublish:GetText())
+            assert.equal("Enchanting: gear only when disenchanting pays more. Publish to guild to send the change.",
+                ns.RoutesUI.GearHint(ns.Guild.Draft()[2], true))
+            -- a new player for the rule keeps the switch
+            ns.Guild.DraftAdd(MEMBER, ENCHANTING)
+            assert.equal(GEAR, ns.Guild.Draft()[2].gear)
+            WowStub.state.addonMessages = {}
+            _G.MailworthyFriendsPublish:Click()
+            assert.equal("333=Plain Member:1001", WowStub.state.addonMessages[2].message:match("|([^|]+)$"))
+            assert.equal(GEAR, ns.Guild.Template().rules[2].gear)
+            assert.is_false(ns.Guild.DraftToggleGear(ALCHEMY), "no switch on another profession's rule")
+            assert.is_true(ns.Guild.DraftToggleGear(ENCHANTING))
+            assert.is_nil(ns.Guild.Draft()[2].gear)
+        end)
+    end)
+
     describe("receiving", function()
         it("takes the guild master's template, waits for the player's choice, and says so", function()
             publishFrom(GM, REV, RULES)
@@ -183,7 +303,7 @@ describe("guild template", function()
             local t = ns.Guild.Template()
             assert.equal(BOB, t.rules[1].to, "the forged copy isn't taken")
             assert.is_true(t.rev > real + 100, "the real one goes out again, newer than the forgery")
-            assert.equal("T2|" .. t.rev .. "|Guild Master|1/1|333=Bob Surname:50000", WowStub.state.addonMessages[1].message)
+            assert.equal("T2|" .. t.rev .. "|Guild Master|1/1|333=Bob Surname:1000", WowStub.state.addonMessages[1].message)
             assert.truthy(printed():find("Plain Member passed on a guild template in your name", 1, true))
             publishFrom(MEMBER, t.rev, { { profession = ENCHANTING, to = BOB } }, GM)
             assert.equal(t.rev, ns.Guild.Template().rev, "its own real revision passed back is fine")
@@ -352,7 +472,7 @@ describe("guild template", function()
             assert.equal("guild", ns.RoutesUI.View(), "a rule returns to the guild view")
             assert.equal(BOB, ns.Guild.Draft()[1].to)
             _G.MailworthyFriendsCapUp1:Click()
-            assert.equal(100000, ns.Guild.Draft()[1].cap)
+            assert.equal(2500, ns.Guild.Draft()[1].cap, "a new rule starts at 10s (2026-11-11); one step up: 25s")
             _G.MailworthyFriendsAdd:Click()
             _G.MailworthyFriendsPick1:Click() -- yourself
             _G.MailworthyFriendsProfession8:Click() -- Tailoring
@@ -362,8 +482,8 @@ describe("guild template", function()
             _G.MailworthyFriendsPublish:Click()
             assert.equal(2, #WowStub.state.addonMessages)
             local head = "T2|" .. WowStub.state.serverTime .. "|Rettana Quilwrit|"
-            assert.equal(head .. "1/2|333=Bob Surname:100000", WowStub.state.addonMessages[1].message)
-            assert.equal(head .. "2/2|197=Rettana Quilwrit:50000", WowStub.state.addonMessages[2].message)
+            assert.equal(head .. "1/2|333=Bob Surname:2500", WowStub.state.addonMessages[1].message)
+            assert.equal(head .. "2/2|197=Rettana Quilwrit:1000", WowStub.state.addonMessages[2].message)
             assert.equal("GUILD", WowStub.state.addonMessages[1].channel)
             assert.is_true(ns.Guild.InUse(), "the author's own copy is on")
             assert.equal(1, ns.Routes.Count(), "the author never mails themself")

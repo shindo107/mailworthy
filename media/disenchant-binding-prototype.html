@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mailworthy Enchanting binding prototype</title>
+<!-- Built 2026-11-11 with the operator's picks (redrawn to match them). From a CurseForge comment: "When adding a friend as
+     an enchanter, the option to only send green/blue items if the disenchant value is greater than
+     vendor/ah would be great", and the operator's note that the price cap's lowest step (50s) is no
+     use before level 30. Picks: the switch on each Enchanting binding; a piece with no disenchant
+     value is sent anyway; the guild master sets it per rule; the ladder starts at 50c and a new
+     binding starts at 10s.
+     Row 1: the friends window (the Enchanting binding's new Gear button, off and on; the longer cap
+     ladder). Row 2: the same bags at the mailbox with the switch off and on, and how one piece is
+     decided. Row 3: the report line, no disenchant value, and the guild template.
+     Rendered to media/disenchant-binding-prototype.png by tools/build-icons.sh. The names are made
+     up (same cast as ux-pass-prototype.html); the prices are a level 15-20 character's. -->
+<style>
+  :root {
+    --gold: #ffd100; --text: #f2e8d0; --dim: #b9ad92; --edge: #8a6a2a; --edge-hi: #e0b44c;
+    --panel: #15110c; --row: #221b12; --row-alt: #1c160f; --green: #1eff00; --blue: #4da6ff; --white: #ffffff;
+    --mint: #33ff99; --note: #9ec7ff; --warn: #ff8040; --new: #ff7ad9;
+  }
+  * { box-sizing: border-box; }
+  /* Authored at 1660 x 1580 (the PNG's size): three columns. In a narrower window the columns
+     wrap to two or one and the page scrolls. */
+  html { margin: 0; overflow: auto; }
+  body { margin: 0; max-width: 1660px; min-height: 1580px;
+    font: 13px/1.35 "Trebuchet MS", "Segoe UI", Arial, sans-serif; color: var(--text);
+    background: radial-gradient(ellipse at 30% 20%, #3a4a3a 0%, #1d241c 45%, #0d110d 100%);
+  }
+  .page { padding: 18px 24px; }
+  .banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; margin-bottom: 6px; }
+  .banner h1 { margin: 0; font: bold 20px Georgia, serif; color: var(--gold); }
+  .banner span { color: var(--dim); font-size: 13px; }
+  .key { color: var(--dim); font-size: 12px; margin-bottom: 14px; }
+  .key b { color: var(--new); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 510px)); column-gap: 40px; row-gap: 26px; align-items: start; }
+  .rowhead { grid-column: 1 / -1; margin: 0 0 -12px; font: bold 15px Georgia, serif; color: var(--text);
+    border-bottom: 1px solid #4b5a48; padding-bottom: 4px; }
+  .rowhead small { color: var(--dim); font: 12px "Trebuchet MS", Arial, sans-serif; margin-left: 10px; }
+  .cap { margin: 0 0 8px; }
+  .cap b { color: var(--gold); font: bold 14px Georgia, serif; }
+  .cap .size { float: right; color: var(--mint); font-size: 12px; font-weight: bold; }
+  .cap ul { margin: 4px 0 0; padding-left: 18px; color: var(--dim); font-size: 12px; }
+  .cap li { margin: 1px 0; }
+  .cap li b { color: var(--text); font: bold 12px "Trebuchet MS", Arial, sans-serif; }
+
+  .frame {
+    position: relative; background: var(--panel); border: 3px solid var(--edge);
+    border-radius: 10px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px var(--edge-hi), 0 12px 30px rgba(0,0,0,.6);
+  }
+  .title {
+    height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    font: bold 15px Georgia, "Times New Roman", serif; color: var(--gold);
+    background: linear-gradient(#3b2d18, #241a0d); border-bottom: 2px solid var(--edge); border-radius: 7px 7px 0 0;
+  }
+  .title img { width: 22px; height: 22px; }
+  .title .x { margin-left: auto; width: 18px; height: 18px; border-radius: 50%; background: #8b1a1a;
+    color: #fff; font: bold 12px Arial; display: grid; place-items: center; border: 1px solid #d9a; }
+  .content { padding: 10px 16px 14px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 70px; height: 26px; padding: 0 12px;
+    font: bold 12px "Trebuchet MS", Arial, sans-serif; color: var(--gold);
+    background: linear-gradient(#9b1c1c, #5c0d0d); border: 1px solid #e0b44c; border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.25); white-space: nowrap;
+  }
+  .btn.grey { background: linear-gradient(#4a4036, #2b241c); }
+  .btn.small { min-width: 0; height: 22px; padding: 0 9px; font-size: 11px; }
+  .btn.step { min-width: 24px; width: 24px; padding: 0; }
+  .btn.lit { color: var(--mint); border-color: var(--mint); }
+  .nav { outline: 2px solid var(--gold); outline-offset: 3px; }
+  h3 { margin: 12px 0 5px; font: bold 13px Georgia, serif; color: var(--gold); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  h3 small { color: var(--dim); font: 12px "Trebuchet MS", Arial, sans-serif; }
+  .hint { color: var(--dim); font-size: 11px; }
+  .sub { color: var(--dim); font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 4px 8px; vertical-align: middle; }
+  tr:nth-child(odd) td { background: var(--row); }
+  tr:nth-child(even) td { background: var(--row-alt); }
+  .icon { width: 24px; height: 24px; border-radius: 3px; border: 1px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+  .q1 { color: var(--white); } .q2 { color: var(--green); } .q3 { color: var(--blue); }
+  .count { color: var(--dim); }
+  .why { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+  .why.ah { background: #2d4a6b; color: #cfe6ff; }
+  .why.friend { background: #8c5a1e; color: #ffe8c2; }
+  .why.stay { background: #3a3a3a; color: #d8d8d8; }
+  .gain { text-align: right; white-space: nowrap; }
+  .money i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 4px 0 2px; }
+  .g { background: radial-gradient(#fff3a0, #d4a017); } .s { background: radial-gradient(#ffffff, #9a9a9a); }
+  .c { background: radial-gradient(#ffcf9a, #a0582a); }
+  .kept td { padding: 3px 8px; color: var(--dim); font-size: 12px; }
+  .kept .tag { color: var(--note); }
+  .group td { background: none !important; padding: 6px 8px 2px; color: var(--dim); font-size: 11px; }
+  .group td b { color: var(--gold); }
+
+  .to { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; background: var(--row);
+    border: 1px solid #3a2e1c; border-radius: 4px; }
+  .to b { color: var(--gold); }
+  .to .who { color: var(--white); font-weight: bold; font-size: 14px; }
+  .to .note { color: var(--dim); font-size: 12px; }
+  .to .btn { margin-left: auto; }
+  .tomore { padding: 3px 10px 0 38px; font-size: 12px; display: flex; gap: 8px; }
+  .tomore .note { color: var(--dim); margin-left: auto; }
+  .total { margin-top: 10px; padding: 7px 10px; background: #1d2a1d; border: 1px solid #3f6b3f; border-radius: 4px; }
+  .total .big { font-size: 15px; font-weight: bold; color: #b6ff9a; }
+  .total .sub { color: var(--dim); font-size: 12px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+  .actions .btn { height: 30px; font-size: 13px; min-width: 100px; }
+  .actions .send { min-width: 180px; }
+  .actions .legend { white-space: nowrap; margin-left: auto; }
+
+  /* The friends window's binding rows */
+  .binding { border: 1px solid #3a2e1c; border-radius: 4px; background: var(--row); padding: 6px 10px; margin-bottom: 6px; }
+  .binding .line1 { display: flex; align-items: center; gap: 8px; }
+  .binding .toname { color: var(--gold); font-weight: bold; }
+  .binding .line1 .btn { margin-left: auto; }
+  .binding .line2, .binding .line3 { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--text); }
+  .binding .line2 .capt { width: 216px; }
+  .binding .line2 .scope { margin-left: auto; min-width: 130px; }
+  .binding .line3 .btn { min-width: 300px; justify-content: flex-start; }
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .foot .hint { flex: 1; }
+  .new { box-shadow: 0 0 0 2px var(--new) !important; border-radius: 4px; }
+  .nav.new { box-shadow: 0 0 0 7px var(--new) !important; }
+
+  /* The cap ladder */
+  .ladder { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 10px; }
+  .ladder span { padding: 2px 7px; border-radius: 4px; background: var(--row); border: 1px solid #3a2e1c; font-size: 12px; color: var(--text); }
+  .ladder .add { border-color: var(--new); color: var(--new); font-weight: bold; }
+  .ladder .def { border-color: var(--gold); color: var(--gold); font-weight: bold; }
+  .ladder.old span { color: var(--dim); }
+  .lab { color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .lab b { color: var(--text); }
+
+  /* Notes and rule tables */
+  .box { background: rgba(21,17,12,.85); border: 1px solid #4b5a48; border-radius: 8px; padding: 10px 14px; }
+  .rule th { text-align: left; color: var(--dim); font-size: 11px; font-weight: normal; border-bottom: 1px solid #4b5a48; }
+  .rule td { font-size: 12px; white-space: nowrap; padding: 5px 6px; }
+  .rule .win { color: #b6ff9a; font-weight: bold; }
+  .rule .lose { color: var(--dim); }
+  .list { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--text); }
+  .list li { margin: 3px 0; }
+  .list .alt { color: var(--dim); }
+  .list b { color: var(--gold); }
+  .chat { background: rgba(0,0,0,.55); border: 1px solid #333; border-radius: 4px; padding: 8px 10px; font-size: 12px; line-height: 1.5; margin-top: 6px; }
+  .chat .mw { color: var(--mint); }
+  .chat .hl { color: var(--new); font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="banner"><h1>Enchanting binding: gear only when disenchanting pays</h1>
+    <span>Built 2026-11-11 with the operator's picks. Every button works by mouse and by Cross on the D-pad highlight (gold outline).</span></div>
+  <div class="key"><b>Pink outline</b> = new or changed. Prices are a level 15-20 character's: everything is in silver. Bob's cap is stepped up to 1g here; a new binding starts at 10s.</div>
+
+  <div class="grid">
+    <!-- ============ Row 1: the friends window ============ -->
+    <div class="rowhead">The friends window <small>where the player sets it</small></div>
+
+    <div>
+      <div class="cap"><b>1 · Off: as today</b><span class="size">the default</span>
+        <ul><li>An <b>Enchanting</b> binding gets a third line with one button; other bindings don't</li>
+          <li><b>Gear: all green and blue</b> is what the binding does now</li>
+          <li>One more stop on the D-pad walk, under - and +</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+        <div class="content">
+          <h3>Bindings</h3>
+          <div class="binding">
+            <div class="line1"><span>Enchanting materials</span><span class="toname">to Bob Thornfield</span>
+              <span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="capt">1g each or more: to my bank alt</span>
+              <span class="btn grey small step">-</span><span class="btn grey small step">+</span>
+              <span class="btn grey small scope">All my characters</span></div>
+            <div class="line3"><span class="btn grey small new">Gear: all green and blue</span></div>
+          </div>
+          <div class="binding">
+            <div class="line1"><span>Leatherworking materials</span><span class="toname">to Mara Quill</span>
+              <span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="capt">2g each or more: to my bank alt</span>
+              <span class="btn grey small step">-</span><span class="btn grey small step">+</span>
+              <span class="btn grey small scope">This character</span></div>
+          </div>
+          <div class="foot"><span class="btn grey small">Add a binding...</span>
+            <span class="hint">Over the cap a material goes to your bank alt instead.</span><span class="btn">Done</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>2 · On: one press</b><span class="size">saved with the binding</span>
+        <ul><li>The button names the rule in force, like the other switches</li>
+          <li>The footer says what happens to the rest</li>
+          <li>The mailbox window redraws at once if it is open</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Send materials to friends</span><span class="x">x</span></div>
+        <div class="content">
+          <h3>Bindings</h3>
+          <div class="binding">
+            <div class="line1"><span>Enchanting materials</span><span class="toname">to Bob Thornfield</span>
+              <span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="capt">1g each or more: to my bank alt</span>
+              <span class="btn grey small step">-</span><span class="btn grey small step">+</span>
+              <span class="btn grey small scope">All my characters</span></div>
+            <div class="line3"><span class="btn grey small lit nav new">Gear: only when disenchanting pays more</span></div>
+          </div>
+          <div class="binding">
+            <div class="line1"><span>Leatherworking materials</span><span class="toname">to Mara Quill</span>
+              <span class="btn grey small">Remove</span></div>
+            <div class="line2"><span class="capt">2g each or more: to my bank alt</span>
+              <span class="btn grey small step">-</span><span class="btn grey small step">+</span>
+              <span class="btn grey small scope">This character</span></div>
+          </div>
+          <div class="foot"><span class="btn grey small">Add a binding...</span>
+            <span class="hint new" style="padding:2px 4px">Other gear follows your normal rule.</span><span class="btn">Done</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>3 · The cap ladder starts lower</b><span class="size">- and + as today</span>
+        <ul><li>The lowest step was 50s: no use before level 30</li>
+          <li>Five steps under it; a new binding starts at <b>10s</b> (it was 5g)</li>
+          <li>The cap is checked against the auction price each; a saved binding keeps its cap</li></ul></div>
+      <div class="box">
+        <div class="lab">Before</div>
+        <div class="ladder old"><span>50s</span><span>1g</span><span>2g</span><span class="def">5g</span><span>10g</span><span>25g</span><span>50g</span><span>100g</span><span>no cap</span></div>
+        <div class="lab"><b>Now</b> <span style="color:var(--gold)">(gold = where a new binding starts)</span></div>
+        <div class="ladder"><span class="add">50c</span><span class="add">1s</span><span class="add">5s</span><span class="add def">10s</span><span class="add">25s</span><span>50s</span><span>1g</span><span>2g</span><span>5g</span><span>10g</span><span>25g</span><span>50g</span><span>100g</span><span>no cap</span></div>
+        <div class="binding" style="margin:10px 0 0">
+          <div class="line1"><span>Enchanting materials</span><span class="toname">to Bob Thornfield</span>
+            <span class="btn grey small">Remove</span></div>
+          <div class="line2"><span class="capt new" style="padding:1px 3px">25s each or more: to my bank alt</span>
+            <span class="btn grey small step nav">-</span><span class="btn grey small step">+</span>
+            <span class="btn grey small scope">All my characters</span></div>
+          <div class="line3"><span class="btn grey small">Gear: all green and blue</span></div>
+        </div>
+        <div class="sub" style="margin-top:8px">A 25s cap alone would catch the gloves and the staff in row 2, but it is one number for every
+          item: it also sends Bob's 30s essences to the bank alt. The Gear button compares each piece instead.</div>
+      </div>
+    </div>
+
+    <!-- ============ Row 2: at the mailbox ============ -->
+    <div class="rowhead">At the mailbox <small>the same bags, the switch off and on</small></div>
+
+    <div>
+      <div class="cap"><b>4 · Off: every piece goes to Bob</b><span class="size">today</span>
+        <ul><li>Gloves that sell for 42s and a blue staff that sells for 95s are both under Bob's 1g cap</li>
+          <li>The belt is worth more at a vendor than as dust</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Mailworthy</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="to"><b>To:</b><span class="who">Penny Ledgerwick</span><span class="note">your bank alt · 1 mail</span><span class="btn grey small">Skip once</span></div>
+          <div class="tomore"><span>Bob Thornfield</span><span class="note">Enchanting materials · 1 mail</span></div>
+          <h3>Mailing <small>8 items · 2 mails</small></h3>
+          <table>
+            <tr><td style="width:32px"><div class="icon" style="background:linear-gradient(135deg,#e0874a,#7a3e1a)"></div></td>
+              <td><span class="q1">Copper Ore</span> <span class="count">x13</span></td><td><span class="why ah">Auction</span></td>
+              <td class="gain money">+29<i class="s"></i>80<i class="c"></i></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#c97b3d,#6b3a18)"></div></td>
+              <td><span class="q2">Bandit Cloak</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#7d9a6a,#3a4a2e)"></div></td>
+              <td><span class="q2">Sentry's Gloves</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#8a7a5a,#4a3f2a)"></div></td>
+              <td><span class="q2">Cadet Belt</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#6a8ad0,#2a3a6a)"></div></td>
+              <td><span class="q3">Ironwood Staff</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#a9c5ff,#3d4f8a)"></div></td>
+              <td><span class="q1">Strange Dust</span> <span class="count">x20</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#c9a6ff,#5a2d8a)"></div></td>
+              <td><span class="q1">Lesser Magic Essence</span> <span class="count">x4</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#e8dcb0,#8a7a4a)"></div></td>
+              <td><span class="q2">Formula: Enchant Bracer - Minor Agility</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+          </table>
+          <h3>Staying in your bags <small>1 item</small></h3>
+          <table class="kept">
+            <tr><td>Linen Cloth x20</td><td class="tag">your Tailoring needs it</td></tr>
+          </table>
+          <div class="total">
+            <div class="big money">+29<i class="s"></i>80<i class="c"></i> more than vendoring</div>
+            <div class="sub">after the 5% AH cut, 24h deposits and 60c postage; 7 stacks to Bob</div>
+          </div>
+          <div class="actions"><span class="btn send">Send to Penny, Bob</span><span class="btn grey">Settings</span>
+            <span class="hint legend">&#9747; press &nbsp; &#9711; close &nbsp; D-pad move</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>5 · On: Bob gets what is worth disenchanting</b><span class="size">+1g 12s 45c for you</span>
+        <ul><li>Gloves and staff sell for more than they disenchant: to the bank alt</li>
+          <li>The belt stays for the vendor; the rest still goes to Bob</li></ul></div>
+      <div class="frame">
+        <div class="title"><img src="logo-512.png" alt=""><span>Mailworthy</span><span class="x">x</span></div>
+        <div class="content">
+          <div class="to"><b>To:</b><span class="who">Penny Ledgerwick</span><span class="note">your bank alt · 1 mail</span><span class="btn grey small">Skip once</span></div>
+          <div class="tomore"><span>Bob Thornfield</span><span class="note">Enchanting materials · 1 mail</span></div>
+          <h3>Mailing <small>7 items · 2 mails</small></h3>
+          <table>
+            <tr><td style="width:32px"><div class="icon" style="background:linear-gradient(135deg,#e0874a,#7a3e1a)"></div></td>
+              <td><span class="q1">Copper Ore</span> <span class="count">x13</span></td><td><span class="why ah">Auction</span></td>
+              <td class="gain money">+29<i class="s"></i>80<i class="c"></i></td></tr>
+            <tr class="chg"><td><div class="icon" style="background:linear-gradient(135deg,#7d9a6a,#3a4a2e)"></div></td>
+              <td><span class="q2">Sentry's Gloves</span></td><td><span class="why ah new">Auction</span></td>
+              <td class="gain money">+35<i class="s"></i>90<i class="c"></i></td></tr>
+            <tr class="chg"><td><div class="icon" style="background:linear-gradient(135deg,#6a8ad0,#2a3a6a)"></div></td>
+              <td><span class="q3">Ironwood Staff</span></td><td><span class="why ah new">Auction</span></td>
+              <td class="gain money">+76<i class="s"></i>55<i class="c"></i></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#c97b3d,#6b3a18)"></div></td>
+              <td><span class="q2">Bandit Cloak</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#a9c5ff,#3d4f8a)"></div></td>
+              <td><span class="q1">Strange Dust</span> <span class="count">x20</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#c9a6ff,#5a2d8a)"></div></td>
+              <td><span class="q1">Lesser Magic Essence</span> <span class="count">x4</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+            <tr><td><div class="icon" style="background:linear-gradient(135deg,#e8dcb0,#8a7a4a)"></div></td>
+              <td><span class="q2">Formula: Enchant Bracer - Minor Agility</span></td><td><span class="why friend">to Bob</span></td><td class="gain"></td></tr>
+          </table>
+          <h3>Staying in your bags <small>2 items</small></h3>
+          <table class="kept">
+            <tr><td>Linen Cloth x20</td><td class="tag">your Tailoring needs it</td></tr>
+            <tr><td>Cadet Belt</td><td class="tag"><span class="new" style="padding:0 3px">sells better at a vendor</span></td></tr>
+          </table>
+          <div class="total">
+            <div class="big money">+1<i class="g"></i>42<i class="s"></i>25<i class="c"></i> more than vendoring</div>
+            <div class="sub">after the 5% AH cut, 24h deposits and 60c postage; 4 stacks to Bob</div>
+          </div>
+          <div class="actions"><span class="btn send">Send to Penny, Bob</span><span class="btn grey">Settings</span>
+            <span class="hint legend">&#9747; press &nbsp; &#9711; close &nbsp; D-pad move</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>6 · How one piece is decided</b><span class="size">switch on</span>
+        <ul><li>To Bob only when it <b>disenchants for more</b> than the auction house would net <b>and</b> more than a vendor pays</li>
+          <li>Otherwise the piece follows the normal rule, as if there were no binding</li>
+          <li>No disenchant value known: the piece still goes to Bob</li></ul></div>
+      <div class="box">
+        <table class="rule">
+          <tr><th>Piece</th><th>Disenchants for</th><th>Auction nets</th><th>Vendor</th><th>Goes</th></tr>
+          <tr><td class="q2">Bandit Cloak</td><td class="win">14s</td><td class="lose">4s 15c</td><td class="lose">2s 6c</td><td><span class="why friend">to Bob</span></td></tr>
+          <tr><td class="q2">Sentry's Gloves</td><td class="lose">9s</td><td class="win">39s</td><td class="lose">3s 10c</td><td><span class="why ah">Auction</span></td></tr>
+          <tr><td class="q3">Ironwood Staff</td><td class="lose">21s</td><td class="win">87s 95c</td><td class="lose">11s 40c</td><td><span class="why ah">Auction</span></td></tr>
+          <tr><td class="q2">Cadet Belt</td><td class="lose">1s 20c</td><td class="lose">82c</td><td class="win">2s 40c</td><td><span class="why stay">stays</span></td></tr>
+          <tr><td class="q2">Scouting Boots</td><td class="win">12s</td><td class="lose">no price</td><td class="lose">2s 80c</td><td><span class="why friend">to Bob</span></td></tr>
+          <tr><td class="q2">Ranger Bracers</td><td class="lose">not known</td><td class="lose">6s</td><td class="lose">1s 90c</td><td><span class="why friend">to Bob</span></td></tr>
+        </table>
+        <div class="sub" style="margin-top:10px"><b style="color:var(--text)">What doesn't change</b></div>
+        <ul class="list">
+          <li>The price cap comes first: at or above it, the normal rule</li>
+          <li>Dust, essences, shards and Enchanting recipes all go to Bob</li>
+          <li>Locked, soulbound, quest, conjured and in-use items stay</li>
+          <li>Every recipient is in the preview before Send</li>
+          <li>A binding with the switch off behaves exactly as today</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============ Row 3: the rest ============ -->
+    <div class="rowhead">The rest <small>the report, no disenchant value, and the guild template</small></div>
+
+    <div>
+      <div class="cap"><b>7 · The report says why</b><span class="size">/mw scan</span>
+        <ul><li>One more "not to Bob" reason, beside the cap's and the skill's</li></ul></div>
+      <div class="chat">
+        <div><span class="mw">binding:</span> Enchanting materials to Bob Thornfield (to my alt at 1g each or more, <span class="hl">gear: only when disenchanting pays more</span>)</div>
+        <div style="margin-top:6px"><span class="mw">MAIL AH [Sentry's Gloves] x1:</span> auction house · AH net 39s (cut 5%, deposit 60c, postage 30c) · disenchant 9s each (tables) ·
+          gain 35s 90c (needs 1s) · <span class="hl">not to Bob Thornfield: DE net 8s 70c is no more than the AH net 39s</span></div>
+        <div style="margin-top:6px"><span class="mw">KEEP [Cadet Belt] x1:</span> not worth it · AH net 82c · disenchant 1s 20c each (tables) ·
+          <span class="hl">not to Bob Thornfield: DE net 90c is no more than the vendor price 2s 40c</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>8 · No disenchant value: the piece still goes</b><span class="size">as before</span>
+        <ul><li>The value comes from a disenchant addon, or Mailworthy's own tables priced with Auctionator</li></ul></div>
+      <div class="box">
+        <ul class="list" style="margin-top:0">
+          <li><b>No Auctionator or TSM:</b> there is no disenchant value at all, so the switch changes nothing:
+            green and blue gear goes to Bob as it does today.</li>
+          <li><b>A material has no price</b> (a shard nobody has listed): that piece goes to Bob too.</li>
+          <li><b>The price lookup failed:</b> nothing is mailed on it, as today.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap"><b>9 · The guild master sets it per rule</b><span class="size">/mw guild</span>
+        <ul><li>The Enchanting rule in the editor has the same button; Publish to guild sends it</li>
+          <li>A member has no button: the rule's cap line says it</li></ul></div>
+      <div class="box">
+        <div class="lab" style="margin-top:0">The editor (guild master, officers)</div>
+        <div class="binding" style="margin:4px 0 0">
+          <div class="line1"><span>Enchanting materials</span><span class="toname">to Bob Thornfield</span>
+            <span class="btn grey small">Remove</span></div>
+          <div class="line2"><span class="capt">10s each or more: to my bank alt</span>
+            <span class="btn grey small step">-</span><span class="btn grey small step">+</span></div>
+          <div class="line3"><span class="btn grey small lit new">Gear: only when disenchanting pays more</span></div>
+        </div>
+        <div class="lab">A member's view</div>
+        <div class="binding" style="margin:4px 0 0">
+          <div class="line1"><span>Enchanting materials</span><span class="toname">to Bob Thornfield</span></div>
+          <div class="line2"><span class="new" style="padding:1px 3px">10s each or more: to my bank alt; gear only when disenchanting pays more</span></div>
+        </div>
+        <div class="sub" style="margin-top:8px">A guildmate on an older Mailworthy still gets the template and passes it on;
+          theirs sends every piece until they update.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

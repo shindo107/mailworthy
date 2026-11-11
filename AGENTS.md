@@ -25,7 +25,9 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   `Conjured.lua`; operator, 2026-11-10: "should always be keep as they are ephemeral items"). Without a bank alt (optional), or with it skipped for the visit, its share
   stays in the bags; only bindings mail.
 - A binding or a return never overrides a hard keep (locked, soulbound, quest, conjured, in use, tool); at or
-  above its price cap the normal rule applies and the item goes to the bank alt.
+  above its price cap the normal rule applies and the item goes to the bank alt. An Enchanting
+  binding or guild rule with its Gear switch on (`Routes.GearBeaten`; operator, 2026-11-11) leaves a
+  green or blue piece to the normal rule too, when it disenchants for no more than it sells for.
 - Re-check each slot right before attaching it; skip anything that changed.
 - Without Auctionator (no price source), the only items mailed are unlocked, tradeable white
   (common) items and the staple trade goods (`Valuation.STAPLES`, whatever their quality)

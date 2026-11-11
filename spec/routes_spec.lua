@@ -218,10 +218,84 @@ describe("bindings", function()
             assert.is_nil(ns.Routes.NextCap(1000000, 1), "past the top: no cap")
             assert.equal(1000000, ns.Routes.NextCap(nil, -1))
             assert.is_nil(ns.Routes.NextCap(nil, 1))
-            assert.equal(5000, ns.Routes.NextCap(5000, -1))
+            -- operator, 2026-11-11: the ladder starts at 50c, not 50s ("even 50s will not be used
+            -- until level 30+"; "add 1s and 50c as lowest options as well")
+            assert.same({ 50, 100, 500, 1000, 2500, 5000, 10000, 20000, 50000, 100000, 250000, 500000, 1000000 },
+                ns.Routes.CAP_STEPS)
+            assert.equal(2500, ns.Routes.NextCap(5000, -1))
+            assert.equal(500, ns.Routes.NextCap(1000, -1))
+            assert.equal(2500, ns.Routes.NextCap(1000, 1))
+            assert.equal(50, ns.Routes.NextCap(100, -1))
+            assert.equal(50, ns.Routes.NextCap(50, -1), "50c is the lowest step")
             assert.equal(100000, ns.Routes.NextCap(42000, 1), "from the nearest step (5g)")
+            for _, step in ipairs(ns.Routes.CAP_STEPS) do
+                assert.equal(0, step % 2, "every step is even: a guild rule's Gear switch travels as an odd cap")
+            end
             assert.equal("to my alt at 5g each or more", ns.Routes.CapText({ cap = 50000 }))
+            assert.equal("to my alt at 50c each or more", ns.Routes.CapText({ cap = 50 }))
             assert.equal("no price cap", ns.Routes.CapText({}))
+        end)
+
+        it("the Gear switch: a piece goes only when disenchanting pays more than the auction house and a vendor", function()
+            -- a CurseForge comment, 2026-11-11: "the option to only send green/blue items if the disenchant
+            -- value is greater than vendor/ah"; operator: on each Enchanting binding, and a piece without
+            -- a disenchant value is "sent anyway as today"
+            local D = ns.Valuation.DEFAULTS
+            local all = { to = BOB, profession = ENCHANTING, key = "k" }
+            local picky = { to = BOB, profession = ENCHANTING, key = "k", gear = ns.Routes.GEAR_DE }
+            local gloves = { classID = 4, subclassID = 2, quality = 2, count = 1, stacks = 1, vendor = 310 }
+            assert.equal("Gear: all green and blue", ns.Routes.GearText(all))
+            assert.equal("Gear: only when disenchanting pays more", ns.Routes.GearText(picky))
+            assert.is_nil(ns.Routes.GearText({ to = BOB, profession = TAILORING }), "only Enchanting takes gear")
+            assert.is_nil(ns.Routes.GearText({ to = BOB, class = "MAGE" }))
+            -- it sells for more than it disenchants for: the normal rule
+            local verdict = { action = "mail", route = "ah", ahNet = 3900, vendor = 310 }
+            assert.equal(BOB, ns.Routes.Divert(gloves, verdict, { ah = 4200, age = 0, de = 900 }, D, { all }).to,
+                "the switch off: every piece, as before")
+            local v, capped, past, beaten = ns.Routes.Divert(gloves, verdict, { ah = 4200, age = 0, de = 900 }, D, { picky })
+            assert.is_nil(v)
+            assert.is_nil(capped)
+            assert.is_nil(past)
+            assert.same({ to = BOB, de = 870, best = 3900, by = "auction" }, beaten, "9s less 30c postage, against the AH net")
+            -- it disenchants for more
+            assert.equal(BOB, ns.Routes.Divert(gloves, verdict, { ah = 4200, age = 0, de = 5000 }, D, { picky }).to)
+            -- exactly as much is not more
+            assert.is_nil((ns.Routes.Divert(gloves, verdict, { ah = 4200, age = 0, de = 3930 }, D, { picky })))
+            -- a vendor pays more than either
+            local belt = { ns.Routes.Divert(gloves, { action = "keep", reason = "not worth it", ahNet = 82 },
+                { ah = 150, age = 0, de = 120 }, D, { picky }) }
+            assert.is_nil(belt[1])
+            assert.same({ to = BOB, de = 90, best = 310, by = "vendor" }, belt[4])
+            -- no current auction price: against the vendor only
+            assert.equal(BOB, ns.Routes.Divert(gloves, { action = "mail", route = "noprice" }, { de = 1200 }, D, { picky }).to)
+            assert.is_nil((ns.Routes.Divert(gloves, { action = "mail", route = "noprice" }, { de = 300 }, D, { picky })))
+            -- no disenchant value (a material without a price; no price source at all): sent anyway
+            assert.equal(BOB, ns.Routes.Divert(gloves, verdict, { ah = 4200, age = 0 }, D, { picky }).to)
+            assert.equal(BOB, ns.Routes.Divert(gloves, { action = "keep", reason = "uncommon or better (no price data)" },
+                nil, D, { picky }).to)
+            -- no price source, but a disenchant addon has a value (item.de, Bags.Evaluate): it decides
+            local nosource = { action = "keep", reason = "uncommon or better (no price data)" }
+            local worth = { classID = 4, subclassID = 2, quality = 2, count = 1, stacks = 1, vendor = 310, de = 100 }
+            assert.same({ to = BOB, de = 70, best = 310, by = "vendor" }, select(4, ns.Routes.Divert(worth, nosource, nil, D, { picky })))
+            worth.de = 5000
+            assert.equal(BOB, ns.Routes.Divert(worth, nosource, nil, D, { picky }).to)
+            -- only gear: dust and recipes go whatever the switch says
+            local dustItem = { classID = 7, subclassID = 12, count = 20, stacks = 1, vendor = 2 }
+            assert.equal(BOB, ns.Routes.Divert(dustItem, { action = "keep", reason = "not worth it", ahNet = 900 },
+                { ah = 50, age = 0, de = 1 }, D, { picky }).to)
+            local formula = { classID = 9, subclassID = 8, quality = 2, count = 1, stacks = 1, vendor = 100 }
+            assert.equal(BOB, ns.Routes.Divert(formula, verdict, { ah = 500, age = 0, de = 1 }, D, { picky }).to)
+            -- the cap comes first, and a hard keep before everything
+            picky.cap = 1000
+            local over = { ns.Routes.Divert(gloves, verdict, { ah = 4200, age = 0, de = 5000 }, D, { picky }) }
+            assert.is_nil(over[1])
+            assert.equal(picky, over[2], "42s each, at or above the 10s cap")
+            assert.is_nil(over[4])
+            assert.is_nil((ns.Routes.Divert(gloves, { action = "keep", reason = "locked" }, { ah = 100, age = 0, de = 5000 }, D,
+                { picky })))
+            -- a failed price call mails nothing
+            assert.is_nil((ns.Routes.Divert(gloves, { action = "keep", reason = "no price" }, { failed = true, de = 5000 }, D,
+                { picky })))
         end)
     end)
 
@@ -231,7 +305,7 @@ describe("bindings", function()
             assert.truthy(r, err)
             assert.equal(BOB, r.to)
             assert.equal("account", r.scope)
-            assert.equal(50000, r.cap, "5g each by default")
+            assert.equal(1000, r.cap, "10s each by default (operator, 2026-11-11; it was 5g)")
             assert.equal(1, #MailworthyDB.routes["Classic Beta PvP|Alliance"])
             assert.is_nil(ns.Routes.Add("Rettana Quilwrit", TAILORING))
             local _, why = ns.Routes.Add("Rettana Quilwrit", TAILORING)
@@ -240,6 +314,24 @@ describe("bindings", function()
             assert.is_nil(ns.Routes.Add("BOB SURNAME", ENCHANTING), "already bound")
             assert.truthy(ns.Routes.Add(BOB, TAILORING), "the same player can get another profession's materials")
             assert.equal(2, ns.Routes.Count())
+        end)
+
+        it("the Gear switch is saved with an Enchanting binding; another binding has none", function()
+            local bob = ns.Routes.Add(BOB, ENCHANTING)
+            local cara = ns.Routes.Add("Cara Friend", TAILORING)
+            assert.is_nil(ns.Routes.Get(bob.key).gear, "off for a new binding: every green and blue piece")
+            assert.is_true(ns.Routes.ToggleGear(bob.key))
+            assert.equal("de", MailworthyDB.routes["Classic Beta PvP|Alliance"][1].gear)
+            assert.equal("de", ns.Routes.Active()[1].gear, "the scan's bindings carry it")
+            assert.truthy(log():find("Enchanting materials to Bob Surname: Gear: only when disenchanting pays more", 1, true))
+            assert.truthy(table.concat(ns.Routes.ReportLines(), "\n"):find(
+                "to my alt at 10s each or more, gear: only when disenchanting pays more, skill unknown", 1, true))
+            assert.is_true(ns.Routes.ToggleGear(bob.key))
+            assert.is_nil(MailworthyDB.routes["Classic Beta PvP|Alliance"][1].gear)
+            assert.is_nil(table.concat(ns.Routes.ReportLines(), "\n"):find("gear:", 1, true))
+            assert.is_false(ns.Routes.ToggleGear(cara.key), "Tailoring takes no gear")
+            assert.is_nil(MailworthyDB.routes["Classic Beta PvP|Alliance"][2].gear)
+            assert.is_false(ns.Routes.ToggleGear("333|nobody"))
         end)
 
         it("this character's bindings come first, move between scopes, step their cap, and go", function()
@@ -255,7 +347,7 @@ describe("bindings", function()
             assert.equal(2, #MailworthyDB.routes["Classic Beta PvP|Alliance"])
             assert.equal("account", ns.Routes.Get(mine.key).scope)
             ns.Routes.StepCap(mine.key, 1)
-            assert.equal(100000, ns.Routes.Get(mine.key).cap)
+            assert.equal(2500, ns.Routes.Get(mine.key).cap, "10s, one step up: 25s")
             assert.is_true(ns.Routes.Remove(mine.key))
             assert.is_false(ns.Routes.Remove(mine.key))
             assert.equal(1, ns.Routes.Count())
@@ -315,7 +407,7 @@ describe("bindings", function()
             assert.same({ "", BOB }, result.totals.recipients)
             assert.equal(before.totals.gain, result.totals.gain, "a gift isn't a gain")
             local report = ns.Bags.Report(result)
-            assert.truthy(report:find("binding: Enchanting materials to Bob Surname (to my alt at 5g each or more)", 1, true), report)
+            assert.truthy(report:find("binding: Enchanting materials to Bob Surname (to my alt at 10s each or more)", 1, true), report)
             assert.truthy(report:find("MAIL FRIEND [Strange Dust] x20: Enchanting materials go to Bob Surname", 1, true), report)
             assert.truthy(report:find("1 stacks to friends", 1, true), report)
         end)
@@ -366,7 +458,76 @@ describe("bindings", function()
             assert.equal("bank", d.result.route, "the normal rule: enchanting materials are banked before the raids")
             assert.is_nil(d.result.to)
             assert.equal(BOB, d.result.capped.to)
-            assert.truthy(ns.Bags.Report(result):find("not to Bob Surname: at or above the 5g cap", 1, true))
+            assert.truthy(ns.Bags.Report(result):find("not to Bob Surname: at or above the 10s cap", 1, true))
+        end)
+
+        it("the Gear switch in the scan: a piece that sells for more follows the normal rule, and the report says why", function()
+            local gloves = WowStub.item(5001, "Sentry's Gloves", { quality = 2, level = 18, class = 4, sell = 310 })
+            local cloak = WowStub.item(5002, "Bandit Cloak", { quality = 2, level = 18, class = 4, sell = 206 })
+            local belt = WowStub.item(5003, "Cadet Belt", { quality = 2, level = 12, class = 4, sell = 240 })
+            WowStub.setBag(0, 3, gloves)
+            WowStub.setBag(0, 4, cloak)
+            WowStub.setBag(0, 5, belt)
+            prices[gloves.hyperlink], prices[cloak.hyperlink], prices[belt.hyperlink] = 4200, 500, 150
+            local de = { [5001] = 900, [5002] = 1400, [5003] = 120 }
+            _G.DisenchantValueAPI = { GetValue = function(l) return de[tonumber(tostring(l):match("item:(%d+)"))] end }
+            finally(function() _G.DisenchantValueAPI = nil end)
+            local bob = ns.Routes.Add(BOB, ENCHANTING, { cap = 10000 })
+            local function byID(result)
+                local out = {}
+                for _, list in ipairs({ result.mail, result.keep }) do
+                    for _, item in ipairs(list) do out[item.itemID] = item.result end
+                end
+                return out
+            end
+            local r = byID(ns.Bags.Evaluate())
+            for _, id in ipairs({ 5001, 5002, 5003, 10940 }) do assert.equal(BOB, r[id].to, "the switch off: " .. id) end
+            ns.Routes.ToggleGear(bob.key)
+            local result = ns.Bags.Evaluate()
+            r = byID(result)
+            assert.equal(BOB, r[5002].to, "the cloak disenchants for more than it sells for")
+            assert.equal(BOB, r[10940].to, "dust goes whatever the switch says")
+            assert.equal("mail", r[5001].action)
+            assert.equal("ah", r[5001].route, "the gloves sell for more: the auction house, by the normal rule")
+            assert.is_nil(r[5001].to)
+            assert.equal("auction", r[5001].gearBeaten.by)
+            assert.equal("keep", r[5003].action, "the belt is worth more at a vendor: it stays")
+            assert.equal("sells better at a vendor", ns.MailWindow.StayReason(r[5003]))
+            assert.equal("vendor", r[5003].gearBeaten.by)
+            local report = ns.Bags.Report(result)
+            assert.truthy(report:find("not to Bob Surname: DE net 8s 70c is no more than the AH net ", 1, true), report)
+            assert.truthy(report:find("not to Bob Surname: DE net 90c is no more than the vendor price 2s 40c", 1, true), report)
+            assert.truthy(report:find("gear: only when disenchanting pays more", 1, true), report)
+        end)
+
+        it("the Gear switch without a price source: a disenchant addon's own value still decides (Codex review)", function()
+            _G.Auctionator = nil
+            local gloves = WowStub.item(5001, "Sentry's Gloves", { quality = 2, level = 18, class = 4, sell = 310 })
+            local cloak = WowStub.item(5002, "Bandit Cloak", { quality = 2, level = 18, class = 4, sell = 206 })
+            local belt = WowStub.item(5003, "Cadet Belt", { quality = 2, level = 12, class = 4, sell = 240 })
+            WowStub.setBag(0, 3, gloves)
+            WowStub.setBag(0, 4, cloak)
+            WowStub.setBag(0, 5, belt)
+            local de = { [5001] = 100, [5002] = 1400 } -- no value for the belt
+            _G.DisenchantValueAPI = { GetValue = function(l) return de[tonumber(tostring(l):match("item:(%d+)"))] end }
+            finally(function() _G.DisenchantValueAPI = nil end)
+            local bob = ns.Routes.Add(BOB, ENCHANTING)
+            local function byID()
+                local out, result = {}, ns.Bags.Evaluate()
+                for _, list in ipairs({ result.mail, result.keep }) do
+                    for _, item in ipairs(list) do out[item.itemID] = item.result end
+                end
+                return out
+            end
+            local r = byID()
+            for _, id in ipairs({ 5001, 5002, 5003 }) do assert.equal(BOB, r[id].to, "the switch off: " .. id) end
+            ns.Routes.ToggleGear(bob.key)
+            r = byID()
+            assert.equal("keep", r[5001].action, "1s disenchanted, 3s 10c at a vendor: it stays, as without a binding")
+            assert.equal("uncommon or better (no price data)", r[5001].reason)
+            assert.equal("vendor", r[5001].gearBeaten.by)
+            assert.equal(BOB, r[5002].to, "14s disenchanted beats the vendor's 2s 6c")
+            assert.equal(BOB, r[5003].to, "no disenchant value at all: sent anyway")
         end)
 
         it("Send mails the bank alt's mail first, then the friend's, with its own subject and body", function()
@@ -701,7 +862,7 @@ describe("bindings", function()
             assert.equal("list", ns.RoutesUI.View(), "a binding returns to the bindings")
             assert.is_false(_G.MailworthyFriendsPick1:IsShown())
             assert.is_true(_G.MailworthyFriendsRemove1:IsShown())
-            assert.equal("5g each or more: to my bank alt", ns.RoutesUI.CapText(r))
+            assert.equal("10s each or more: to my bank alt", ns.RoutesUI.CapText(r))
             assert.equal("no price cap", ns.RoutesUI.CapText({}))
             f:Hide()
             ns.SettingsUI.Show()
@@ -718,7 +879,9 @@ describe("bindings", function()
             assert.is_nil(_G.MailworthyFriendsVia1, "no delivery toggle: the profession decides")
             _G.MailworthyFriendsCapUp1:Click()
             _G.MailworthyFriendsCapUp1:Click()
-            assert.equal(250000, ns.Routes.List()[1].cap)
+            assert.equal(5000, ns.Routes.List()[1].cap, "10s, two steps up: 50s")
+            _G.MailworthyFriendsCapDown1:Click()
+            assert.equal(2500, ns.Routes.List()[1].cap)
             _G.MailworthyFriendsScope1:Click()
             assert.equal("This character", _G.MailworthyFriendsScope1:GetText())
             assert.equal(1, #MailworthyCharDB.routes)
@@ -730,6 +893,32 @@ describe("bindings", function()
             _G.MailworthyFriendsRemove1:Click()
             assert.equal(0, ns.Routes.Count())
             assert.is_true(_G.MailworthyFriendsRemove1:IsShown() == false)
+        end)
+
+        it("an Enchanting binding's Gear switch: a third line, one press, lit while on; other bindings have none", function()
+            ns.Routes.Add(BOB, ENCHANTING)
+            ns.Routes.Add("Cara Friend", TAILORING)
+            ns.RoutesUI.Show()
+            assert.is_true(_G.MailworthyFriendsGear1:IsShown())
+            assert.equal("Gear: all green and blue", _G.MailworthyFriendsGear1:GetText())
+            assert.is_false(ns.Widgets.IsToggled(_G.MailworthyFriendsGear1))
+            assert.is_false(_G.MailworthyFriendsGear2:IsShown(), "a Tailoring binding takes no gear: no switch")
+            -- the Enchanting row is one line taller: the next row starts lower than a plain row would
+            assert.equal(_G.MailworthyFriendsRemove1.point[5] - 76, _G.MailworthyFriendsRemove2.point[5])
+            assert.equal(_G.MailworthyFriendsRemove1.point[5] - 50, _G.MailworthyFriendsGear1.point[5])
+            _G.MailworthyFriendsGear1:Click()
+            assert.equal("Gear: only when disenchanting pays more", _G.MailworthyFriendsGear1:GetText())
+            assert.is_true(ns.Widgets.IsToggled(_G.MailworthyFriendsGear1))
+            assert.equal("de", ns.Routes.List()[1].gear)
+            assert.equal("Other gear follows your normal rule.", ns.RoutesUI.GearHint(ns.Routes.List()[1]))
+            _G.MailworthyFriendsGear1:Click()
+            assert.equal("Gear: all green and blue", _G.MailworthyFriendsGear1:GetText())
+            assert.is_false(ns.Widgets.IsToggled(_G.MailworthyFriendsGear1))
+            assert.is_nil(ns.Routes.List()[1].gear)
+            _G.MailworthyFriendsRemove1:Click()
+            assert.is_false(_G.MailworthyFriendsGear1:IsShown(), "the Tailoring binding moved up: no switch on its row")
+            _G.MailworthyFriendsAdd:Click()
+            assert.is_false(_G.MailworthyFriendsGear1:IsShown(), "not in the add view")
         end)
 
         it("with bindings it opens on the list; Add a binding... and Back move between the views", function()
@@ -847,7 +1036,7 @@ describe("bindings", function()
             ns.Routes.Add(BOB, ENCHANTING)
             local text = ns.Report.Build()
             assert.truthy(text:find("binding: Enchanting materials to Bob Surname (all my characters, "
-                .. "to my alt at 5g each or more, skill unknown)", 1, true), text)
+                .. "to my alt at 10s each or more, skill unknown)", 1, true), text)
             assert.truthy(text:find("comms=on", 1, true))
         end)
     end)

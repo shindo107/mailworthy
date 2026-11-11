@@ -150,6 +150,8 @@ tr:nth-child(even) td { background: var(--row-alt); }
 .binding .line2 { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--dim); }
 .binding .line2 .captext { width: 200px; }
 .binding .line2 .scope { margin-left: auto; }
+.binding .line3 { display: flex; margin-top: 5px; }
+.binding .line3 .btn { min-width: 290px; justify-content: flex-start; }
 .binding .via { color: var(--dim); font-size: 12px; margin-top: 3px; }
 
 /* Bags */

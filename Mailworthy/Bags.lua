@@ -143,6 +143,11 @@ function Bags.Evaluate(settings)
     local classRoutes = false
     for _, r in ipairs(routes) do classRoutes = classRoutes or r.class ~= nil end
     local mine = classRoutes and ns.Classes.Mine() or nil
+    -- An Enchanting binding with its Gear switch on asks each piece's disenchant value. Without a
+    -- price source there is no price table to carry it, but a disenchant addon may still have one
+    -- (Siz DisenchantValue): read it then, for gear only (Codex review, 2026-11-11).
+    local gearRoutes = false
+    for _, r in ipairs(routes) do gearRoutes = gearRoutes or r.gear == ns.Routes.GEAR_DE end
     local function value(item)
         item.locked = ns.Locks.IsItemLocked(item.itemID)
         if classRoutes then item.classes, item.myClass = ns.Classes.Of(item.itemID), mine end
@@ -152,9 +157,14 @@ function Bags.Evaluate(settings)
         item.vendor = item.noValue and 0 or ns.Prices.Vendor(item.link)
         item.price = priced and ns.Prices.Lookup(item.link) or nil
         item.result = ns.Valuation.Evaluate(item, item.price, settings)
-        local diverted, capped, past = ns.Routes.Divert(item, item.result, item.price, settings, routes)
+        item.de = nil
+        if gearRoutes and item.price == nil and ns.Routes.IsGear(item) then
+            item.de = ns.Prices.DisenchantValueFor(item.link)
+        end
+        local diverted, capped, past, beaten = ns.Routes.Divert(item, item.result, item.price, settings, routes)
         if diverted then item.result = diverted elseif capped then item.result.capped = capped end
         if not diverted and past then item.result.pastFor = past end
+        if not diverted and beaten then item.result.gearBeaten = beaten end
         -- No bank alt, or skipped this visit: its share stays (bindings still go).
         if settings.hold and item.result.action == "mail" and not item.result.to then
             item.result.action, item.result.held = "keep", settings.hold
@@ -310,6 +320,11 @@ local function workings(item, settings)
         parts[#parts + 1] = string.format("not to %s: at or above the %s cap", tostring(r.capped.to),
             money(r.capped.cap or 0))
     end
+    if r.gearBeaten then
+        parts[#parts + 1] = string.format("not to %s: DE net %s is no more than %s %s", tostring(r.gearBeaten.to),
+            money(r.gearBeaten.de), r.gearBeaten.by == "auction" and "the AH net" or "the vendor price",
+            money(r.gearBeaten.best))
+    end
     if r.pastFor then
         parts[#parts + 1] = string.format("not to %s: their %s (%s) is past it", tostring(r.pastFor.to),
             tostring(ns.Routes.ProfessionName(r.pastFor.profession)), tostring(r.pastFor.skill))
@@ -394,8 +409,9 @@ function Bags.Report(result)
     }
     for _, r in ipairs(result.routes or {}) do
         local to, crafter = ns.Routes.Recipient(r)
-        lines[#lines + 1] = string.format("binding: %s (%s%s)", ns.Routes.Describe(r), ns.Routes.CapText(r),
-            crafter and (", delivered to their crafter " .. to) or "")
+        local gear = r.gear and ns.Routes.GearText(r)
+        lines[#lines + 1] = string.format("binding: %s (%s%s%s)", ns.Routes.Describe(r), ns.Routes.CapText(r),
+            gear and (", " .. gear:lower()) or "", crafter and (", delivered to their crafter " .. to) or "")
     end
     for _, item in ipairs(result.mail) do
         local w = workings(item, s)

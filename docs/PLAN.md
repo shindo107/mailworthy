@@ -126,7 +126,7 @@ the same pattern that made the More-menu entry taint gamepad input (alpha2).
 | Postage | **30c per attached item** (measured 2026-10-13) | account |
 | Locked items | none | **per character** |
 | Minimap button | shown | account |
-| Bindings ("send my Enchanting materials to Bob", operator 2026-10-26) | none; `/mw friends` or the settings' "Send materials to friends" button: pick a player (party, guild, own characters, Mailworthy users; online first, their professions suggested from the guild roster's `profession1ID` / `profession2ID`, the known-character record or their Mailworthy's hello), then the profession. Each binding: price cap stepper (5g each by default; at or above it the normal rule applies and the item goes to the bank alt), scope, Remove; the mail goes to the friend, or to the character of theirs that has the profession when their Mailworthy has said so. Or a class instead of a profession (operator, 2026-11-08): "Mage items" takes what only a mage can use and this character can't (the tooltip's "Classes: Mage"), offered first when the player's class is known. The Mailworthy window shows them with Skip once (until the mailbox closes) and Remove | account (per realm + faction) or **per character**; this character's bindings win |
+| Bindings ("send my Enchanting materials to Bob", operator 2026-10-26) | none; `/mw friends` or the settings' "Send materials to friends" button: pick a player (party, guild, own characters, Mailworthy users; online first, their professions suggested from the guild roster's `profession1ID` / `profession2ID`, the known-character record or their Mailworthy's hello), then the profession. Each binding: price cap stepper (10s each by default, steps from 50c to 100g or none; 5g until 2026-11-11; at or above it the normal rule applies and the item goes to the bank alt), for an Enchanting binding the Gear switch ("all green and blue" / "only when disenchanting pays more"), scope, Remove; the mail goes to the friend, or to the character of theirs that has the profession when their Mailworthy has said so. Or a class instead of a profession (operator, 2026-11-08): "Mage items" takes what only a mage can use and this character can't (the tooltip's "Classes: Mage"), offered first when the player's class is known. The Mailworthy window shows them with Skip once (until the mailbox closes) and Remove | account (per realm + faction) or **per character**; this character's bindings win |
 
 ### Bank alt picker (no mistypes)
 
@@ -283,7 +283,9 @@ verdict, a trade good a bound profession uses (`Valuation.PROFESSION_MATS`) beco
 with route `friend` and `to` = the bound player, whatever its value, unless the verdict is
 a hard keep (locked, soulbound, quest, in use, tool, info not loaded) or the smoothed unit
 price is at or above the binding's **cap** (then the normal rule applies: the item goes to
-the bank alt, and the scan says why). A binding beats "your Tailoring needs it": an
+the bank alt, and the scan says why), or the binding is an Enchanting one with its Gear switch
+on and the item is a green or blue piece that disenchants for no more than it sells for
+(`Routes.GearBeaten`, 2026-11-11: the normal rule applies too). A binding beats "your Tailoring needs it": an
 explicit choice over the default keep. The bank alt's tags ignore bindings.
 
 - **Scope:** all the account's characters on the realm + faction (`MailworthyDB.routes`)
@@ -319,7 +321,8 @@ to use ... send enchanting to this person, send herbs here, etc. ... to help dis
 materials amongst the guild." And: "the template should have a 1 click disable as well."
 
 - **What a rule is:** a binding (above) the guild hands out: one crafting profession's
-  materials to one guild member, with a per-unit price cap. One rule per profession (at most
+  materials to one guild member, with a per-unit price cap (and, for the Enchanting rule, the
+  Gear switch: gear only when disenchanting pays more; 2026-11-11). One rule per profession (at most
   8). "Herbs" is Alchemy's rule, "cloth" Tailoring's.
 - **Who publishes:** the guild master and the rank right below (rank index 0 and 1). The
   friends window shows them Create... / Edit...: the draft (`MailworthyDB.guildDrafts`), Add a
@@ -327,7 +330,7 @@ materials amongst the guild." And: "the template should have a 1 click disable a
 - **Copies, from anyone** (operator, same day: "the guild master and officers have the original
   and can modify it, whoever is online gets the copy, and it can be copied from them by any
   member"). Wire, GUILD only: `T2|<revision>|<author>|<i>/<n>|<skill line>=<Name>:<cap copper>`
-  per rule (`0/0` = empty) and `Q2|<revision held>` (ask). The revision is the author's server
+  per rule (`0/0` = empty; an odd cap on the Enchanting rule is its Gear switch, `Guild.WireCap`) and `Q2|<revision held>` (ask). The revision is the author's server
   time; the newest wins, never more than 10 minutes ahead. Everyone asks at login with the
   revision they hold; whoever holds a newer copy answers after a short wait (an officer 1 s,
   anyone else 2-6 s) unless another answer as new goes out first, so one answer per ask; whoever

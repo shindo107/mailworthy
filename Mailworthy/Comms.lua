@@ -12,7 +12,8 @@
 --   F2|<server day of this character's freshest Auctionator scan>  (Stale.lua; right after
 --       a hello; Mailworthys before v0.15 drop it, as they drop any kind they don't know)
 --   T2|<revision>|<author>|<i>/<n>|<skill line>=<Name>:<cap>   (a guild template rule: Guild.lua;
---       GUILD only; any member passes a copy on)
+--       GUILD only; any member passes a copy on; an odd cap on the Enchanting rule is its Gear
+--       switch, Guild.WireCap)
 --   Q2|<revision held>                    (ask: whoever holds a newer guild template sends it)
 --   S2|<this character's crafting skills: 129:80,197:130>|<other characters here:
 --       Name=197:150,333:120;Other Name=165:90>   (right after a hello, for the material

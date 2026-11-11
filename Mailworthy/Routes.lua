@@ -11,7 +11,7 @@
 --
 -- Safety: locks, soulbound / quest / in-use items and profession tools still
 -- stay; a binding never mails what the normal rule wouldn't touch. The price
--- cap ("to my alt above 5g each", a stepper on the binding) keeps a material
+-- cap ("to my alt at 10s each or more", a stepper on the binding) keeps a material
 -- the market suddenly wants: at or above the cap the normal rule applies and
 -- the item goes to the bank alt. "Skip once" drops a binding for this mailbox
 -- visit (cleared at MAIL_CLOSED). The recipient is always shown in the window.
@@ -36,8 +36,14 @@ local _, ns = ...
 local Routes = {}
 ns.Routes = Routes
 
-Routes.CAP_STEPS = { 5000, 10000, 20000, 50000, 100000, 250000, 500000, 1000000 } -- copper per unit; nil = no cap
-Routes.DEFAULT_CAP = 50000  -- 5g each: "an insane market high" while levelling (operator, 2026-10-26)
+-- Copper per unit; nil = no cap. Every step is an even number of copper: a guild template rule's
+-- gear switch travels as an odd cap (Guild.lua, the wire). From 50c (operator, 2026-11-11: "if
+-- they only step through gold values that wont be very helpful early game. even 50s will not be
+-- used until level 30+"; "add 1s and 50c as lowest options as well").
+Routes.CAP_STEPS = { 50, 100, 500, 1000, 2500, 5000, 10000, 20000, 50000, 100000, 250000, 500000, 1000000 }
+-- 10s each for a new binding (operator, 2026-11-11: "i think 10s is a good default option to
+-- start"; it was 5g, 2026-10-26). A saved binding keeps the cap it has.
+Routes.DEFAULT_CAP = 1000
 Routes.MAX = 12             -- bindings per scope
 Routes.SCOPES = { account = "All my characters", character = "This character" }
 Routes.SCOPE_REPORT = { account = "all my characters", character = "this character", guild = "guild template" }
@@ -107,6 +113,13 @@ end
 -- the auction house pays well for to the bank alt; soulbound gear never leaves (a hard keep).
 Routes.ENCHANTING = 333
 Routes.GEAR_QUALITIES = { [2] = true, [3] = true } -- uncommon (green), rare (blue)
+-- The Gear switch on an Enchanting binding (a CurseForge comment, 2026-11-11: "the option to only
+-- send green/blue items if the disenchant value is greater than vendor/ah"; operator: "on each
+-- enchanting binding"): `route.gear` = nil (every green and blue piece, as before) or GEAR_DE (a
+-- piece goes only when disenchanting it pays more than the auction house and a vendor would;
+-- Routes.GearBeaten). A piece without a disenchant value still goes (operator: "sent anyway as
+-- today"). Dust, essences, shards and recipes aren't touched by it.
+Routes.GEAR_DE = "de"
 -- What a binding takes, when it differs from the profession's own list (primary materials only).
 Routes.BINDING_MATS = { [333] = "dust, essences, shards, green and blue gear", [129] = "cloth" }
 
@@ -123,6 +136,43 @@ end
 function Routes.ProfessionName(id)
     local p = ns.Valuation.PROFESSION_MATS[tonumber(id) or -1]
     return p and p.name or nil
+end
+
+--- Pure: the binding takes gear to disenchant (an Enchanting binding): the one with a Gear switch.
+function Routes.TakesGear(route)
+    return route ~= nil and not route.class and tonumber(route.profession) == Routes.ENCHANTING
+end
+
+--- Pure: a green or blue weapon or armor piece (what an Enchanting binding takes to disenchant).
+function Routes.IsGear(item)
+    return Routes.GEAR_QUALITIES[tonumber(item.quality) or -1] == true and ns.Valuation.CanDisenchant(item)
+end
+
+--- Pure: "Gear: all green and blue" / "Gear: only when disenchanting pays more" (the switch's
+--- button), or nil for a binding that takes no gear.
+function Routes.GearText(route)
+    if not Routes.TakesGear(route) then return nil end
+    return route.gear == Routes.GEAR_DE and "Gear: only when disenchanting pays more" or "Gear: all green and blue"
+end
+
+--- Pure: with the Gear switch on "only when disenchanting pays more", why this piece doesn't go
+--- to the binding, or nil when it goes: { to, de (the disenchant value after postage), best
+--- (what beats or matches it), by = "auction" / "vendor" }. Nil too with the switch off, for
+--- anything but gear, and for a piece without a disenchant value (it goes, as before). The
+--- auction side is the verdict's net (after cut, deposit and postage; none without a current
+--- auction price), the vendor side what a vendor pays for the stack. Without a price source there
+--- is no `price`: a disenchant addon's own value then comes as `item.de` (Bags.Evaluate).
+function Routes.GearBeaten(route, item, verdict, price, settings)
+    if not (Routes.TakesGear(route) and route.gear == Routes.GEAR_DE and Routes.IsGear(item)) then return nil end
+    local de = type(price) == "table" and tonumber(price.de) or tonumber(item.de)
+    if not de then return nil end
+    local n = item.count or 1
+    local net = math.floor(de * n) - (settings and settings.postage or 30) * (item.stacks or 1)
+    local best, by = (tonumber(item.vendor) or 0) * n, "vendor"
+    local ah = type(verdict) == "table" and tonumber(verdict.ahNet) or nil
+    if ah and ah > best then best, by = ah, "auction" end
+    if net > best then return nil end
+    return { to = route.to, de = net, best = best, by = by }
 end
 
 --- Pure: "Enchanting materials" (the profession's materials, for rows and subjects), or
@@ -153,10 +203,7 @@ function Routes.Matches(route, item, tiers, priceOf)
     if route.class then -- a class binding: what only that class may use, and this character can't
         return ns.Classes.ForOther(item.classes, route.class, item.myClass) == true
     end
-    if tonumber(route.profession) == Routes.ENCHANTING and Routes.GEAR_QUALITIES[tonumber(item.quality) or -1]
-        and ns.Valuation.CanDisenchant(item) then
-        return true
-    end
+    if Routes.TakesGear(route) and Routes.IsGear(item) then return true end
     -- A recipe its profession learns (operator, 2026-11-08: "recipes should go to their respective
     -- profession mappings"); the cap still sends a recipe the auction house pays well for to the bank alt.
     local recipeFor = ns.Valuation.RecipeProfession(item)
@@ -241,10 +288,6 @@ function Routes.Skill(route)
     return best
 end
 
---- Pure: divert an item to a binding. `verdict` is Valuation.Evaluate's result for the
---- item, `routes` the active bindings (Routes.Active()). Returns the new verdict, or nil
---- when no binding applies; a second return names the binding whose cap kept the item on
---- the normal rule, a third the binding whose player's skill is past the material (Tiers).
 local GROUP = { character = 1, account = 2, guild = 3 }
 
 --- Pure: of two bindings that both take an item, `a` goes first: this character's, then the
@@ -263,9 +306,11 @@ end
 --- Pure: divert an item to a binding. `verdict` is Valuation.Evaluate's result for the
 --- item, `routes` the active bindings (Routes.Active()). Returns the new verdict, or nil
 --- when no binding applies; a second return names the binding whose cap kept the item on
---- the normal rule, a third the binding whose player's skill is past the material (Tiers).
+--- the normal rule, a third the binding whose player's skill is past the material (Tiers), a
+--- fourth why a piece of gear didn't go to an Enchanting binding whose Gear switch is on
+--- (Routes.GearBeaten: disenchanting pays no more than selling it).
 --- Several bindings taking the item (metal and stone: Blacksmithing and Engineering): the first
---- by Routes.Before; its cap decides, as if it were the only one.
+--- by Routes.Before; its cap and its Gear switch decide, as if it were the only one.
 function Routes.Divert(item, verdict, price, settings, routes)
     if verdict and verdict.action == "keep" and Routes.HARD_KEEPS[verdict.reason] then return nil end
     -- A failed price call mails nothing, to a binding neither (AGENTS safety; Codex review, 2026-11-08).
@@ -293,6 +338,8 @@ function Routes.Divert(item, verdict, price, settings, routes)
     end
     if not route then return nil, nil, outgrown end
     if route.cap and capUnit and capUnit >= route.cap then return nil, route end
+    local beaten = Routes.GearBeaten(route, item, verdict, price, settings)
+    if beaten then return nil, nil, outgrown, beaten end
     local to, crafter = Routes.Recipient(route)
     local n = item.count or 1
     return {
@@ -452,7 +499,17 @@ function Routes.StepCap(key, dir)
     ns.Log.Add("routes", "%s to %s: cap %s", Routes.What(r), r.to, r.cap and ns.Valuation.Money(r.cap) or "none")
 end
 
---- Pure: "to my alt above 5g each" / "no price cap".
+--- Flip an Enchanting binding's Gear switch (Routes.GEAR_DE / every piece). Returns true when
+--- the binding has one.
+function Routes.ToggleGear(key)
+    local _, _, r = find(key)
+    if not Routes.TakesGear(r) then return false end
+    r.gear = r.gear ~= Routes.GEAR_DE and Routes.GEAR_DE or nil
+    ns.Log.Add("routes", "%s to %s: %s", Routes.What(r), r.to, Routes.GearText(r))
+    return true
+end
+
+--- Pure: "to my alt at 10s each or more" / "no price cap".
 function Routes.CapText(route)
     if not route.cap then return "no price cap" end
     return "to my alt at " .. ns.Valuation.Money(route.cap) .. " each or more"
@@ -748,8 +805,10 @@ function Routes.ReportLines()
         local to, crafter = Routes.Recipient(r)
         local skill = Routes.Skill(r)
         local past = skill and ns.Tiers.PastText(r.profession, skill) or ""
-        lines[#lines + 1] = string.format("binding: %s (%s, %s%s, skill %s%s%s)", Routes.Describe(r),
+        local gear = Routes.GearText(r)
+        lines[#lines + 1] = string.format("binding: %s (%s, %s%s%s, skill %s%s%s)", Routes.Describe(r),
             Routes.SCOPE_REPORT[r.scope] or tostring(r.scope), Routes.CapText(r),
+            gear and r.gear and (", " .. gear:lower()) or "",
             crafter and (", delivered to their crafter " .. to) or "", skill and tostring(skill) or "unknown",
             past ~= "" and (": past " .. past) or "",
             skipped[r.key] and ", skipped this visit" or "")
