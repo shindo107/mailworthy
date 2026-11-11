@@ -1,7 +1,9 @@
 -- The friends window (/mw friends, the settings' Friends button, the Mailworthy
 -- window's Friends button; media/ux-pass-prototype.png), one view at a time:
 --   list: the player's own bindings, each with its price cap stepper, scope (all my
---     characters / this character), where the mail goes (the friend, or the
+--     characters / this character), for an Enchanting binding its Gear switch on a third line
+--     ("Gear: all green and blue" / "Gear: only when disenchanting pays more";
+--     media/disenchant-binding-prototype.png), where the mail goes (the friend, or the
 --     character of theirs that has the profession, as their own Mailworthy
 --     reported) and Remove; then "Add a binding...";
 --   add, step 1: pick a player (party, guild, own characters, Mailworthy users;
@@ -13,7 +15,8 @@
 --     guild inside the mailworthy settings, seems weird its in the friends tab"): who
 --     shared the guild's template, "Guild rules: on / off" in one press, and its rules
 --     (why one is left out here); for the guild master and officers (Guild.lua) the
---     rules being edited, each with its cap stepper and Remove, "Add a rule...",
+--     rules being edited, each with its cap stepper and Remove (the Enchanting rule with its
+--     Gear switch too; a member reads it on the rule's cap line), "Add a rule...",
 --     "Publish to guild".
 -- With no bindings and no guild template it opens straight on step 1. Every control is a
 -- button, so the controller drives it (PadKey "settings" set, Nav); nothing needs typing.
@@ -25,6 +28,8 @@ ns.RoutesUI = UI
 UI.BINDING_ROWS, UI.CANDIDATE_ROWS, UI.PROFESSION_ROWS = 4, 6, 9
 local WIDTH = 560
 local BIND_ROW, LIST_ROW = 50, 26
+local GEAR_LINE = 26     -- an Enchanting row's third line: the Gear switch
+local CAP_WIDTH = 220
 local BIND_TOP = -92
 local GUILD_LINE = -66   -- the guild template line in the guild view
 local GUILD_HELP = -96   -- what the rules do, under it
@@ -78,10 +83,31 @@ local function pageOf(list, rows, key)
     return pages[key], count
 end
 
---- Pure: the cap as the rule it is: "5g each or more: to my bank alt", or "no price cap".
+--- Pure: the cap as the rule it is: "10s each or more: to my bank alt", or "no price cap".
 function UI.CapText(route)
     if not route.cap then return "no price cap" end
     return ns.Valuation.Money(route.cap) .. " each or more: to my bank alt"
+end
+
+--- Pure: a guild rule in force has no buttons: its cap line also says the Gear switch when the
+--- guild set it ("10s each or more: to my bank alt; gear only when disenchanting pays more").
+function UI.GuildCapText(rule)
+    local text = UI.CapText(rule)
+    if ns.Routes.TakesGear(rule) and rule.gear == ns.Routes.GEAR_DE then
+        text = text .. "; gear only when disenchanting pays more"
+    end
+    return text
+end
+
+--- Pure: what the footer says after a press on a binding's Gear switch (short: the list view's
+--- footer line is narrow) or on a draft rule's.
+function UI.GearHint(route, draft)
+    local on = route and route.gear == ns.Routes.GEAR_DE
+    if draft then
+        return (on and "Enchanting: gear only when disenchanting pays more." or "Enchanting: all green and blue gear.")
+            .. " Publish to guild to send the change."
+    end
+    return on and "Other gear follows your normal rule." or "All green and blue gear goes."
 end
 
 --- What the bound player mailed this account beyond what it mailed back (Ledger.lua), as a
@@ -133,7 +159,7 @@ local function createBindingRows()
             end
         end, "MailworthyFriendsRemove" .. i)
         row.cap = W.Label(frame, "GameFontHighlightSmall")
-        row.cap:SetWidth(220)
+        row.cap:SetWidth(CAP_WIDTH)
         row.cap:SetJustifyH("LEFT")
         local function step(dir)
             if not row.key then return end
@@ -146,7 +172,22 @@ local function createBindingRows()
             if row.key and row.kind == "route" then ns.Routes.ToggleScope(row.key) end
             UI.Refresh()
         end, "MailworthyFriendsScope" .. i)
-        row.widgets = { row.text, row.remove, row.cap, row.capDown, row.capUp, row.scope }
+        -- The Gear switch (an Enchanting binding or draft rule only): one press, the text is the rule.
+        row.gear = W.Button(frame, "", 300, function()
+            if not row.key then return end
+            if row.kind == "draft" then
+                if not ns.Guild.DraftToggleGear(row.key) then return end
+                for _, r in ipairs(ns.Guild.Draft() or {}) do
+                    if tonumber(r.profession) == tonumber(row.key) then setHint(UI.GearHint(r, true)) end
+                end
+            elseif row.kind == "route" then
+                if not ns.Routes.ToggleGear(row.key) then return end
+                setHint(UI.GearHint(ns.Routes.Get(row.key)))
+                ns.MailWindow.RefreshIfShown()
+            end
+            UI.Refresh()
+        end, "MailworthyFriendsGear" .. i)
+        row.widgets = { row.text, row.remove, row.cap, row.capDown, row.capUp, row.scope, row.gear }
         bindingRows[i] = row
     end
     emptyBindings = W.Label(frame, "GameFontHighlightSmall")
@@ -176,6 +217,7 @@ local function placeRow(row, y)
     at(row.capDown, 252, y - 24)
     at(row.capUp, 282, y - 24)
     at(row.scope, -24, y - 24, "TOPRIGHT")
+    at(row.gear, 24, y - 24 - GEAR_LINE)
 end
 
 local function createGuild()
@@ -315,14 +357,14 @@ end
 local function fillRows(list, top, kindOf, emptyText)
     local page, count = pageOf(list, UI.BINDING_ROWS, "bind")
     local first = (page - 1) * UI.BINDING_ROWS
-    local shown = 0
+    local shown, y = 0, top
     for i, row in ipairs(bindingRows) do
         local r = list[first + i]
         row.kind = r and kindOf(r) or nil
         row.key = r and (row.kind == "draft" and r.profession or r.key) or nil
         show(row.widgets, false)
         if r then
-            placeRow(row, top - shown * BIND_ROW)
+            placeRow(row, y)
             if row.kind == "draft" then
                 local me = tostring(r.to):lower() == tostring(ns.PlayerName()):lower()
                 row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. withMark(r.to) .. "|r"
@@ -336,12 +378,21 @@ local function fillRows(list, top, kindOf, emptyText)
                 row.text:SetText(ns.Routes.What(r) .. " |cffffd100to " .. withMark(r.to) .. "|r"
                     .. (crafter and (" |cffaaaaaa(delivered to " .. withMark(to) .. ")|r") or "") .. UI.OwedText(r.to))
             end
-            row.cap:SetText(UI.CapText(r))
+            -- A guild rule in force has no buttons: its cap line is wider and says the Gear switch.
+            row.cap:SetWidth(row.kind == "guild" and (WIDTH - 56) or CAP_WIDTH)
+            row.cap:SetText(row.kind == "guild" and UI.GuildCapText(r) or UI.CapText(r))
             row.scope:SetText(ns.Routes.SCOPES[r.scope] or tostring(r.scope))
             show({ row.text, row.cap }, true)
             show({ row.remove, row.capDown, row.capUp }, row.kind ~= "guild")
             show({ row.scope }, row.kind == "route")
+            local gear = row.kind ~= "guild" and ns.Routes.GearText(r) or nil
+            if gear then
+                row.gear:SetText(gear)
+                W.SetToggled(row.gear, r.gear == ns.Routes.GEAR_DE)
+                row.gear:Show()
+            end
             shown = shown + 1
+            y = y - BIND_ROW - (gear and GEAR_LINE or 0)
         end
     end
     if #list == 0 then
@@ -358,7 +409,7 @@ local function fillRows(list, top, kindOf, emptyText)
     else
         bindPage:Hide()
     end
-    return top - shown * BIND_ROW - (shown == 0 and 30 or 0)
+    return y - (shown == 0 and 30 or 0)
 end
 
 --- Pure: what the guild view says under the template line.
@@ -474,7 +525,7 @@ local function fillProfessions()
     candPage:Hide()
     refreshButton:Hide()
     if hint:GetText() == nil or hint:GetText() == "" then
-        setHint("Over the cap (" .. ns.Valuation.Money(ns.Routes.CAP_STEPS[1]) .. " each to start) a material goes to "
+        setHint("Over the cap (" .. ns.Valuation.Money(ns.Routes.DEFAULT_CAP) .. " each to start) a material goes to "
             .. "your bank alt instead.")
     end
     return LIST_TOP - 24 - shown * LIST_ROW

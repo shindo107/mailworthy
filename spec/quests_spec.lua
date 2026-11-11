@@ -19,7 +19,7 @@ describe("quests", function()
         ns.Fire("PLAYER_LOGIN")
         ns.Config.SetBankAlt("Roknua Themicrulah")
         WowStub.setBag(0, 1, WowStub.item(MEAT, "Crisp Spider Meat", { count = 5, sell = 250, class = 7, subclass = 8 }))
-        prices[WowStub.link(MEAT, "Crisp Spider Meat")] = 5000 -- the auction house would pay well
+        prices[WowStub.link(MEAT, "Crisp Spider Meat")] = 900 -- the auction house would pay well (under a binding's 10s cap)
         WowStub.state.quests = {
             { title = "Redridge", header = true },
             { title = "Redridge Goulash", objectives = {

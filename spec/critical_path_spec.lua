@@ -183,7 +183,7 @@ describe("critical path: mailing", function()
     end)
     after_each(function()
         assertQuiet(ns)
-        _G.Auctionator, _G.TSM_API = nil, nil
+        _G.Auctionator, _G.TSM_API, _G.DisenchantValueAPI = nil, nil, nil
     end)
 
     it("the .toc loads every addon file and only files that exist", function()
@@ -371,7 +371,7 @@ describe("critical path: mailing", function()
         local tailor = WowStub.item(7979, "Pattern: Some Robe", { quality = 2, sell = 450, class = 9, subclass = 2 })
         WowStub.setBag(2, 5, hammer)    -- no auction price
         WowStub.setBag(2, 6, pants)
-        prices[pants.hyperlink] = 90000  -- 9g: at or above the 5g default cap
+        prices[pants.hyperlink] = 90000  -- 9g: at or above the 10s default cap
         WowStub.setBag(1, 4, tailor)    -- no Tailoring binding, no price
         ns.Routes.Add(SMITH, 164)
         mailbox()
@@ -380,7 +380,7 @@ describe("critical path: mailing", function()
         assert.equal(SMITH, preview[7975], "the unpriced Blacksmithing recipe goes to the blacksmith friend")
         assert.equal(BANK_ALT, preview[7978], "at or above the cap: the normal rule, the bank alt for the AH")
         assert.equal(BANK_ALT, preview[7979], "no binding for Tailoring, no price: the bank alt")
-        prices[pants.hyperlink] = 2000  -- 20s: under the cap
+        prices[pants.hyperlink] = 500  -- 5s: under the cap (10s for a new binding; operator, 2026-11-11)
         ns.MailWindow.Refresh()
         preview = previewed(ns)
         assert.equal(SMITH, preview[7978], "under the cap: the friend")
@@ -578,6 +578,7 @@ describe("critical path: mailing", function()
         MailworthyDB.bankAlts = {}
         WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
         prices[WowStub.link(10940, "Strange Dust")] = 3
+        prices[WowStub.link(6515, "Spellbinder Robes")] = 900 -- 9s: under the binding's 10s default cap (2026-11-11)
         ns.Routes.Add(BOB, ENCHANTING)
         mailbox()
         _G.MailworthyMailButton:Click()
@@ -594,6 +595,7 @@ describe("critical path: mailing", function()
         -- operator, 2026-11-08: "Players should be able to click skip once for their bank alt sends too"
         WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
         prices[WowStub.link(10940, "Strange Dust")] = 3
+        prices[WowStub.link(6515, "Spellbinder Robes")] = 900 -- 9s: under the binding's 10s default cap (2026-11-11)
         ns.Routes.Add(BOB, ENCHANTING)
         mailbox()
         _G.MailworthyMailButton:Click()
@@ -680,6 +682,7 @@ describe("critical path: mailing", function()
     it("a guild rule's mail is tagged and counted for the guild; the bank alt's and a binding's aren't", function()
         guildTemplate()
         ns.Guild.SetUse(true)
+        prices[WowStub.link(2592, "Wool Cloth")] = 900 -- 9s each: under the binding's 10s default cap (2026-11-11)
         ns.Routes.Add("Cara Friend", 197) -- a personal Tailoring binding: its Wool Cloth is never counted
         mailbox()
         _G.MailworthyMailButton:Click()
@@ -1014,6 +1017,8 @@ describe("critical path: mailing", function()
             name = SADIE, realm = "Classic Beta PvP", faction = "Alliance", class = "MAGE", level = 30,
             professions = { { name = "Enchanting", skillLine = ENCHANTING, rank = 140 } },
         }
+        -- 9s: under the 10s cap the offered binding starts with (operator, 2026-11-11; it was 5g)
+        prices[WowStub.link(6515, "Spellbinder Robes")] = 900
     end
     local function sentTo(name)
         local n = 0
@@ -1092,6 +1097,109 @@ describe("critical path: mailing", function()
         assert.equal(0, ns.Routes.Count())
     end)
 
+    -- A binding's price cap and an Enchanting binding's Gear switch (operator, 2026-11-11). Neither adds
+    -- a recipient: they only move an item from the friend back to the normal rule. So: what the
+    -- preview shows after the change is exactly what is sent, and nobody else gets mail.
+    it("a new binding starts with a 10s cap: what sells for 10s or more each follows the normal rule", function()
+        -- operator, 2026-11-11: "i think 10s is a good default option to start" (it was 5g)
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        local bob = ns.Routes.Add(BOB, ENCHANTING)
+        assert.equal(1000, bob.cap)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940], "3c each: under the cap, to the friend")
+        assert.equal(BANK_ALT, preview[6515], "the green sells for 50s: at or above the cap, the bank alt for the AH")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+    end)
+
+    --- Dust, the fixture's robes (50s at auction, 9s disenchanted: they sell for more) and a cloak
+    --- (5s at auction, 40s disenchanted: worth disenchanting), with a disenchant addon's values.
+    local function gearBags()
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        local cloak = WowStub.item(6516, "Bandit Cloak", { quality = 2, sell = 206, class = 4, level = 18 })
+        WowStub.setBag(2, 5, cloak)
+        prices[cloak.hyperlink] = 500
+        local de = { [6515] = 900, [6516] = 4000 }
+        _G.DisenchantValueAPI = { GetValue = function(l) return de[tonumber(tostring(l):match("item:(%d+)"))] end }
+    end
+
+    it("an Enchanting binding's Gear switch (mouse): gear that sells for more goes the normal way, the rest to the friend", function()
+        gearBags()
+        ns.Routes.Add(BOB, ENCHANTING, { cap = 10000 })
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local before = previewed(ns)
+        assert.equal(BOB, before[6515], "the switch off: every green goes to the enchanter, as before")
+        assert.equal(BOB, before[6516])
+        ns.RoutesUI.Show()
+        _G.MailworthyFriendsGear1:Click()
+        local preview = previewed(ns) -- the mailbox window redrew with the press
+        assert.equal(BANK_ALT, preview[6515], "the robes sell for more than they disenchant for")
+        assert.equal(BOB, preview[6516], "the cloak is worth disenchanting")
+        assert.equal(BOB, preview[10940], "dust goes whatever the switch says")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+    end)
+
+    it("an Enchanting binding's Gear switch (controller): Cross on the switch, then Send mails as previewed", function()
+        gearBags()
+        ns.Routes.Add(BOB, ENCHANTING, { cap = 10000 })
+        WowStub.state.gamepadUI = true
+        WowStub.state.activeFrame = MailFrame
+        mailbox()
+        local watcher = _G.MailworthyPadWatcher
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        _G.MailworthyPadTriangle:Click()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        ns.RoutesUI.Show(ns.MailWindow.Frame())
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        assert.is_true(_G.MailworthyFriendsGear1:IsShown())
+        ns.Nav.Select(_G.MailworthyFriendsGear1)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        assert.equal("Gear: only when disenchanting pays more", _G.MailworthyFriendsGear1:GetText())
+        ns.RoutesUI.Frame():Hide()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[6515])
+        assert.equal(BOB, preview[6516])
+        ns.Nav.Select(_G.MailworthyMailSend)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+    end)
+
+    it("a guild template whose Enchanting rule has the Gear switch on: the same, for the guild's enchanter", function()
+        -- operator, 2026-11-11: "guild master sets it per rule"
+        guildTemplate()
+        gearBags()
+        for _, m in ipairs(ns.Guild.Encode(WowStub.state.serverTime - 30, "Guild Master",
+            { { profession = ENCHANTING, to = BOB, gear = "de" } })) do
+            ns.Fire("CHAT_MSG_ADDON", "Mailworthy", m, "GUILD", BOB)
+        end
+        assert.equal("de", ns.Guild.Template().rules[1].gear)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        for _, to in pairs(previewed(ns)) do assert.equal(BANK_ALT, to, "not turned on: nothing goes to the guild") end
+        ns.Guild.SetUse(true)
+        ns.MailWindow.Refresh()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[6515], "the robes sell for more than they disenchant for")
+        assert.equal(BOB, preview[6516])
+        assert.equal(BOB, preview[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+        assertGuildCounted({ [BOB] = true })
+    end)
+
     it("bags that change after the preview: Send re-reads them, and a slot that changes mid-run is skipped", function()
         local pants = function() return WowStub.item(6125, "Brawler's Pants", { bound = true, quality = 2, sell = 300, class = 4 }) end
         mailbox()
@@ -1158,6 +1266,71 @@ describe("critical path: an older build's SavedVariables", function()
         assert.is_nil(MailworthyAPI.v1.GetGuildExport(), "no guild: the export is nil, not an error")
         assert.is_nil(next(MailworthyDB.guildGiven), "nothing counted without a guild rule")
         _G.Auctionator = nil
+    end)
+
+    -- A binding saved before the Gear switch and the 10s default (2026-11-11): it has no `gear`
+    -- field and its own cap. Nothing about it changes: it takes every green piece under its cap.
+    it("a binding saved before the Gear switch keeps its 5g cap and still takes every green piece", function()
+        local saved = oldSaved()
+        saved.db.routes = { [REALM_KEY] = { { to = BOB, profession = ENCHANTING, cap = 50000, at = 1700000000 } } }
+        local ns = loadAddon(saved)
+        local prices = fillBags()
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        useAuctionator(prices)
+        -- the robes sell for 50s and disenchant for 9s: only a binding with the switch on would leave them
+        _G.DisenchantValueAPI = { GetValue = function(l) return tostring(l):find("item:6515", 1, true) and 900 or nil end }
+        finally(function() _G.Auctionator, _G.DisenchantValueAPI = nil, nil end)
+        ns.Fire("ADDON_LOADED", "Mailworthy")
+        ns.Fire("PLAYER_LOGIN")
+        local binding = ns.Routes.List()[1]
+        assert.equal(50000, binding.cap, "a saved binding keeps the cap it has")
+        assert.is_nil(binding.gear, "and the switch is off")
+        ns.Fire("MAIL_SHOW")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940])
+        assert.equal(BOB, preview[6515], "under its 5g cap, the switch off: to the enchanter, as before")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+        assertQuiet(ns)
+    end)
+
+    -- A guild template taken by a build from before the Gear switch: it stored the Enchanting rule's
+    -- cap as it travelled (odd = the switch on, Guild.WireCap) with no `gear` field. After the update
+    -- that copy is read as the switch on (Guild.ReadSaved; Codex review, 2026-11-11).
+    it("a guild template saved by a build from before the Gear switch: its odd cap is the switch, on", function()
+        local saved = oldSaved()
+        local rev = 1791900000 - 3600
+        saved.db.guildTemplates = { [REALM_KEY .. "|Bank Of Azeroth"] = { rev = rev, from = "Guild Master", at = rev,
+            use = true, rules = { { profession = ENCHANTING, to = BOB, cap = 100001 } } } }
+        local ns = loadAddon(saved)
+        WowStub.state.guild = { clubId = 7, name = "Bank Of Azeroth", members = {
+            { name = "Guild Master", rank = 0, online = true }, { name = BOB, rank = 3, online = true } } }
+        local prices = fillBags()
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        useAuctionator(prices)
+        -- the robes sell for 50s (under the rule's 10g cap) and disenchant for 9s
+        _G.DisenchantValueAPI = { GetValue = function(l) return tostring(l):find("item:6515", 1, true) and 900 or nil end }
+        finally(function() _G.Auctionator, _G.DisenchantValueAPI = nil, nil end)
+        ns.Fire("ADDON_LOADED", "Mailworthy")
+        ns.Fire("PLAYER_LOGIN")
+        local rule = ns.Routes.List()[1]
+        assert.equal("de", rule.gear)
+        assert.equal(100000, rule.cap)
+        ns.Fire("MAIL_SHOW")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[10940])
+        assert.equal(BANK_ALT, preview[6515], "the switch is on: the robes sell for more than they disenchant for")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
+        assertQuiet(ns)
     end)
 
     -- v0.30.0 (before guild contributions): a guild template in use and a full mail log with no

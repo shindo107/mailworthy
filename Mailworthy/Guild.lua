@@ -28,6 +28,13 @@
 --   T2|<revision>|<author>|<i>/<n>|<skill line>=<Name>:<cap copper, 0 = none>   one per rule
 --   T2|<revision>|<author>|0/0|                                               an empty template
 --   Q2|<revision held, 0 = none>     (ask: whoever holds a newer copy answers, one of them)
+-- The Enchanting rule's Gear switch (Routes.GEAR_DE; operator, 2026-11-11: "guild master sets it
+-- per rule") travels in that rule's cap, with no new field: an ODD cap means "gear only when
+-- disenchanting pays more", and the cap is the even number below it (every cap step is even);
+-- GEAR_NO_CAP is the switch with no cap. A Mailworthy from before the switch reads the same
+-- message as an ordinary rule (every piece of gear, a cap one copper higher), keeps the odd
+-- number and passes it on unchanged, so the switch survives a copy made by an older member and
+-- no member is left without the template. A longer rule body would have been dropped by them.
 -- The revision is the author's server time. Received data is validated like hellos:
 -- known crafting skill lines, clean short names, at most MAX_RULES, a revision no more
 -- than FUTURE seconds ahead. Switch: /mw feature guildTemplate off.
@@ -45,6 +52,7 @@ Guild.ANSWER_THROTTLE = 30  -- seconds between answers to asks
 Guild.ASK_THROTTLE = 30     -- seconds between asks
 Guild.ASK_DELAY = 12        -- seconds after login (after the hello)
 Guild.FUTURE = 600          -- a revision further ahead of our server time is refused
+Guild.GEAR_NO_CAP = 999999999 -- on the wire: the Gear switch on, no price cap (odd, 9 digits)
 
 local partial, pending = {}, {} -- sender -> template being assembled / waiting for the roster
 local lastAnswer, lastAsk, answering = -math.huge, -math.huge, false
@@ -119,17 +127,35 @@ local function store(field)
 end
 
 --- The template this character's guild uses, or nil: { rev, from, at, rules = { { profession, to,
---- cap } }, use = nil (not chosen yet) / true / false }.
+--- cap, gear (Routes.GEAR_DE or nil; the Enchanting rule only) } }, use = nil (not chosen yet) /
+--- true / false }.
 function Guild.Template()
     local key = guildKey()
     local t = key and store("guildTemplates")[key]
-    return type(t) == "table" and t or nil
+    if type(t) ~= "table" then return nil end
+    Guild.ReadSaved(t.rules)
+    return t
+end
+
+--- Saved rules as this build reads them (in place). A Mailworthy from before the Gear switch
+--- stored the Enchanting rule's cap as it travelled: an odd cap with no `gear` field. Once that
+--- player updates, the odd cap is read as what it is, the switch on and the even cap below, so
+--- their copy says the same as everyone else's of that revision and goes out again unchanged.
+function Guild.ReadSaved(rules)
+    for _, r in ipairs(type(rules) == "table" and rules or {}) do
+        local cap = type(r) == "table" and tonumber(r.cap) or nil
+        if cap and r.gear == nil and ns.Routes.TakesGear(r) and cap % 2 == 1 then
+            r.cap, r.gear = Guild.ReadCap(r.profession, cap)
+        end
+    end
+    return rules
 end
 
 local function copyRules(rules)
     local out = {}
     for _, r in ipairs(type(rules) == "table" and rules or {}) do
-        out[#out + 1] = { profession = r.profession, to = r.to, cap = r.cap }
+        out[#out + 1] = { profession = r.profession, to = r.to, cap = r.cap,
+            gear = ns.Routes.TakesGear(r) and r.gear == ns.Routes.GEAR_DE and ns.Routes.GEAR_DE or nil }
     end
     return out
 end
@@ -142,11 +168,12 @@ local function sorted(rules)
     return rules
 end
 
---- Pure: "Alchemy to Ann, Enchanting to Bob" / "no rules".
+--- Pure: "Alchemy to Ann, Enchanting to Bob (gear only when disenchanting pays more)" / "no rules".
 function Guild.RulesText(rules)
     local parts = {}
     for _, r in ipairs(rules or {}) do
         parts[#parts + 1] = tostring(ns.Routes.ProfessionName(r.profession)) .. " to " .. tostring(r.to)
+            .. (ns.Routes.TakesGear(r) and r.gear == ns.Routes.GEAR_DE and " (gear only when disenchanting pays more)" or "")
     end
     return #parts > 0 and table.concat(parts, ", ") or "no rules"
 end
@@ -186,7 +213,7 @@ function Guild.Rules(personal)
         if id and not own[id] and not bound[id] and r.to and lower(r.to) ~= me then
             -- rev and guildKey travel with the binding to the mail log and the guild contributions
             -- (Contributions.lua): what this rule mails is counted for the guild under that revision.
-            out[#out + 1] = { to = r.to, profession = id, cap = r.cap, scope = "guild",
+            out[#out + 1] = { to = r.to, profession = id, cap = r.cap, gear = r.gear, scope = "guild",
                 key = "guild|" .. ns.Routes.Key(id, r.to), from = t.from, rev = tonumber(t.rev), guildKey = key }
         end
     end
@@ -207,6 +234,26 @@ end
 
 -- Wire ------------------------------------------------------------------------------------
 
+--- Pure: a rule's cap as it travels (copper, 0 = none): odd when the Enchanting rule's Gear
+--- switch is on (the cap is then the even number below; GEAR_NO_CAP = the switch, no cap).
+function Guild.WireCap(rule)
+    local cap = math.max(0, math.floor(tonumber(rule.cap) or 0))
+    if not ns.Routes.TakesGear(rule) then return cap end
+    -- the Enchanting rule with the switch off: never odd (a cap edited by hand would read as "on")
+    if rule.gear ~= ns.Routes.GEAR_DE then return cap - cap % 2 end
+    if cap == 0 or cap >= Guild.GEAR_NO_CAP - 1 then return Guild.GEAR_NO_CAP end
+    return cap - cap % 2 + 1
+end
+
+--- Pure: the cap and the Gear switch of a rule read from the wire (Guild.WireCap's inverse): an
+--- odd cap on the Enchanting rule is the switch. Any other rule's cap is taken as it is.
+function Guild.ReadCap(profession, cap)
+    cap = tonumber(cap) or 0
+    if tonumber(profession) ~= ns.Routes.ENCHANTING or cap % 2 == 0 then return cap > 0 and cap or nil, nil end
+    if cap >= Guild.GEAR_NO_CAP then return nil, ns.Routes.GEAR_DE end
+    return cap > 1 and cap - 1 or nil, ns.Routes.GEAR_DE
+end
+
 --- Pure: a template's messages (one per rule; one empty message for no rules), naming its author.
 function Guild.Encode(rev, author, rules)
     rev = math.floor(tonumber(rev) or 0)
@@ -216,7 +263,7 @@ function Guild.Encode(rev, author, rules)
     local out = {}
     for i, r in ipairs(rules) do
         out[i] = head .. string.format("%d/%d|%d=%s:%d", i, #rules, tonumber(r.profession) or 0, tostring(r.to),
-            math.floor(tonumber(r.cap) or 0))
+            Guild.WireCap(r))
     end
     return out
 end
@@ -228,7 +275,7 @@ local function goodName(name)
 end
 
 --- Pure: the body of a "T" message (after "T2|"), or nil: { rev, author, index, count, rule =
---- { profession, to, cap } or nil (an empty template) }.
+--- { profession, to, cap, gear } or nil (an empty template) }.
 function Guild.DecodePart(rest)
     local rev, author, index, count, body = tostring(rest):match("^(%d+)|([^|]+)|(%d+)/(%d+)|(.*)$")
     if not rev or #rev > 10 or #index > 2 or #count > 2 then return nil end
@@ -244,9 +291,10 @@ function Guild.DecodePart(rest)
     local profession, name, cap = body:match("^(%d+)=([^:]+):(%d+)$")
     profession, name = tonumber(profession), name and goodName(name)
     if not profession or not ns.Routes.ProfessionName(profession) or not name or #cap > 9 then return nil end
-    cap = tonumber(cap)
+    local gear
+    cap, gear = Guild.ReadCap(profession, cap)
     return { rev = rev, author = author, index = index, count = count,
-        rule = { profession = profession, to = name, cap = cap > 0 and cap or nil } }
+        rule = { profession = profession, to = name, cap = cap, gear = gear } }
 end
 
 local function myRev()
@@ -418,7 +466,7 @@ function Guild.Draft()
         local t = Guild.Template()
         drafts[key] = { rules = t and copyRules(t.rules) or {} }
     end
-    return drafts[key].rules
+    return Guild.ReadSaved(drafts[key].rules)
 end
 
 --- The draft differs from the published template.
@@ -431,7 +479,10 @@ function Guild.DraftChanged()
     if not t then return #a > 0 end
     if #a ~= #b then return true end
     for i = 1, #a do
-        if a[i].profession ~= b[i].profession or lower(a[i].to) ~= lower(b[i].to) or a[i].cap ~= b[i].cap then return true end
+        if a[i].profession ~= b[i].profession or lower(a[i].to) ~= lower(b[i].to) or a[i].cap ~= b[i].cap
+            or a[i].gear ~= b[i].gear then
+            return true
+        end
     end
     return false
 end
@@ -449,7 +500,7 @@ function Guild.DraftAdd(name, profession)
     for i, r in ipairs(rules) do
         if tonumber(r.profession) == profession then
             local was = r.to
-            rules[i] = { profession = profession, to = name, cap = r.cap }
+            rules[i] = { profession = profession, to = name, cap = r.cap, gear = r.gear }
             return rules[i], was
         end
     end
@@ -475,6 +526,18 @@ function Guild.DraftStepCap(profession, dir)
     for _, r in ipairs(Guild.Draft() or {}) do
         if tonumber(r.profession) == tonumber(profession) then r.cap = ns.Routes.NextCap(r.cap, dir) end
     end
+end
+
+--- Flip the draft's Enchanting rule's Gear switch (Routes.GEAR_DE / every piece). Returns true
+--- when that rule has one.
+function Guild.DraftToggleGear(profession)
+    for _, r in ipairs(Guild.Draft() or {}) do
+        if tonumber(r.profession) == tonumber(profession) and ns.Routes.TakesGear(r) then
+            r.gear = r.gear ~= ns.Routes.GEAR_DE and ns.Routes.GEAR_DE or nil
+            return true
+        end
+    end
+    return false
 end
 
 --- Publish the draft to the guild: a new revision, sent at once; this character's own copy

@@ -210,6 +210,13 @@ describe("D-pad reach in every view", function()
         ns.RoutesUI.Show()
         tick()
         assertNavigable("friends list", 6)
+        -- the Enchanting binding's Gear switch (2026-11-11): one more stop under - and +
+        local gear
+        for _, c in ipairs(ns.Nav.Candidates()) do gear = gear or (c.button == _G.MailworthyFriendsGear1 and c) end
+        assert.truthy(gear, "the Gear switch is a D-pad target")
+        ns.Routes.ToggleGear(ns.Routes.List()[1].key)
+        ns.RoutesUI.Refresh()
+        assertNavigable("friends list, the Gear switch on", 7)
         for i, prof in ipairs({ 164, 165, 171, 186 }) do ns.Routes.Add("Friend Number" .. i, prof) end
         ns.RoutesUI.Refresh()
         assert.is_true(_G.MailworthyFriendsBindPageBack:IsVisible(), "the bindings list's two-way pager")
@@ -222,9 +229,13 @@ describe("D-pad reach in every view", function()
         assertNavigable("friends add, step 2", 4)
         ns.RoutesUI.Frame():Hide()
         ns.Guild.DraftAdd(BOB, ENCHANTING)
+        ns.Guild.DraftAdd("Ann Other", 197)
         ns.RoutesUI.ShowGuild()
         tick()
         assertNavigable("guild template", 3)
+        local draftGear
+        for _, c in ipairs(ns.Nav.Candidates()) do draftGear = draftGear or (c.button == _G.MailworthyFriendsGear1 and c) end
+        assert.truthy(draftGear, "the Enchanting rule's Gear switch is a D-pad target in the editor")
     end)
 
     it("the ledger and the bank alt summary", function()

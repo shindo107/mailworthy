@@ -87,8 +87,14 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   tailor, herbs for an alchemist, metal and stone for a blacksmith, ...) are mailed to them,
   every time, for all your
   characters on that realm and faction (or this character only). Each binding has a
-  **price cap** (default 5g each): a material the market suddenly wants goes to your bank
-  alt instead. The Mailworthy window lists the bindings with **Skip once** (this mailbox
+  **price cap**, checked against the item's auction price each (10s for a new binding; the
+  **-** and **+** buttons step it from 50c to 100g, or to no cap): anything at or above it
+  follows your normal rules, so what the market wants goes to your bank alt instead. An
+  **Enchanting** binding also has a **Gear** button: "Gear: all green and blue" sends every
+  green and blue piece, "Gear: only when disenchanting pays more" sends a piece only when it
+  disenchants for more than the auction house would net and more than a vendor pays (a piece
+  with no disenchant value still goes; dust, essences, shards and recipes always go). The
+  Mailworthy window lists the bindings with **Skip once** (this mailbox
   visit only) and **Remove**. Locked items still stay. If the friend runs Mailworthy too,
   it tells yours which of their characters craft what (addon messages to guild and group;
   `/mw feature comms off` stops them), and the mail goes to **whichever of their characters
@@ -122,7 +128,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 - **Guild template** (`/mw guild`, or **Guild...** in Mailworthy settings): the guild master
   (or an officer, the rank right below) presses **Add a rule...** and sets one rule per
   profession: "Enchanting to Bob", "Alchemy (herbs) to Ann", "Tailoring (cloth) to me", each
-  with a price cap, then **Publish to guild**. Every guild member running Mailworthy gets a
+  with a price cap (and, for the Enchanting rule, the same **Gear** button as a binding of your
+  own), then **Publish to guild**. Every guild member running Mailworthy gets a
   chat line and the Guild window shows "Guild template from ..." with its rules; nothing is
   mailed until they press **Use guild rules** once. Later updates then apply on their own
   (with a chat line). **One press turns the guild rules off** again: "Guild rules: on" in the
