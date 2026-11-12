@@ -5,17 +5,17 @@
 -- an unknown style and a Steam Deck get the Xbox names.
 local loadAddon = require("spec.support.load_addon")
 
--- style (false = no mapped device) -> right shoulder, top face, left stick press
+-- style (false = no mapped device) -> right shoulder, top face, left stick press, right stick press
 local STYLES = {
-    { style = "Shapes", shoulder = "R1", top = "Triangle", stick = "L3" },
-    { style = "Letters", shoulder = "RB", top = "Y", stick = "LS" },
-    { style = "Generic", shoulder = "RB", top = "Y", stick = "LS" },
-    { style = "Reverse", shoulder = "RB", top = "Y", stick = "LS" },
-    { style = "SomethingNew", shoulder = "RB", top = "Y", stick = "LS" },
-    { style = false, shoulder = "RB", top = "Y", stick = "LS" },
+    { style = "Shapes", shoulder = "R1", top = "Triangle", stick = "L3", rstick = "R3" },
+    { style = "Letters", shoulder = "RB", top = "Y", stick = "LS", rstick = "RS" },
+    { style = "Generic", shoulder = "RB", top = "Y", stick = "LS", rstick = "RS" },
+    { style = "Reverse", shoulder = "RB", top = "Y", stick = "LS", rstick = "RS" },
+    { style = "SomethingNew", shoulder = "RB", top = "Y", stick = "LS", rstick = "RS" },
+    { style = false, shoulder = "RB", top = "Y", stick = "LS", rstick = "RS" },
 }
 -- Every controller word Mailworthy used to type, whatever the controller.
-local TYPED = { "R1", "RB", "L3", "LS", "Triangle" }
+local TYPED = { "R1", "RB", "L3", "LS", "R3", "RS", "Triangle" }
 
 local function word(text, name)
     return (" " .. text .. " "):find("[^%w]" .. name .. "[^%w]") ~= nil
@@ -35,6 +35,7 @@ describe("controller names", function()
         assert.equal("PAD4", ns.Gamepad.FACE_TOP)
         assert.equal("PADRSHOULDER", ns.Gamepad.SHOULDER_RIGHT)
         assert.equal("PADLSTICK", ns.Gamepad.STICK_LEFT_PRESS)
+        assert.equal("PADRSTICK", ns.Gamepad.STICK_RIGHT_PRESS)
     end)
 
     it("names the face buttons per style: a Switch controller gets the Xbox letters", function()
@@ -74,10 +75,11 @@ describe("controller names", function()
                 end
             end
 
-            it("names the three keys", function()
+            it("names the four keys", function()
                 assert.equal(case.shoulder, ns.Gamepad.Name(ns.Gamepad.SHOULDER_RIGHT))
                 assert.equal(case.top, ns.Gamepad.Name(ns.Gamepad.FACE_TOP))
                 assert.equal(case.stick, ns.Gamepad.Name(ns.Gamepad.STICK_LEFT_PRESS))
+                assert.equal(case.rstick, ns.Gamepad.Name(ns.Gamepad.STICK_RIGHT_PRESS))
             end)
 
             it("chat, controller on the Inbox: the shoulder (and top) button by this controller's name", function()
@@ -98,15 +100,16 @@ describe("controller names", function()
                 assert.is_false(ns.MailWindow.Frame():IsShown(), "still only a hint: never switches tabs")
             end)
 
-            it("chat, /mw help: all three keys by this controller's name", function()
+            it("chat, /mw help: all four keys by this controller's name", function()
                 ns.HandleSlash("help")
                 local help = table.concat(WowStub.printed, "\n")
                 assert.truthy(help:find("Controller: Send Mail tab (" .. case.shoulder .. "); " .. case.top
                     .. " closes and reopens it.", 1, true), help)
                 assert.truthy(help:find("Alt+click it, or " .. case.stick .. " in your bags (controller).", 1, true), help)
+                assert.truthy(help:find("Ctrl+Alt+click it, or " .. case.rstick .. " in your bags (controller).", 1, true), help)
                 assert.is_nil(help:find("{", 1, true), "no mark left unfilled")
                 -- "padTriangle" is a switch's name, not a button's.
-                others(help:gsub("padTriangle", "padTop"), case.shoulder, case.top, case.stick)
+                others(help:gsub("padTriangle", "padTop"), case.shoulder, case.top, case.stick, case.rstick)
             end)
 
             it("window and tooltip, when the game can't draw the icon: this controller's names in brackets", function()
@@ -116,7 +119,8 @@ describe("controller names", function()
                 assert.equal("[" .. case.shoulder .. "] to Send Mail, then [" .. case.top .. "]", ns.MailButton.InboxHint())
                 assert.truthy(ns.Border.Tooltip():find("Alt+click it ([" .. case.stick .. "] on a controller) to unlock.", 1, true))
                 ns.PadKey.RefreshHint()
-                assert.equal("[" .. case.stick .. "] Mailworthy: lock / unlock item", ns.PadKey.BagHint())
+                assert.equal("[" .. case.stick .. "] Mailworthy: lock / unlock item   [" .. case.rstick .. "] pin: bank / vendor",
+                    ns.PadKey.BagHint())
             end)
 
             it("window and tooltip: the game's icon for the key, no typed name", function()
@@ -133,9 +137,10 @@ describe("controller names", function()
                 local tip = ns.Border.Tooltip()
                 assert.truthy(tip:find("Alt+click it (|A:atlas-PADLSTICK:14:14|a on a controller) to unlock.", 1, true), tip)
                 ns.PadKey.RefreshHint()
-                assert.equal("|A:atlas-PADLSTICK:14:14|a Mailworthy: lock / unlock item", ns.PadKey.BagHint())
+                assert.equal("|A:atlas-PADLSTICK:14:14|a Mailworthy: lock / unlock item   |A:atlas-PADRSTICK:14:14|a pin: bank / vendor",
+                    ns.PadKey.BagHint())
                 others(ns.MailButton.InboxHint() .. tip .. ns.PadKey.BagHint())
-                assert.same({ PAD4 = true, PADRSHOULDER = true, PADLSTICK = true }, asked)
+                assert.same({ PAD4 = true, PADRSHOULDER = true, PADLSTICK = true, PADRSTICK = true }, asked)
             end)
         end)
     end
@@ -149,7 +154,7 @@ describe("controller names", function()
         ns.Fire("INPUT_DEVICE_INTERFACE_TRANSITION")
         assert.equal("[RB] to Send Mail, then [Y]", ns.MailButton.InboxHint())
         assert.equal("Mailworthy [Y]", _G.MailworthyMailButton.text)
-        assert.equal("[LS] Mailworthy: lock / unlock item", ns.PadKey.BagHint())
+        assert.equal("[LS] Mailworthy: lock / unlock item   [RS] pin: bank / vendor", ns.PadKey.BagHint())
         WowStub.state.gamepadUI = false
         ns.Fire("INPUT_DEVICE_INTERFACE_TRANSITION")
         assert.equal("", ns.MailButton.InboxHint(), "back to the mouse: no hint")

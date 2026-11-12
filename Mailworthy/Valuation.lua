@@ -460,9 +460,14 @@ end
 
 local evaluate
 
+-- item.pin: Pins.BANK / Pins.VENDOR (Pins.lua loads before this file; kept apart so this stays pure)
+Valuation.PIN_BANK = "bank"
+Valuation.PIN_VENDOR = "vendor"
+Valuation.VENDOR_PIN_REASON = "vendor: you pinned it" -- a hard keep (Routes.HARD_KEEPS)
+
 --- item: { link, itemID, count, stacks, quality, classID, vendor (copper per unit; nil = not
 ---   loaded yet), bound, quest, conjured (Conjured.Is), questFor (the title of an active quest
----   that needs it), inUse (locked by the game), locked (Mailworthy lock) }
+---   that needs it), inUse (locked by the game), locked (Mailworthy lock), pin ("bank" / "vendor": Pins.lua) }
 --- price: nil when there's no price source at all (no Auctionator); else
 ---   { ah = copper per unit or nil, age = days or nil, de = copper per item or nil }
 ---   history = Prices.History rows (optional), exact = true / false / nil }
@@ -476,6 +481,14 @@ local evaluate
 function Valuation.Evaluate(item, price, settings)
     settings = settings or Valuation.DEFAULTS
     if item.locked then return keep("locked") end
+    -- A vendor pin (Pins.lua): the player asked for this item to stay for the vendor and show V,
+    -- soulbound or not (an outgrown quest reward: before the soulbound keep, so it gets the tag).
+    -- It only ever keeps an item; a quest item, a quest's objective, a conjured item and an item
+    -- in use keep their own reason, and without a vendor price there is nothing to vendor.
+    if item.pin == Valuation.PIN_VENDOR and not item.quest and not item.questFor and not item.inUse
+        and not Valuation.IsConjured(item) and (item.vendor or 0) > 0 then
+        return keep(Valuation.VENDOR_PIN_REASON, { vendor = item.vendor * (item.count or 1), pinned = true, vendorPin = true })
+    end
     if item.bound then return keep("soulbound") end
     if item.quest then return keep("quest item") end
     -- Conjured (a Healthstone, operator 2026-11-10): gone 15 minutes after logout, never mailed.
@@ -484,6 +497,13 @@ function Valuation.Evaluate(item, price, settings)
     if item.questFor then return keep("a quest needs it", { quest = item.questFor }) end
     if item.inUse then return keep("in use") end
     if Valuation.IsTool(item) then return keep("profession tool") end
+    -- A bank pin (Pins.lua): the player asked for this item to always go to the bank alt and be
+    -- banked there, whatever the market or a profession of this character says. Past every hard
+    -- keep above, so a pin never mails what the rule wouldn't touch.
+    if item.pin == Valuation.PIN_BANK then
+        return { action = "mail", route = "bank", listRoute = "common", reason = "bank: you pinned it", pinned = true,
+            vendor = (item.vendor or 0) * (item.count or 1), postage = (settings.postage or 0) * (item.stacks or 1) }
+    end
     if settings.keepProfessionMats then
         local profession, _, untilSkill, convert, window = Valuation.NeededBy(item, settings.professions,
             settings.tiers, settings.priceOf)

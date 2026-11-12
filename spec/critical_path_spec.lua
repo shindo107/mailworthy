@@ -515,6 +515,97 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
     end)
 
+    it("a bank pin (mouse): the pinned item goes to the bank alt, not to a binding's friend; a pinned hard keep stays", function()
+        -- Pins.lua: "always bank this". Junk the rule keeps, a material a binding would take, and three
+        -- hard keeps the player pinned by mistake.
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, ENCHANTING)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(previewed(ns)[4865], "junk stays until it is pinned")
+        assert.equal(BOB, previewed(ns)[10940], "the binding takes the dust until it is pinned")
+        WowStub.state.mods = { alt = true, ctrl = true }
+        for _, at in ipairs({ { 0, 7 }, { 2, 6 }, { 0, 1 }, { 0, 3 }, { 0, 4 } }) do -- pelt, dust, Hearthstone, quest item, locked ore
+            -- This build's own click handler: the global hook is shared by every addon load in this file.
+            ns.Pins.OnModifiedItemClick("link", WowStub.itemLocation(at[1], at[2]))
+        end
+        WowStub.state.mods = {}
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[4865], "the pinned junk goes to the bank alt")
+        assert.equal(BANK_ALT, preview[10940], "the pinned dust goes to the bank alt, not to the friend")
+        assert.is_nil(preview[6948], "a pinned soulbound item stays")
+        assert.is_nil(preview[5022], "a pinned quest item stays")
+        assert.is_nil(preview[2775], "a pinned locked item stays")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("a bank pin (controller): R3 on the selected bag item, then Send mails it as previewed", function()
+        WowStub.state.gamepadUI = true
+        ns.Fire("MAIL_SHOW")
+        mailbox()
+        local watcher = _G.MailworthyPadWatcher
+        local function tick() watcher.scripts.OnUpdate(watcher, 0.2) end
+        local function press(name)
+            WowStub.state.now = WowStub.state.now + 1
+            _G[name]:Click()
+            tick()
+        end
+        WowStub.state.activeFrame = ContainerFrameCombinedBags
+        tick()
+        assert.equal("CLICK MailworthyPadPin:LeftButton", WowStub.state.bindings.PADRSTICK, "R3 isn't bound in the bags")
+        WowStub.state.navButton = WowStub.itemButton(0, 7) -- Ruined Pelt: junk, stays by the rule
+        press("MailworthyPadPin")
+        WowStub.state.activeFrame = MailFrame
+        tick()
+        press("MailworthyPadTriangle")
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[4865], "the pinned junk goes to the bank alt")
+        ns.Nav.Select(_G.MailworthyMailSend)
+        press("MailworthyPadCross")
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("a vendor pin: the pinned items never leave, priced, soulbound or wanted by a binding", function()
+        -- Pins.lua: "always vendor this". A green the rule would mail for the auction house, a soulbound
+        -- green, and a material a binding would take: all three stay, tagged V.
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, ENCHANTING)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(BANK_ALT, previewed(ns)[6515], "the green goes until it is pinned")
+        for _, pin in ipairs({ { 6515, "Spellbinder Robes" }, { 6125, "Brawler's Pants" }, { 10940, "Strange Dust" } }) do
+            ns.Pins.Set(pin[1], WowStub.link(pin[1], pin[2]), ns.Pins.VENDOR, "spec")
+        end
+        local preview = previewed(ns)
+        assert.is_nil(preview[6515], "the vendor-pinned green stays")
+        assert.is_nil(preview[6125], "the vendor-pinned soulbound green stays")
+        assert.is_nil(preview[10940], "the vendor-pinned dust stays: the binding doesn't take it")
+        local tagged = {}
+        for _, it in ipairs(ns.MailWindow.Result().keep) do tagged[it.itemID] = ns.BankAlt.Verdict(it) end
+        assert.equal("v", tagged[6515])
+        assert.equal("v", tagged[6125])
+        assert.equal("v", tagged[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("no bank alt: a pinned item stays in the bags like the rest of the bank alt's share", function()
+        MailworthyDB.bankAlts = {}
+        ns.Pins.Set(4865, WowStub.link(4865, "Ruined Pelt"), ns.Pins.BANK, "spec")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(0, #ns.MailWindow.Result().mail, "nobody to mail to")
+        _G.MailworthyMailSend:Click()
+        WowStub.runTimers()
+        assert.equal(0, #WowStub.state.sent)
+    end)
+
     it("a class binding: the mage friend gets the mage-only scroll, the bank alt the rest, nobody else", function()
         -- operator, 2026-11-08: "this is a mage only item, id like to be able to friend mail these types of items too"
         WowStub.setBag(0, 13, WowStub.item(211234, "Scroll: VOCE WELL", { sell = 15, class = 0 }))

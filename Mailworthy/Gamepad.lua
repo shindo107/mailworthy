@@ -19,6 +19,7 @@ Gamepad.FACE_LEFT = "PAD3" -- Square / X
 Gamepad.FACE_TOP = "PAD4" -- Triangle / Y
 Gamepad.SHOULDER_RIGHT = "PADRSHOULDER" -- R1 / RB
 Gamepad.STICK_LEFT_PRESS = "PADLSTICK" -- L3 / LS
+Gamepad.STICK_RIGHT_PRESS = "PADRSTICK" -- R3 / RS
 
 -- What each controller calls a key, for chat lines (a window or tooltip draws the game's icon:
 -- Gamepad.Glyph). The key strings are Blizzard's (Blizzard_SharedXML/Shared/GamepadConstants.lua:
@@ -28,9 +29,10 @@ Gamepad.STICK_LEFT_PRESS = "PADLSTICK" -- L3 / LS
 -- "Reverse" = Switch. A Switch controller gets the Xbox names in chat (operator, 2026-11-09:
 -- "Use Xbox names"), though Blizzard's icons for it draw the top button as X and the right
 -- shoulder as R ("gamepad-switch-128x-face-x").
-local XBOX = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y", PADRSHOULDER = "RB", PADLSTICK = "LS" }
+local XBOX = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y", PADRSHOULDER = "RB", PADLSTICK = "LS", PADRSTICK = "RS" }
 local NAMES = {
-    Shapes = { PAD1 = "Cross", PAD2 = "Circle", PAD3 = "Square", PAD4 = "Triangle", PADRSHOULDER = "R1", PADLSTICK = "L3" },
+    Shapes = { PAD1 = "Cross", PAD2 = "Circle", PAD3 = "Square", PAD4 = "Triangle", PADRSHOULDER = "R1", PADLSTICK = "L3",
+        PADRSTICK = "R3" },
     Letters = XBOX,
     Generic = XBOX,
     Reverse = XBOX,

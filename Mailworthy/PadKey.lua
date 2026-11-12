@@ -10,7 +10,8 @@
 --   mail    mail window focused, Mailworthy window closed:  Triangle opens it
 --   window  mail window focused, Mailworthy window open:    Triangle closes,
 --           D-pad moves Mailworthy's highlight (Nav), Cross presses, Circle closes
---   bags    bags focused:  L3 locks / unlocks the selected item (Locks)
+--   bags    bags focused:  L3 locks / unlocks the selected item (Locks), R3 moves its pin on
+--           (bank, vendor, none: Pins); each key has its own switch (padLock, padPin)
 --   settings  the settings, friends, ledger, locked items, summary or report window open, anywhere (out of combat): D-pad moves,
 --           Cross presses, Circle closes it. Our own window, so no Blizzard
 --           panel needs focus; the bindings go as soon as it closes.
@@ -33,7 +34,7 @@ PadKey.SETS = {
         PADDUP = "MailworthyPadUp", PADDDOWN = "MailworthyPadDown",
         PADDLEFT = "MailworthyPadLeft", PADDRIGHT = "MailworthyPadRight",
     },
-    bags = { PADLSTICK = "MailworthyPadLock" },
+    bags = { PADLSTICK = "MailworthyPadLock", PADRSTICK = "MailworthyPadPin" },
     settings = {
         PAD1 = "MailworthyPadCross", PAD2 = "MailworthyPadCircle",
         PADDUP = "MailworthyPadUp", PADDDOWN = "MailworthyPadDown",
@@ -42,6 +43,8 @@ PadKey.SETS = {
 }
 
 local NAVIGATES = { window = true, settings = true }
+-- A key with a switch of its own (/mw feature): bound only while its feature is on.
+PadKey.KEY_FEATURE = { PADLSTICK = "padLock", PADRSTICK = "padPin" }
 
 local watcher, active, elapsed = nil, nil, 0
 PadKey.stats = { applies = 0, clears = 0, presses = 0, sets = {} }
@@ -86,7 +89,7 @@ function PadKey.Wanted()
         local window = ns.MailWindow and ns.MailWindow.Frame()
         if window and window:IsShown() and ns.Features.On("padNav") then return "window" end
         if ns.Features.On("padTriangle") then return "mail" end
-    elseif isBagFrame(focused) and ns.Features.On("padLock") then
+    elseif isBagFrame(focused) and (ns.Features.On("padLock") or ns.Features.On("padPin")) then
         return "bags"
     end
     return nil
@@ -118,8 +121,11 @@ function PadKey.Check()
     if NAVIGATES[active] then ns.Nav.Follow() end
     for key, buttonName in pairs(PadKey.SETS[active]) do
         local expected = "CLICK " .. buttonName .. ":LeftButton"
+        local feature = PadKey.KEY_FEATURE[key]
         local okAction, action = pcall(GetBindingAction, key, true)
-        if not okAction or action ~= expected then
+        if feature and not ns.Features.On(feature) then -- luacheck: ignore 542
+            -- this key's switch is off: Blizzard keeps it
+        elseif not okAction or action ~= expected then
             local ok, err = pcall(SetOverrideBindingClick, watcher, true, key, buttonName)
             PadKey.stats.applies = PadKey.stats.applies + 1
             if PadKey.stats.applies <= 12 or PadKey.stats.applies % 50 == 0 then
@@ -181,9 +187,10 @@ function PadKey.Create()
         padButton("MailworthyPad" .. dir, function() ns.Nav.Move(dir:lower()) end)
     end
     padButton("MailworthyPadLock", function() ns.Locks.ToggleSelectedBagSlot() end)
+    padButton("MailworthyPadPin", function() ns.Pins.ToggleSelectedBagSlot() end)
     -- Hint under the combined bags (a font string: not a frame, not seen by smart navigation).
     local bags = rawget(_G, "ContainerFrameCombinedBags")
-    if type(bags) == "table" and ns.Features.On("padLock") then
+    if type(bags) == "table" and (ns.Features.On("padLock") or ns.Features.On("padPin")) then
         PadKey.bagHint = bags:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         PadKey.bagHint:SetPoint("TOPLEFT", bags, "BOTTOMLEFT", 10, -4)
         PadKey.RefreshHint()
@@ -193,11 +200,17 @@ end
 
 function PadKey.RefreshHint()
     if not PadKey.bagHint then return end
-    PadKey.bagHint:SetText(ns.MailButton.GamepadUI()
-        and (ns.Gamepad.Glyph(ns.Gamepad.STICK_LEFT_PRESS, 14) .. " Mailworthy: lock / unlock item") or "")
+    local parts = {}
+    if ns.Features.On("padLock") then
+        parts[#parts + 1] = ns.Gamepad.Glyph(ns.Gamepad.STICK_LEFT_PRESS, 14) .. " Mailworthy: lock / unlock item"
+    end
+    if ns.Features.On("padPin") then
+        parts[#parts + 1] = ns.Gamepad.Glyph(ns.Gamepad.STICK_RIGHT_PRESS, 14) .. " pin: bank / vendor"
+    end
+    PadKey.bagHint:SetText(ns.MailButton.GamepadUI() and table.concat(parts, "   ") or "")
 end
 
---- The hint under the bags as drawn ("" for mouse / keyboard, or with padLock off).
+--- The hint under the bags as drawn ("" for mouse / keyboard, or with padLock and padPin off).
 function PadKey.BagHint()
     return PadKey.bagHint and PadKey.bagHint:GetText() or ""
 end

@@ -80,6 +80,33 @@ describe("controller bindings", function()
         assert.is_true(ns.Locks.IsItemLocked(2770))
     end)
 
+    it("R3 in the bags pins the selected item for the bank; each stick has its own switch", function()
+        WowStub.setBag(0, 3, WowStub.item(2770, "Copper Ore", { count = 5 }))
+        WowStub.state.activeFrame = ContainerFrameCombinedBags
+        tick()
+        assert.equal(click("MailworthyPadPin"), WowStub.state.bindings.PADRSTICK)
+        WowStub.state.navButton = WowStub.itemButton(0, 3)
+        _G.MailworthyPadPin:Click()
+        assert.equal("bank", ns.Pins.Kind(2770))
+        assert.is_false(ns.Locks.IsItemLocked(2770), "a pin is not a lock")
+
+        WowStub.state.activeFrame = nil
+        tick()
+        MailworthyDB.features.padPin = false
+        WowStub.state.activeFrame = ContainerFrameCombinedBags
+        tick()
+        assert.is_nil(WowStub.state.bindings.PADRSTICK, "padPin off: R3 stays Blizzard's")
+        assert.equal(click("MailworthyPadLock"), WowStub.state.bindings.PADLSTICK, "L3 still ours")
+
+        WowStub.state.activeFrame = nil
+        tick()
+        MailworthyDB.features.padPin, MailworthyDB.features.padLock = true, false
+        WowStub.state.activeFrame = ContainerFrameCombinedBags
+        tick()
+        assert.equal(click("MailworthyPadPin"), WowStub.state.bindings.PADRSTICK, "padLock off: R3 still ours")
+        assert.is_nil(WowStub.state.bindings.PADLSTICK)
+    end)
+
     it("lets go when nothing of ours is focused, at combat, and without the controller UI", function()
         WowStub.state.activeFrame = MailFrame
         tick()

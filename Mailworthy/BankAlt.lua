@@ -98,6 +98,7 @@ end
 function BankAlt.Verdict(item)
     local r = item.result
     if not r then return nil end
+    if r.vendorPin then return "v" end -- a vendor pin (Pins.lua): V whatever the market says
     if ns.Valuation.BankForCraft(r) then return "craft" end
     if r.action == "mail" then
         if r.route == "bank" then return "b" end
@@ -279,6 +280,8 @@ function BankAlt.TooltipLines(item, record, settings)
             text = string.format("Auction price today: %s each%s%s. After the %d%% cut and the %dh deposit: %s more than a vendor.",
                 money(unit), basis, ageText(p.age), math.floor(settings.cut * 100 + 0.5),
                 ns.Valuation.DURATION_HOURS[settings.duration], money(r.gain))
+        elseif verdict == "b" and r.pinned then
+            text = "Bank it: you pinned this item for the bank (Pins: /mw pins). Pin it again to unpin."
         elseif verdict == "b" then
             local why = tostring(r.reason):gsub("^bank: ", "")
             text = "Bank it, don't list it yet: " .. why .. ". " .. (r.gain
@@ -287,6 +290,9 @@ function BankAlt.TooltipLines(item, record, settings)
                 or "No auction price yet, so the gain is unknown.")
         elseif verdict == "craft" then
             text = "Bank it: " .. ns.MailWindow.WhyKept(r) .. ". It waits in your bank, not your bags, until you craft."
+        elseif verdict == "v" and r.vendorPin then
+            text = string.format("Vendor it (%s): you pinned this item for the vendor (Pins: /mw pins). Pin it again to unpin.",
+                money(r.vendor))
         elseif verdict == "de" then
             text = string.format("Disenchanting today: %s, %s more than a vendor.", money(p.de), money(r.gain))
         elseif p.ah then
@@ -480,6 +486,7 @@ ns.On("PLAYER_LOGIN", function()
         legend:SetPoint("TOPRIGHT", bags, "BOTTOMRIGHT", -10, -4)
     end
     ns.Locks.OnChanged(redraw)
+    ns.Pins.OnChanged(redraw)
     ns.Mailer.OnSent(function() BankAlt.AfterSend() end)
     local settings = ns.SettingsUI.Frame()
     if settings then settings:HookScript("OnHide", redraw) end
