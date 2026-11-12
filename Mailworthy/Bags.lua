@@ -410,7 +410,8 @@ end
 function Bags.ProfessionMatsText(settings)
     if not settings.keepProfessionMats then return "mailed" end
     local crafting = Bags.CraftingText(settings.professions)
-    local text = crafting ~= "" and ("kept for " .. crafting) or "kept (no crafting profession here)"
+    local kept = settings.matsToBankAlt and "banked on your bank alt for " or "kept for "
+    local text = crafting ~= "" and (kept .. crafting) or "kept (no crafting profession here)"
     local past = settings.tiers ~= false and Bags.OutgrownText(settings.professions) or ""
     if past ~= "" then text = text .. "; " .. past .. " (mailed)" end
     local names = ns.Valuation.CraftingProfessions(settings.professions)

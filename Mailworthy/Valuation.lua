@@ -46,6 +46,9 @@ Valuation.DEFAULTS = {
     maxAgeDays = 7,       -- older Auctionator prices don't count
     disenchant = false,   -- Valuation.Settings switches it on when a disenchant addon is installed
     keepProfessionMats = true, -- materials this character's crafting professions use stay (operator, 2026-10-22)
+    -- With keepProfessionMats: those materials wait on the bank alt instead of in this character's
+    -- bank (the B tag, mailed like the other banked items; the Bank send switch gates them too).
+    matsToBankAlt = false,
     sellGathered = false,      -- ... except what its gathering professions gather (operator, 2026-11-06: off by default)
     -- What Send takes of the bank alt's share, by verdict (Valuation.SEND; applied by Bags.ApplySendSwitches):
     sendAuction = true,    -- items for the auction house (the AH tag)
@@ -489,6 +492,17 @@ function Valuation.Evaluate(item, price, settings)
             settings.tiers, settings.priceOf)
         -- "Sell what I gather": what a gathering profession brought in is valued like anything else.
         if profession and not (settings.sellGathered and Valuation.GatheredBy(item, settings.professions)) then
+            -- "On my bank alt": mailed there and banked, not kept here. Never one to convert (that
+            -- is crafted now, here), never before the item's data or with a failed price call, and
+            -- without a price source only what the rule mails then: white items and staples.
+            if settings.matsToBankAlt and not convert and item.vendor ~= nil
+                and not (type(price) == "table" and price.failed)
+                and (price ~= nil or item.quality == 1 or ((item.quality or 0) >= 1 and Valuation.IsStaple(item))) then
+                return { action = "mail", route = "bank", listRoute = "common", craftBank = true,
+                    reason = "bank: your " .. profession .. " needs it", untilSkill = untilSkill, window = window,
+                    neededBy = profession, vendor = item.vendor * (item.count or 1),
+                    postage = (settings.postage or 0) * (item.stacks or 1) }
+            end
             return keep("your " .. profession .. " needs it", { untilSkill = untilSkill, convert = convert,
                 window = window, neededBy = profession })
         end

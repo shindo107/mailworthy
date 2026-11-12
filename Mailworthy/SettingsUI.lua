@@ -265,7 +265,16 @@ local function createRule()
     end)
     disenchantButton:SetPoint("TOPLEFT", 24, -210)
     matsButton = toggle(372, "Mats", function()
-        ns.Config.Set("keepProfessionMats", not ns.Config.Get("keepProfessionMats"))
+        -- Three states: on (kept here) -> off (valued like anything else) -> on my bank alt -> on.
+        local keepHere, toAlt = ns.Config.Get("keepProfessionMats"), ns.Config.Get("matsToBankAlt")
+        if keepHere and not toAlt then
+            ns.Config.Set("keepProfessionMats", false)
+        elseif not keepHere then
+            ns.Config.Set("keepProfessionMats", true)
+            ns.Config.Set("matsToBankAlt", true)
+        else
+            ns.Config.Set("matsToBankAlt", false)
+        end
         if ns.BankAlt then ns.BankAlt.Redraw() end
     end)
     matsButton:SetPoint("TOPLEFT", 24, -236)
@@ -435,7 +444,8 @@ local function fillMain(bankAlt, here, choices)
         deAddon or "era tables"))
     W.SetToggled(disenchantButton, v.disenchant == true)
     local crafting = ns.Bags.CraftingText(ns.Characters.Professions()) -- "First Aid 80, Tailoring 130"
-    matsButton:SetText(string.format("Keep my professions' materials: %s (%s)", v.keepProfessionMats and "on" or "off",
+    matsButton:SetText(string.format("Keep my professions' materials: %s (%s)",
+        not v.keepProfessionMats and "off" or v.matsToBankAlt and "on my bank alt" or "on",
         crafting ~= "" and crafting or "no crafting profession here"))
     W.SetToggled(matsButton, v.keepProfessionMats == true)
     local gathering = {}

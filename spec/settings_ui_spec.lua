@@ -172,6 +172,15 @@ describe("settings window", function()
         assert.is_false(ns.Config.Get("keepProfessionMats"))
         assert.equal("Keep my professions' materials: off (Enchanting 1)",
             _G.MailworthySettingsMats:GetText())
+        _G.MailworthySettingsMats:Click() -- the third state: kept, on the bank alt
+        assert.is_true(ns.Config.Get("keepProfessionMats"))
+        assert.is_true(ns.Config.Get("matsToBankAlt"))
+        assert.equal("Keep my professions' materials: on my bank alt (Enchanting 1)", _G.MailworthySettingsMats:GetText())
+        _G.MailworthySettingsMats:Click() -- and round to on (kept here)
+        assert.is_true(ns.Config.Get("keepProfessionMats"))
+        assert.is_false(ns.Config.Get("matsToBankAlt"))
+        assert.equal("Keep my professions' materials: on (Enchanting 1)", _G.MailworthySettingsMats:GetText())
+        _G.MailworthySettingsMats:Click() -- off again, as the lines below expect
         assert.equal("Sell what I gather: off (Mining)", _G.MailworthySettingsGather:GetText(), "the stub character mines")
         _G.MailworthySettingsGather:Click()
         assert.is_true(ns.Config.Get("sellGathered"))

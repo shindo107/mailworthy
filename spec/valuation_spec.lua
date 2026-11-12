@@ -636,6 +636,30 @@ describe("valuation", function()
             assert.is_nil(V.NeededBy(cloth, nil))
         end)
 
+        it("on my bank alt: the materials are mailed to be banked, behind every hard keep and the no-price rule", function()
+            S.professions = { 197 }
+            S.matsToBankAlt = true
+            local rich = { ah = 1000, exact = true, age = 0 }
+            local white = { classID = 7, subclassID = 5, quality = 1, vendor = 13, count = 20, stacks = 1 }
+            local r = V.Evaluate(white, rich, S)
+            assert.same({ "mail", "bank", "bank: your Tailoring needs it", "Tailoring", true, 260, 30 },
+                { r.action, r.route, r.reason, r.neededBy, r.craftBank, r.vendor, r.postage })
+            assert.equal("mail", V.Evaluate(white, nil, S).action, "no price source: a white item still goes")
+            local green = { classID = 7, subclassID = 5, quality = 2, vendor = 13, count = 1, stacks = 1 }
+            assert.equal("keep", V.Evaluate(green, nil, S).action, "no price source: only white items and staples go")
+            assert.equal("your Tailoring needs it", V.Evaluate(green, nil, S).reason)
+            assert.equal("keep", V.Evaluate(white, { failed = true }, S).action, "a failed price call mails nothing")
+            local unloaded = { classID = 7, subclassID = 5, quality = 1, count = 1, stacks = 1 }
+            assert.equal("keep", V.Evaluate(unloaded, rich, S).action, "item data not loaded: stays")
+            for _, hard in ipairs({ "locked", "bound", "quest", "inUse" }) do
+                local it = { classID = 7, subclassID = 5, quality = 1, vendor = 13, count = 1, stacks = 1, [hard] = true }
+                assert.equal("keep", V.Evaluate(it, rich, S).action, hard)
+            end
+            S.keepProfessionMats = false
+            assert.is_nil(V.Evaluate(white, rich, S).craftBank, "keep off: valued like anything else")
+            S.keepProfessionMats, S.matsToBankAlt = true, false
+        end)
+
         it("keeps the materials before any pricing, unless the setting is off", function()
             S.professions = { 197 }
             local rich = { ah = 1000, exact = true, age = 0 }
@@ -685,7 +709,7 @@ describe("valuation", function()
     describe("settings", function()
         it("defaults: 24h, 5% cut, 30c postage, 5s and 25%, 7 days", function()
             assert.same({ duration = 3, relistFactor = 0.5, cut = 0.05, postage = 30, minGain = 500, minGainPct = 0.25,
-                maxAgeDays = 7, disenchant = false, keepProfessionMats = true, sellGathered = false,
+                maxAgeDays = 7, disenchant = false, keepProfessionMats = true, matsToBankAlt = false, sellGathered = false,
                 sendAuction = true, sendDisenchant = true, sendBank = true, sendVendor = false }, S)
         end)
 

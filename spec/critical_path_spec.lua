@@ -622,6 +622,73 @@ describe("critical path: mailing", function()
         end
     end)
 
+    it("my professions' materials on my bank alt (mouse): previewed to the bank alt, then exactly that is sent", function()
+        -- A new way to mail, behind a setting that is off by default: what this character's own
+        -- crafting needs is kept here unless the player picks "on my bank alt" in the settings.
+        WowStub.state.professions[2] = { index = 9, name = "Leatherworking", rank = 30, maxRank = 75, skillLine = 165 }
+        prices[WowStub.link(2318, "Light Leather")] = 25
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(previewed(ns)[2318], "by default the leatherworker's leather stays")
+        ns.SettingsUI.Show(ns.MailWindow.Frame())
+        _G.MailworthySettingsMats:Click() -- off
+        _G.MailworthySettingsMats:Click() -- on my bank alt
+        assert.truthy(_G.MailworthySettingsMats:GetText():find("on my bank alt", 1, true))
+        ns.SettingsUI.Frame():Hide()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[2318], "the leather goes to the bank alt")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("my professions' materials on my bank alt (controller): Cross on the switch, then Send mails as previewed", function()
+        WowStub.state.professions[2] = { index = 9, name = "Leatherworking", rank = 30, maxRank = 75, skillLine = 165 }
+        prices[WowStub.link(2318, "Light Leather")] = 25
+        WowStub.state.gamepadUI = true
+        WowStub.state.activeFrame = MailFrame
+        mailbox()
+        local watcher = _G.MailworthyPadWatcher
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        _G.MailworthyPadTriangle:Click()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        ns.SettingsUI.Show(ns.MailWindow.Frame())
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        ns.Nav.Select(_G.MailworthySettingsMats)
+        for _ = 1, 2 do
+            WowStub.state.now = WowStub.state.now + 1
+            _G.MailworthyPadCross:Click()
+        end
+        assert.truthy(_G.MailworthySettingsMats:GetText():find("on my bank alt", 1, true))
+        ns.SettingsUI.Frame():Hide()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[2318])
+        ns.Nav.Select(_G.MailworthyMailSend)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("my professions' materials on my bank alt: the B switch off, or no bank alt, and they stay", function()
+        WowStub.state.professions[2] = { index = 9, name = "Leatherworking", rank = 30, maxRank = 75, skillLine = 165 }
+        prices[WowStub.link(2318, "Light Leather")] = 25
+        ns.Config.Set("matsToBankAlt", true)
+        ns.Config.Set("sendBank", false)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.is_nil(preview[2318], "Send by tag B off: the banked materials stay")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+        ns.Config.Set("sendBank", true)
+        ns.Config.ClearBankAlt()
+        ns.MailWindow.Refresh()
+        assert.is_nil(previewed(ns)[2318], "no bank alt: nowhere to send them")
+    end)
+
     it("a bank alt picked after the preview holds Send until the list shows it (Codex review)", function()
         local NEW = "Newbank Alt"
         mailbox()
