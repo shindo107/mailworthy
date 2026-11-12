@@ -1,13 +1,21 @@
--- Pins: "always bank this item". A pin belongs to the ITEM (its item ID), like a lock (Locks.lua),
--- but it is saved for the whole account (MailworthyDB.pins), so the bank alt knows it too: a main
--- pins an item once, Send mails it to the bank alt every time, and it shows the B (Bank) tag there
--- and here, whatever the auction house or this character's professions say.
+-- Pins: "always bank this item" and "always vendor this item". A pin belongs to the ITEM (its
+-- item ID), like a lock (Locks.lua), but it is saved for the whole account (MailworthyDB.pins),
+-- so the bank alt knows it too.
 --
--- A pin is a wish, not a safety rule: every hard keep still wins (locked, soulbound, quest,
--- conjured, in use, a profession tool; Valuation.Evaluate), and it goes only to the bank alt, the
--- recipient the window shows (a binding never takes a pinned item: Routes.Divert).
+--   * bank:   Send mails it to the bank alt every time, and it shows the B (Bank) tag there and
+--             here, whatever the auction house or this character's professions say.
+--   * vendor: it is never mailed and shows the V (Vendor) tag on every character, whatever the
+--             auction house says, soulbound or not (an outgrown quest reward). Needs a vendor price.
 --
--- Ways to toggle a pin, none of which writes into Blizzard's UI (the lock's techniques):
+-- A pin is a wish, not a safety rule. A bank pin: every hard keep still wins (locked, soulbound,
+-- quest, conjured, in use, a profession tool; Valuation.Evaluate), and it goes only to the bank
+-- alt, the recipient the window shows (a binding never takes a pinned item: Routes.Divert). A
+-- vendor pin only ever keeps an item in the bags, and is a hard keep itself (Routes.HARD_KEEPS):
+-- no binding and no Return to sender mails a vendor-pinned item; a lock, a quest item and an
+-- item in use are left alone.
+--
+-- One action cycles the pin: none -> bank -> vendor -> none. Ways to press it, none of which
+-- writes into Blizzard's UI (the lock's techniques):
 --   * keyboard / mouse: Ctrl+Alt+click a bag item. The post-hook on the global
 --     HandleModifiedItemClick the lock uses for Alt alone; with Ctrl held too Blizzard's own
 --     dress-up case may also run for a piece of gear (it opens the dressing room; harmless).
@@ -20,6 +28,8 @@ local Pins = {}
 ns.Pins = Pins
 
 Pins.BANK = "bank"
+Pins.VENDOR = "vendor"
+Pins.NEXT = { [Pins.BANK] = Pins.VENDOR } -- the cycle: none -> bank -> vendor -> none
 
 local listeners = {}
 
@@ -30,14 +40,14 @@ end
 
 function Pins.OnChanged(fn) table.insert(listeners, fn) end
 
---- The pin on an item: Pins.BANK, or nil.
+--- The pin on an item: Pins.BANK, Pins.VENDOR, or nil.
 function Pins.Kind(itemID)
     if itemID == nil or type(MailworthyDB) ~= "table" or type(MailworthyDB.pins) ~= "table" then return nil end
     local entry = MailworthyDB.pins[itemID]
     return type(entry) == "table" and entry.kind or nil
 end
 
---- Pin an item (kind = Pins.BANK) or clear its pin (kind = nil). Returns the new kind.
+--- Pin an item (kind = Pins.BANK or Pins.VENDOR) or clear its pin (kind = nil). Returns the new kind.
 function Pins.Set(itemID, link, kind, how)
     if not itemID then return nil end
     pins()[itemID] = kind and { kind = kind, link = link, at = time() } or nil
@@ -45,21 +55,29 @@ function Pins.Set(itemID, link, kind, how)
         tostring(how))
     if kind == Pins.BANK then
         ns.Print(string.format("Bank pin on %s: Send always mails it to your bank alt, on every character.", tostring(link)))
-        if ns.Locks.IsItemLocked(itemID) then
-            ns.Print("It is locked on this character too, and a lock wins: it stays here until you unlock it.")
-        end
+    elseif kind == Pins.VENDOR then
+        ns.Print(string.format("Vendor pin on %s: it stays for the vendor and shows V, on every character.", tostring(link)))
     else
         ns.Print(string.format("Pin removed from %s.", tostring(link)))
+    end
+    if kind and ns.Locks.IsItemLocked(itemID) then
+        ns.Print("It is locked on this character too, and a lock wins: it stays here until you unlock it.")
     end
     for _, fn in ipairs(listeners) do pcall(fn, itemID, kind) end
     return kind
 end
 
---- Toggle the bank pin on whatever item is in this bag slot.
+--- Move the pin on whatever item is in this bag slot one step on: none -> bank -> vendor -> none.
 function Pins.Toggle(bag, slot, how)
     local info = ns.Locks.ItemAt(bag, slot)
     if not info or not info.itemID then return nil end
-    return Pins.Set(info.itemID, info.hyperlink, Pins.Kind(info.itemID) == nil and Pins.BANK or nil, how)
+    local now = Pins.Kind(info.itemID)
+    local nextKind = now == nil and Pins.BANK or Pins.NEXT[now]
+    local kind = Pins.Set(info.itemID, info.hyperlink, nextKind, how)
+    if kind == Pins.VENDOR and info.hasNoValue then
+        ns.Print("No vendor buys it, so the vendor pin does nothing for this item.")
+    end
+    return kind
 end
 
 --- The pinned items, by name: { { itemID, link, name, kind } }.
@@ -81,13 +99,18 @@ end
 function Pins.PrintList()
     local list = Pins.List()
     if #list == 0 then
-        ns.Print(ns.Gamepad.Fill("No pinned items. Ctrl+Alt+click an item in your bags (controller: {PADRSTICK}) to always"
-            .. " bank it."))
+        ns.Print(ns.Gamepad.Fill("No pinned items. Ctrl+Alt+click an item in your bags (controller: {PADRSTICK}): once to"
+            .. " always bank it, twice to always vendor it, a third time to unpin."))
         return
     end
-    local names = {}
-    for i, entry in ipairs(list) do names[i] = tostring(entry.link or entry.name) end
-    ns.Print("Bank pins (always mailed to your bank alt): " .. table.concat(names, ", "))
+    for _, kind in ipairs({ { Pins.BANK, "Bank pins (always mailed to your bank alt): " },
+        { Pins.VENDOR, "Vendor pins (never mailed, tagged V): " } }) do
+        local names = {}
+        for _, entry in ipairs(list) do
+            if entry.kind == kind[1] then names[#names + 1] = tostring(entry.link or entry.name) end
+        end
+        if #names > 0 then ns.Print(kind[2] .. table.concat(names, ", ")) end
+    end
 end
 
 --- For /mw report.

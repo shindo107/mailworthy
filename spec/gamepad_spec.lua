@@ -119,7 +119,7 @@ describe("controller names", function()
                 assert.equal("[" .. case.shoulder .. "] to Send Mail, then [" .. case.top .. "]", ns.MailButton.InboxHint())
                 assert.truthy(ns.Border.Tooltip():find("Alt+click it ([" .. case.stick .. "] on a controller) to unlock.", 1, true))
                 ns.PadKey.RefreshHint()
-                assert.equal("[" .. case.stick .. "] Mailworthy: lock / unlock item   [" .. case.rstick .. "] bank pin",
+                assert.equal("[" .. case.stick .. "] Mailworthy: lock / unlock item   [" .. case.rstick .. "] pin: bank / vendor",
                     ns.PadKey.BagHint())
             end)
 
@@ -137,7 +137,7 @@ describe("controller names", function()
                 local tip = ns.Border.Tooltip()
                 assert.truthy(tip:find("Alt+click it (|A:atlas-PADLSTICK:14:14|a on a controller) to unlock.", 1, true), tip)
                 ns.PadKey.RefreshHint()
-                assert.equal("|A:atlas-PADLSTICK:14:14|a Mailworthy: lock / unlock item   |A:atlas-PADRSTICK:14:14|a bank pin",
+                assert.equal("|A:atlas-PADLSTICK:14:14|a Mailworthy: lock / unlock item   |A:atlas-PADRSTICK:14:14|a pin: bank / vendor",
                     ns.PadKey.BagHint())
                 others(ns.MailButton.InboxHint() .. tip .. ns.PadKey.BagHint())
                 assert.same({ PAD4 = true, PADRSHOULDER = true, PADLSTICK = true, PADRSTICK = true }, asked)
@@ -154,7 +154,7 @@ describe("controller names", function()
         ns.Fire("INPUT_DEVICE_INTERFACE_TRANSITION")
         assert.equal("[RB] to Send Mail, then [Y]", ns.MailButton.InboxHint())
         assert.equal("Mailworthy [Y]", _G.MailworthyMailButton.text)
-        assert.equal("[LS] Mailworthy: lock / unlock item   [RS] bank pin", ns.PadKey.BagHint())
+        assert.equal("[LS] Mailworthy: lock / unlock item   [RS] pin: bank / vendor", ns.PadKey.BagHint())
         WowStub.state.gamepadUI = false
         ns.Fire("INPUT_DEVICE_INTERFACE_TRANSITION")
         assert.equal("", ns.MailButton.InboxHint(), "back to the mouse: no hint")
