@@ -137,6 +137,7 @@ local function assertSafeAndComplete(ns, preview, allowed)
         assert.is_true(allowed[mail.name] == true, "mail " .. i .. " went to " .. tostring(mail.name))
         assert.equal(0, mail.money, "mail " .. i .. " carried money")
         assert.equal(0, mail.cod, "mail " .. i .. " was COD")
+        assert.equal("", mail.body, "mail " .. i .. " has text: a letter the recipient has to delete")
         assert.is_true(mail.count <= 12)
         for _, it in ipairs(carried[i]) do
             assert.is_nil(HARD_KEEPS[it.itemID], "mailed a hard keep: " .. tostring(HARD_KEEPS[it.itemID]))

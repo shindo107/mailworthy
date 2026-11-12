@@ -134,19 +134,31 @@ describe("bank alt view", function()
         assert.is_nil(text:find("Mailed for", 1, true), "never mailed: no such line")
     end)
 
-    it("tooltip: a kept item says why (operator, 2026-11-08: Sharp Claw and Jade said nothing)", function()
+    -- Operator, 2026-11-08: Sharp Claw and Jade said nothing; 2026-11-11: "if the recommendation is to
+    -- keep in my bag because some profession needs it, it should recommend Banking", with a tag and an
+    -- explanation like the AH's and the vendor's.
+    it("a profession keep: B on the bag slot, [Bank] in the tooltip, not in the summary", function()
         WowStub.state.professions = { { index = 1, name = "Blacksmithing", rank = 60, maxRank = 150, skillLine = 164 } }
         WowStub.setBag(0, 5, WowStub.item(5635, "Sharp Claw", { count = 4, sell = 45, class = 7, subclass = 6 }))
         prices[WowStub.link(5635, "Sharp Claw")] = { ah = 900 }
         WowStub.setBag(0, 6, WowStub.item(1529, "Jade", { quality = 2, count = 2, sell = 700, class = 7, subclass = 7 }))
         prices[WowStub.link(1529, "Jade")] = { ah = 2150 }
+        combined.Items[5], combined.Items[6] = WowStub.itemButton(0, 5), WowStub.itemButton(0, 6)
         ns.BankAlt.Redraw()
+        combined:UpdateItems()
+        assert.equal("B", tagOf(combined.Items[5]))
+        assert.equal("B", tagOf(combined.Items[6]))
         local text = hover(WowStub.link(5635, "Sharp Claw"), 5635)
-        assert.truthy(text:find("Mailworthy  |cffffffff[Keep]|r", 1, true), text)
-        assert.truthy(text:find("Stays in your bags: your Blacksmithing needs it (until skill 200).", 1, true), text)
+        assert.truthy(text:find("Mailworthy  |cffffffff[Bank]|r", 1, true), text)
+        assert.truthy(text:find("Bank it: your Blacksmithing needs it (until skill 200). It waits in your bank, "
+            .. "not your bags, until you craft.", 1, true), text)
+        assert.is_nil(text:find("Stays in your bags", 1, true), text)
         text = hover(WowStub.link(1529, "Jade"), 1529)
-        assert.truthy(text:find("Stays in your bags: your Blacksmithing needs it (until skill 290).", 1, true), text)
+        assert.truthy(text:find("Bank it: your Blacksmithing needs it (until skill 290).", 1, true), text)
         assert.equal("", hover(WowStub.link(6948, "Hearthstone"), 6948), "soulbound: the game already says so")
+        local s = ns.BankAlt.Summary(ns.BankAlt.Refresh())
+        assert.same({ stacks = 0, items = 0, gain = 0 }, s.b, "the summary is what to sell: not these")
+        assert.truthy(ns.BankAlt.LegendText():find("B|r bank   ", 1, true))
     end)
 
     it("tooltip lines are pure: where the window mails it, or why it stays", function()

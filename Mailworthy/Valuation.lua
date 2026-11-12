@@ -439,6 +439,13 @@ local function mail(route, reason, r, item, settings)
     return r
 end
 
+--- Pure: a verdict that keeps an item for this character's own crafting, which the bank holds as
+--- well as the bags (operator, 2026-11-11: "if the recommendation is to keep in my bag because some
+--- profession needs it, it should recommend Banking"). Not one to convert: that's crafted now.
+function Valuation.BankForCraft(r)
+    return type(r) == "table" and r.action == "keep" and r.neededBy ~= nil and not r.convert
+end
+
 local evaluate
 
 --- item: { link, itemID, count, stacks, quality, classID, vendor (copper per unit; nil = not
@@ -470,7 +477,7 @@ function Valuation.Evaluate(item, price, settings)
         -- "Sell what I gather": what a gathering profession brought in is valued like anything else.
         if profession and not (settings.sellGathered and Valuation.GatheredBy(item, settings.professions)) then
             return keep("your " .. profession .. " needs it", { untilSkill = untilSkill, convert = convert,
-                window = window })
+                window = window, neededBy = profession })
         end
     end
     local r = evaluate(item, price, settings)

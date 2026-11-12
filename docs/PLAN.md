@@ -569,6 +569,12 @@ has a highlight when toggled on. same with any other toggled button."
 - **B (bank)** (2026-10-20): the fourth tag and summary row, for items the rule says to
   hold for a later phase (decision rule above); the tooltip says why and what listing
   it today would bring. Tags are advice: the bank alt can list a B item any time.
+  Since 2026-11-11 (operator: "if the recommendation is to keep in my bag because some profession
+  needs it, it should recommend Banking") an item kept for this character's own crafting
+  (`Valuation.BankForCraft`: the profession keep, not one to convert) is a B too, its own verdict
+  `craft` so the summary ("what to sell") leaves it out; tooltip "[Bank] Bank it: your Tailoring
+  needs it. It waits in your bank, not your bags, until you craft."; the window's Staying row
+  says "bank it: ...".
 
 ## Release and CurseForge
 

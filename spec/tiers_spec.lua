@@ -130,7 +130,9 @@ describe("material tiers", function()
             local r = V.Evaluate(light, nil, s)
             assert.equal("keep", r.action, "no prices: can't tell, keep it to convert")
             assert.same({ into = 2319, count = 4, name = "Medium Leather" }, r.convert)
-            assert.equal("convert it: 4 make a Medium Leather (pays more)", ns.MailWindow.StayReason(r))
+            assert.equal("convert it: 4 make a Medium Leather (pays more)", ns.MailWindow.StayReason(r),
+                "converting is crafting now, not banking")
+            assert.is_false(V.BankForCraft(r))
             ah[2318], ah[2319] = 20, 200
             assert.equal("keep", V.Evaluate(light, nil, s).action, "4 x 20c < 200c: convert")
             ah[2318] = 50
@@ -172,7 +174,7 @@ describe("material tiers", function()
             local r = V.Evaluate(item, nil, s)
             assert.equal("your First Aid needs it", r.reason)
             assert.equal(80, r.untilSkill)
-            assert.equal("your First Aid needs it (until skill 80)", ns.MailWindow.StayReason(r))
+            assert.equal("bank it: your First Aid needs it (until skill 80)", ns.MailWindow.StayReason(r))
             s.professions[1].rank = 80
             r = V.Evaluate(item, nil, s)
             assert.equal("mail", r.action, "no Auctionator: a white item is mailed")

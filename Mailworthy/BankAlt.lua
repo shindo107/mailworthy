@@ -1,8 +1,8 @@
 -- The bank alt view (media/bank-alt-prototype.png): what each item is for,
 -- recomputed with this character's own, fresh Auctionator prices.
 --
---   * tags on bag slots: AH (list it), B (bank it: it sells higher later), DE
---     (disenchant it), V (vendor now);
+--   * tags on bag slots: AH (list it), B (bank it: it sells higher later, or this character's
+--     own crafting needs it, Valuation.BankForCraft), DE (disenchant it), V (vendor now);
 --   * tooltip lines: today's verdict with the price and its age, and why it was
 --     mailed ("Mailed for: Auction +8s 21c, Oct 14, from <main>", recorded by
 --     Mailer in MailworthyDB.mailed);
@@ -40,6 +40,9 @@ ns.BankAlt = BankAlt
 BankAlt.TAGS = {
     ah = { text = "AH", label = "Auction", color = { 0.2, 0.4, 0.75 } },
     b = { text = "B", label = "Bank", color = { 0.15, 0.5, 0.45 } },
+    -- Kept for this character's own crafting: in the bank, not the bags (operator, 2026-11-11). The
+    -- same B for the player; its own key so the summary ("what to sell") leaves it out.
+    craft = { text = "B", label = "Bank", color = { 0.15, 0.5, 0.45 } },
     de = { text = "DE", label = "Disenchant", color = { 0.45, 0.25, 0.65 } },
     v = { text = "V", label = "Vendor now", color = { 0.45, 0.38, 0.2 } },
 }
@@ -89,11 +92,13 @@ end
 
 --- Pure: the tag for a valued item: "ah" / "de" when the auction house or
 --- disenchanting beats the vendor by the minimum gain, "b" when it should be banked
---- for a later phase instead of listed, "v" when the vendor wins, nil when there's
---- nothing to say (locked, soulbound, tool, no price...).
+--- for a later phase instead of listed, "craft" when this character's own profession needs
+--- it (bank it until then), "v" when the vendor wins, nil when there's nothing to say
+--- (locked, soulbound, tool, no price...).
 function BankAlt.Verdict(item)
     local r = item.result
     if not r then return nil end
+    if ns.Valuation.BankForCraft(r) then return "craft" end
     if r.action == "mail" then
         if r.route == "bank" then return "b" end
         return (r.route == "ah" or r.route == "de") and r.route or nil
@@ -204,7 +209,7 @@ function BankAlt.LegendText()
     local mode = ns.Features.On("bankAltTags") and BankAlt.Mode()
     if mode == "vendor" then return "Mailworthy: |cffd0b070V|r sell to a vendor" end
     if not mode then return "" end
-    return "Mailworthy: |cff6f9fffAH|r auction   |cff40b0a0B|r bank for later   |cffb080e0DE|r disenchant"
+    return "Mailworthy: |cff6f9fffAH|r auction   |cff40b0a0B|r bank   |cffb080e0DE|r disenchant"
         .. "   |cffd0b070V|r vendor now"
 end
 
@@ -279,6 +284,8 @@ function BankAlt.TooltipLines(item, record, settings)
                 and string.format("Listed today it would bring %s%s more than a vendor.", unit and (money(unit) .. " each, ") or "",
                     money(r.gain))
                 or "No auction price yet, so the gain is unknown.")
+        elseif verdict == "craft" then
+            text = "Bank it: " .. ns.MailWindow.WhyKept(r) .. ". It waits in your bank, not your bags, until you craft."
         elseif verdict == "de" then
             text = string.format("Disenchanting today: %s, %s more than a vendor.", money(p.de), money(r.gain))
         elseif p.ah then

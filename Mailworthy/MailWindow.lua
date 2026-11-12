@@ -96,8 +96,8 @@ function UI.StayCountText(items, locked)
     return text
 end
 
---- Pure: a player-facing reason for an item that stays.
-function UI.StayReason(r)
+--- Pure: a player-facing reason for an item that stays, without the advice (UI.StayReason).
+function UI.WhyKept(r)
     if r.held then -- the bank alt's share, held (none set, or skipped this visit): Bags.HoldReason
         local chip = UI.CHIPS[r.route] or UI.CHIPS.common
         return string.format("%s%s: %s", chip[1], r.gain and (" +" .. money(r.gain)) or "", r.held)
@@ -118,6 +118,13 @@ function UI.StayReason(r)
     end
     if r.convert then return string.format("convert it: %d make a %s (pays more)", r.convert.count, r.convert.name) end
     return r.reason
+end
+
+--- Pure: a player-facing reason for an item that stays; one kept for this character's own crafting
+--- says to bank it (operator, 2026-11-11), as the bag tag's B does.
+function UI.StayReason(r)
+    if ns.Valuation.BankForCraft(r) then return "bank it: " .. UI.WhyKept(r) end
+    return UI.WhyKept(r)
 end
 
 local function firstName(name) return tostring(name):match("^(%S+)") or tostring(name) end
@@ -239,7 +246,9 @@ function UI.TooltipLines(item, staying, pad, bankAlt, busy)
             return "Locked in Mailworthy: it stays in your bags and is never mailed.",
                 busy and UI.BUSY_LINE or (verb .. " to unlock.")
         end
-        return "It stays: " .. UI.StayReason(r) .. ".", busy and UI.BUSY_LINE or (verb .. " to lock it, so it always stays.")
+        local where = ns.Valuation.BankForCraft(r) and ("Bank it: " .. UI.WhyKept(r) .. ".")
+            or ("It stays: " .. UI.StayReason(r) .. ".")
+        return where, busy and UI.BUSY_LINE or (verb .. " to lock it, so it always stays.")
     end
     local to = r.to or bankAlt
     local where = to and ((r.route == "return" and "Going back to " or "Mailing to ") .. firstName(to) .. ".")

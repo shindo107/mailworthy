@@ -272,7 +272,8 @@ describe("tier check (the profession window against the tier table)", function()
             assert.truthy(linen, "kept after the read")
             assert.equal("your Tailoring needs it", linen.result.reason)
             assert.same({ recipe = "Soft-soled Linen Boots", difficulty = 1, via = "Bolt of Linen Cloth" }, linen.result.window)
-            assert.equal("your Tailoring needs it (Soft-soled Linen Boots still yellow)", ns.MailWindow.StayReason(linen.result))
+            assert.equal("bank it: your Tailoring needs it (Soft-soled Linen Boots still yellow)",
+                ns.MailWindow.StayReason(linen.result))
             hasNot(ns.Bags.Report(result), "is past Bolt of Linen Cloth, Linen Cloth")
             has(ns.Bags.Report(result),
                 "KEEP [Linen Cloth] x20: your Tailoring needs it - vendor 10c each = 2s; past the table, but your profession "
