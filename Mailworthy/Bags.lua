@@ -132,7 +132,8 @@ function Bags.ApplySendSwitches(item, settings, priced)
     if not key then return end
     if r.action == "mail" and settings[key] == false then
         r.action, r.held = "keep", "sending " .. ns.Valuation.SEND_LABEL[tag] .. " items is off"
-    elseif tag == "v" and r.action == "keep" and settings.sendVendor == true and priced and not item.bound then
+    elseif tag == "v" and r.action == "keep" and settings.sendVendor == true and priced and not item.bound
+        and not ns.Routes.HARD_KEEPS[r.reason] then
         r.action, r.route, r.keptFor = "mail", ns.Valuation.VENDOR, r.reason
         r.reason = "vendor item (sending Vendor items is on)"
         r.postage = r.postage or (settings.postage or 0) * (item.stacks or 1)
