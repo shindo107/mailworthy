@@ -99,6 +99,7 @@ function Report.Build()
         "features: " .. ns.Features.Describe(),
         ns.PadKey.Report(),
         "locked items (this character): " .. ns.Locks.Describe(),
+        "pinned items (account): " .. ns.Pins.Describe(),
         "last send: " .. tostring(ns.Mailer.Status() or "none this session"),
     }
     for _, entry in pairs(MailworthyDB.characters) do lines[#lines + 1] = "known character: " .. ns.Characters.Describe(entry) end
