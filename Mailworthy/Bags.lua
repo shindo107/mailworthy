@@ -150,6 +150,7 @@ function Bags.Evaluate(settings)
     for _, r in ipairs(routes) do gearRoutes = gearRoutes or r.gear == ns.Routes.GEAR_DE end
     local function value(item)
         item.locked = ns.Locks.IsItemLocked(item.itemID)
+        item.pin = ns.Pins.Kind(item.itemID)
         if classRoutes then item.classes, item.myClass = ns.Classes.Of(item.itemID), mine end
         item.questFor = ns.Quests.For(item.link)
         item.conjured = ns.Conjured.Is(item.itemID)

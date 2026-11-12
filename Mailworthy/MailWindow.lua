@@ -1372,6 +1372,7 @@ ns.On("PLAYER_LOGIN", function()
         if not ok then ns.Log.Add("ui", "tab watcher error: %s", tostring(err)) end
     end)
     ns.Locks.OnChanged(refreshIfShown)
+    ns.Pins.OnChanged(refreshIfShown)
     -- While sending, redraw the status only; once it's done or stopped, re-scan: the bag
     -- update for the sent items may have come mid-send, when it was skipped (v0.4.0).
     ns.Mailer.OnChanged(function()

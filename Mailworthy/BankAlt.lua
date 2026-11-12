@@ -281,6 +281,8 @@ function BankAlt.TooltipLines(item, record, settings)
             text = string.format("Auction price today: %s each%s%s. After the %d%% cut and the %dh deposit: %s more than a vendor.",
                 money(unit), basis, ageText(p.age), math.floor(settings.cut * 100 + 0.5),
                 ns.Valuation.DURATION_HOURS[settings.duration], money(r.gain))
+        elseif verdict == "b" and r.pinned then
+            text = "Bank it: you pinned this item for the bank (Pins: /mw pins). Pin it again to unpin."
         elseif verdict == "b" then
             local why = tostring(r.reason):gsub("^bank: ", "")
             text = "Bank it, don't list it yet: " .. why .. ". " .. (r.gain
@@ -481,6 +483,7 @@ ns.On("PLAYER_LOGIN", function()
         legend:SetPoint("TOPRIGHT", bags, "BOTTOMRIGHT", -10, -4)
     end
     ns.Locks.OnChanged(redraw)
+    ns.Pins.OnChanged(redraw)
     ns.Mailer.OnSent(function() BankAlt.AfterSend() end)
     local settings = ns.SettingsUI.Frame()
     if settings then settings:HookScript("OnHide", redraw) end
