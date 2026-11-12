@@ -25,9 +25,7 @@ Mailer.DELAY = 0.5
 Mailer.TIMEOUT = 10
 Mailer.SUBJECT = "Mailworthy %d/%d"
 Mailer.FRIEND_SUBJECT = "Mailworthy %d/%d: %s"
-Mailer.FRIEND_BODY = "Your %s, sent by %s with Mailworthy."
 Mailer.RETURN_SUBJECT = "Mailworthy %d/%d: returned to you"
-Mailer.RETURN_BODY = "What you mailed %s, sent back with Mailworthy."
 Mailer.KEEP_DAYS = 30
 
 local state = { busy = false, run = 0 }
@@ -358,16 +356,16 @@ local function sendMail(index)
     end
     state.waiting = index
     ns.lastCommand = string.format("Mailworthy send %d/%d", index, #state.mails)
-    local subject, body = string.format(Mailer.SUBJECT, index, #state.mails), ""
+    -- No body (operator, 2026-11-11): a mail with text keeps a letter to take after its items,
+    -- so the recipient had to delete every one; with none it goes away once emptied.
+    local subject = string.format(Mailer.SUBJECT, index, #state.mails)
     if mail.returning then
         subject = string.format(Mailer.RETURN_SUBJECT, index, #state.mails)
-        body = string.format(Mailer.RETURN_BODY, tostring(ns.PlayerName()))
     elseif mail.what then
         subject = string.format(Mailer.FRIEND_SUBJECT, index, #state.mails, mail.what)
-        body = string.format(Mailer.FRIEND_BODY, mail.what:lower(), tostring(ns.PlayerName()))
     end
     mail.subject = subject
-    local ok, err = pcall(SendMail, mail.to, subject, body)
+    local ok, err = pcall(SendMail, mail.to, subject, "")
     ns.Log.Add("mailer", "SendMail %q to %s with %d stacks: %s", subject, tostring(mail.to), n, ok and "called" or tostring(err))
     if not ok then return Mailer.Stop("SendMail failed: " .. tostring(err)) end
     setStatus("Sending mail %d of %d to %s...", index, #state.mails, tostring(mail.to))

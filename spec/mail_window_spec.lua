@@ -91,6 +91,12 @@ describe("mail window", function()
         assert.equal("no auction price yet", ns.MailWindow.StayReason({ reason = "no price" }))
         assert.equal("the price lookup failed", ns.MailWindow.StayReason({ reason = "no price", failed = true }))
         assert.equal("profession tool", ns.MailWindow.StayReason({ reason = "profession tool" }))
+        -- Kept for this character's own crafting: bank it (operator, 2026-11-11).
+        local craft = { action = "keep", reason = "your Tailoring needs it", neededBy = "Tailoring" }
+        assert.equal("bank it: your Tailoring needs it", ns.MailWindow.StayReason(craft))
+        assert.equal("Bank it: your Tailoring needs it.", (ns.MailWindow.TooltipLines({ result = craft }, true)))
+        assert.equal("It stays: profession tool.",
+            (ns.MailWindow.TooltipLines({ result = { action = "keep", reason = "profession tool" } }, true)))
     end)
 
     it("the total counts what goes with no price yet, and says what goes without a price source (Codex review)", function()

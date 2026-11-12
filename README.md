@@ -51,7 +51,8 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   wherever the item moves. **Locked items** (`/mw locks`, or Settings > More) lists them with
   how many your bags hold and an Unlock button each, also for an item you banked or used up.
 - **On your bank alt:** bag slots carry **AH / B / DE / V** tags (list it, bank it for a
-  later phase, disenchant it, vendor it now) recomputed with that character's own prices;
+  later phase or for your own crafting, disenchant it, vendor it now) recomputed with that
+  character's own prices;
   tooltips show today's verdict and why the item was mailed, or why it stays (a profession
   that still needs it, a quest, no price yet). The Mailworthy button opens the window there
   too: what it sells stays, and bindings and Return to sender mail from it; its **Summary...**
