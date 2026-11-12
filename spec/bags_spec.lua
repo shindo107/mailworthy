@@ -303,6 +303,8 @@ describe("bag scan", function()
     it("/mw scan says what 'Sell what I gather' does", function()
         local text = ns.Bags.ProfessionMatsText
         assert.equal("kept for Blacksmithing", text({ keepProfessionMats = true, professions = { 164, 186 } }))
+        assert.equal("banked on your bank alt for Blacksmithing",
+            text({ keepProfessionMats = true, matsToBankAlt = true, professions = { 164, 186 } }))
         assert.equal("kept for Blacksmithing; what Mining gathers is mailed",
             text({ keepProfessionMats = true, sellGathered = true, professions = { 164, 186 } }))
         assert.equal("kept for Blacksmithing; sell what I gather: on (no gathering profession here)",
