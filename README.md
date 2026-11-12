@@ -223,6 +223,14 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   skinner-leatherworker, a fisher-cook), what the gathering profession brings in is mailed
   to be sold instead of kept for the craft. Mining counts all metal and stone (ore, stone
   and the bars its smelting makes).
+- **Send by tag** (settings: AH / DE / B / V, one switch each): what Send takes of the bank
+  alt's share, by the verdict the bag tag shows. **AH** (list it), **DE** (disenchant it) and
+  **B** (bank it for a later phase) are on; switch one off and those items stay in your bags
+  (the window says "sending Auction items is off"). **V** (a vendor pays more) is off: switch
+  it on and vendor items and grey junk go to the bank alt too, for it to sell, with their
+  postage counted in the total (it is often more than the item is worth). The switches change
+  what is mailed, never a tag; a binding's share, a return and every hard keep are untouched,
+  and without a price source junk still stays.
 
 ```
 /mw                   settings: bank alt (pick, type, or "This character is my bank alt"), minimum gain, disenchant, listing length, tags, lock glow, profession materials, friends, guild, minimap button

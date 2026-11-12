@@ -1,7 +1,7 @@
 -- The settings window (media/ux-pass-prototype.png), one task at a time:
 --   main view: the bank alt on one row with Change..., then "What gets mailed"
 --     (minimum gain, listing length, disenchant, profession materials, sell what I
---     gather), "In your
+--     gather, send by tag: AH / DE / B / V), "In your
 --     bags" (tags, lock glow) and "More" (friends, guild, bank alt summary, mail ledger,
 --     minimap button, locked items);
 --   pick view (Change... / Choose...; a bank alt is optional since 2026-11-08): the known
@@ -22,10 +22,11 @@ local UI = {}
 ns.SettingsUI = UI
 
 UI.MAX_CHOICES = 6
-local WIDTH, MAIN_HEIGHT, ROW, VERSION_ROW = 420, 522, 26, 20
+local WIDTH, MAIN_HEIGHT, ROW, VERSION_ROW = 420, 548, 26, 20
 
 local frame, nameBox, nameHint, current, emptyHint, legend, pricesLine, versionLine, changeButton
 local choiceRows = {}
+local sendButtons = {} -- verdict tag ("ah", "de", "b", "v") -> its Send switch
 local amountLabel, pctLabel, disenchantButton, minimapButton, tagsButton, glowButton, matsButton, hereButton, friendsButton
 local gatherButton, guildButton, locksButton
 local durationButtons = {}
@@ -273,53 +274,65 @@ local function createRule()
         if ns.BankAlt then ns.BankAlt.Redraw() end
     end)
     gatherButton:SetPoint("TOPLEFT", 24, -262)
+    -- What Send takes of the bank alt's share, by verdict (Bags.ApplySendSwitches): one switch per tag.
+    local send = add(mainWidgets, W.Label(frame, "GameFontHighlight"))
+    send:SetPoint("TOPLEFT", 28, -292)
+    send:SetText("Send by tag")
+    for i, tag in ipairs(ns.Valuation.SEND_ORDER) do
+        local key = ns.Valuation.SEND[tag]
+        local b = toggle(64, "Send" .. ns.Valuation.SEND_LABEL[tag], function()
+            ns.Config.Set(key, not ns.Config.Get(key))
+        end)
+        b:SetPoint("TOPLEFT", 124 + (i - 1) * 68, -288)
+        sendButtons[tag] = b
+    end
 end
 
 local function createBagsAndMore()
-    heading(mainWidgets, "In your bags", -298)
+    heading(mainWidgets, "In your bags", -324)
     tagsButton = toggle(182, "Tags", function()
         ns.Config.Set("tagsEverywhere", not ns.Config.Flag("tagsEverywhere"))
         if ns.BankAlt then ns.BankAlt.Redraw() end
     end)
-    tagsButton:SetPoint("TOPLEFT", 24, -320)
+    tagsButton:SetPoint("TOPLEFT", 24, -346)
     glowButton = toggle(182, "Glow", function()
         ns.Config.Set("glowEverywhere", not ns.Config.Flag("glowEverywhere"))
         if ns.Border then ns.Border.RefreshAll() end
     end)
-    glowButton:SetPoint("TOPLEFT", 214, -320)
-    heading(mainWidgets, "More", -356)
+    glowButton:SetPoint("TOPLEFT", 214, -346)
+    heading(mainWidgets, "More", -382)
     friendsButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.RoutesUI.Show(frame) end,
         "MailworthySettingsFriends"))
-    friendsButton:SetPoint("TOPLEFT", 24, -378)
+    friendsButton:SetPoint("TOPLEFT", 24, -404)
     add(mainWidgets, W.Button(frame, "Bank alt summary...", 182, function()
         if ns.BankAlt then ns.BankAlt.ShowWindow(frame) end
-    end, "MailworthySettingsSummary")):SetPoint("TOPLEFT", 214, -378)
+    end, "MailworthySettingsSummary")):SetPoint("TOPLEFT", 214, -404)
     -- 2026-11-07: "I want a new button for guild inside the mailworthy settings"
     guildButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.RoutesUI.ShowGuild(frame) end,
         "MailworthySettingsGuild"))
-    guildButton:SetPoint("TOPLEFT", 24, -404)
+    guildButton:SetPoint("TOPLEFT", 24, -430)
     add(mainWidgets, W.Button(frame, "Mail ledger...", 182, function() ns.LedgerUI.Show(frame) end,
-        "MailworthySettingsLedger")):SetPoint("TOPLEFT", 214, -404)
+        "MailworthySettingsLedger")):SetPoint("TOPLEFT", 214, -430)
     minimapButton = toggle(182, "Minimap", function()
         ns.Config.Set("minimapHidden", ns.Config.MinimapShown())
         if ns.MinimapButton then ns.MinimapButton.Refresh() end
     end)
-    minimapButton:SetPoint("TOPLEFT", 24, -430)
+    minimapButton:SetPoint("TOPLEFT", 24, -456)
     -- QoL pass D (2026-11-09): the locked items window; the count is in the label.
     locksButton = add(mainWidgets, W.Button(frame, "", 182, function() ns.LocksUI.Show(frame) end,
         "MailworthySettingsLocks"))
-    locksButton:SetPoint("TOPLEFT", 214, -430)
+    locksButton:SetPoint("TOPLEFT", 214, -456)
     pricesLine = add(mainWidgets, W.Label(frame, "GameFontDisableSmall"))
-    pricesLine:SetPoint("TOPLEFT", 28, -472)
+    pricesLine:SetPoint("TOPLEFT", 28, -498)
     pricesLine:SetWidth(270)
     pricesLine:SetJustifyH("LEFT")
     -- A newer Mailworthy is out (Version.lua): under the Prices line; the window grows to fit it.
     versionLine = add(mainWidgets, W.Label(frame, "GameFontHighlightSmall"))
-    versionLine:SetPoint("TOPLEFT", 28, -490)
+    versionLine:SetPoint("TOPLEFT", 28, -516)
     versionLine:SetWidth(WIDTH - 56)
     versionLine:SetJustifyH("LEFT")
     add(mainWidgets, W.Button(frame, "Done", 100, function() frame:Hide() end, "MailworthySettingsDone"))
-        :SetPoint("TOPRIGHT", -24, -466)
+        :SetPoint("TOPRIGHT", -24, -492)
 end
 
 function UI.Create()
@@ -430,6 +443,11 @@ local function fillMain(bankAlt, here, choices)
     gatherButton:SetText(string.format("Sell what I gather: %s (%s)", v.sellGathered and "on" or "off",
         #gathering > 0 and table.concat(gathering, ", ") or "no gathering profession here"))
     W.SetToggled(gatherButton, v.sellGathered == true)
+    for tag, b in pairs(sendButtons) do
+        local on = v[ns.Valuation.SEND[tag]] == true
+        b:SetText(ns.Valuation.SEND_TAG[tag] .. ": " .. (on and "on" or "off")) -- the bag tag's own letters
+        W.SetToggled(b, on)
+    end
     tagsButton:SetText("Bag tags: " .. (ns.Config.Flag("tagsEverywhere") and "every character" or "bank alt only"))
     W.SetToggled(tagsButton, ns.Config.Flag("tagsEverywhere") == true)
     glowButton:SetText("Lock glow: " .. (ns.Config.Flag("glowEverywhere") and "always" or "in Mailworthy"))

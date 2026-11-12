@@ -515,6 +515,70 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
     end)
 
+    it("Send by tag (mouse): Vendor on mails junk to the bank alt too, Auction off keeps the auction items", function()
+        -- Rule changed on purpose, behind a setting that is off by default: "Grey junk stays" (AGENTS.md
+        -- Safety) holds until the player turns "V" on in the settings; the hard keeps hold regardless.
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local before = previewed(ns)
+        assert.is_nil(before[4865], "junk stays by default")
+        assert.equal(BANK_ALT, before[2770], "the ore goes for the auction house by default")
+        ns.SettingsUI.Show(ns.MailWindow.Frame())
+        _G.MailworthySettingsSendVendor:Click()
+        _G.MailworthySettingsSendAuction:Click()
+        ns.SettingsUI.Frame():Hide()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[4865], "Vendor on: the junk goes to the bank alt")
+        assert.is_nil(preview[2770], "Auction off: the ore stays")
+        assert.is_nil(preview[6515], "Auction off: the priced green stays")
+        assert.equal(BANK_ALT, preview[2318], "an unpriced item has no tag: it goes as before")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("Send by tag (controller): Cross on the V switch in the settings, then Send mails as previewed", function()
+        WowStub.state.gamepadUI = true
+        WowStub.state.activeFrame = MailFrame
+        mailbox()
+        local watcher = _G.MailworthyPadWatcher
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        _G.MailworthyPadTriangle:Click()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        ns.SettingsUI.Show(ns.MailWindow.Frame())
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        assert.is_true(_G.MailworthySettingsSendVendor:IsShown())
+        ns.Nav.Select(_G.MailworthySettingsSendVendor)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        assert.equal("V: on", _G.MailworthySettingsSendVendor:GetText())
+        ns.SettingsUI.Frame():Hide()
+        watcher.scripts.OnUpdate(watcher, 0.2)
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[4865], "the junk goes to the bank alt")
+        ns.Nav.Select(_G.MailworthyMailSend)
+        WowStub.state.now = WowStub.state.now + 1
+        _G.MailworthyPadCross:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("Send by tag with Vendor on but no price source: junk and non-white items still stay", function()
+        _G.Auctionator = nil
+        ns.Config.Set("sendVendor", true)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        local preview = previewed(ns)
+        assert.is_nil(preview[4865], "junk stays without prices, whatever the switch says")
+        assert.is_nil(preview[6515], "a green stays without prices")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+        for i in ipairs(WowStub.state.sent) do
+            for _, it in ipairs(WowStub.state.sentItems[i]) do assert.equal(1, it.quality, "item " .. it.itemID) end
+        end
+    end)
+
     it("a class binding: the mage friend gets the mage-only scroll, the bank alt the rest, nobody else", function()
         -- operator, 2026-11-08: "this is a mage only item, id like to be able to friend mail these types of items too"
         WowStub.setBag(0, 13, WowStub.item(211234, "Scroll: VOCE WELL", { sell = 15, class = 0 }))

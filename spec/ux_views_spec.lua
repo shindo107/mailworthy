@@ -65,7 +65,8 @@ describe("window views", function()
         assert.is_true(ns.Nav.Current():IsVisible(), "the highlight left the hidden picker")
         r = reachable()
         for _, name in ipairs({ "Change", "AmountUp", "AmountDown", "PercentUp", "PercentDown", "Duration1",
-            "Duration3", "Disenchant", "Mats", "Gather", "Tags", "Glow", "Friends", "Summary", "Minimap", "Done" }) do
+            "Duration3", "Disenchant", "Mats", "Gather", "SendAuction", "SendDisenchant", "SendBank", "SendVendor",
+            "Tags", "Glow", "Friends", "Summary", "Minimap", "Done" }) do
             assert.truthy(r["MailworthySettings" .. name], "reaches " .. name)
         end
         assert.is_nil(r.MailworthySettingsChoice1)

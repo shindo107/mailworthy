@@ -47,7 +47,19 @@ Valuation.DEFAULTS = {
     disenchant = false,   -- Valuation.Settings switches it on when a disenchant addon is installed
     keepProfessionMats = true, -- materials this character's crafting professions use stay (operator, 2026-10-22)
     sellGathered = false,      -- ... except what its gathering professions gather (operator, 2026-11-06: off by default)
+    -- What Send takes of the bank alt's share, by verdict (Valuation.SEND; applied by Bags.ApplySendSwitches):
+    sendAuction = true,    -- items for the auction house (the AH tag)
+    sendDisenchant = true, -- items to disenchant (DE)
+    sendBank = true,       -- items to bank for a later phase (B)
+    sendVendor = false,    -- items a vendor pays more for (V): they stay unless the player wants them sent too
 }
+
+-- The setting behind each verdict tag (BankAlt.Verdict), in the order the settings window shows them.
+Valuation.SEND = { ah = "sendAuction", de = "sendDisenchant", b = "sendBank", v = "sendVendor" }
+Valuation.SEND_ORDER = { "ah", "de", "b", "v" }
+Valuation.SEND_LABEL = { ah = "Auction", de = "Disenchant", b = "Bank", v = "Vendor" }
+Valuation.SEND_TAG = { ah = "AH", de = "DE", b = "B", v = "V" } -- as the bag tags read (BankAlt.TAGS)
+Valuation.VENDOR = "vendor" -- the route of a vendor (V) item mailed because sendVendor is on
 
 -- What each crafting profession needs from the trade goods (class 7) in the bags, by
 -- the profession's skill line ID (GetProfessionInfo's 7th return) and the item's
@@ -455,6 +467,7 @@ local evaluate
 ---   { ah = copper per unit or nil, age = days or nil, de = copper per item or nil }
 ---   history = Prices.History rows (optional), exact = true / false / nil }
 --- Returns { action = "mail" | "keep", route = "ah" | "de" | "common" | "bank" | "noprice" (mail only;
+---   Bags.ApplySendSwitches may add "vendor";
 ---   bank = mail it and hold it, listRoute = the route it would have had; noprice = no auction price
 ---   yet, the bank alt holds it), reason, failed (a "no price" keep: the price call failed),
 ---   vendor, deposit, depositCounted, postage, ahUnit (the smoothed unit price), median / medianDays

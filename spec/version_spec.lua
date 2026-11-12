@@ -242,7 +242,7 @@ describe("version notice", function()
             WowStub.state.layout = true -- sizes are read back
             ns.SettingsUI.Show()
             local before = ns.SettingsUI.Frame():GetHeight()
-            assert.equal(522, before)
+            assert.equal(548, before)
             assert.equal("", ns.SettingsUI.VersionLine())
             say(BOB, "U2|v0.31.0")
             assert.equal(ns.Version.Text(), ns.SettingsUI.VersionLine())

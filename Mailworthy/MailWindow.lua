@@ -59,6 +59,7 @@ UI.CHIPS = {
     common = { "Common", 0.4, 0.4, 0.4 },
     bank = { "Bank", 0.15, 0.5, 0.45 },
     noprice = { "No price", 0.35, 0.35, 0.5 }, -- no auction price yet: the bank alt holds it (2026-11-08)
+    vendor = { "Vendor", 0.45, 0.38, 0.2 }, -- a V item mailed because "Send: Vendor" is on (the V tag's colour)
     friend = { "to a friend", 0.55, 0.35, 0.12 }, -- the chip says "to <first name>"
     ["return"] = { "back to sender", 0.5, 0.3, 0.5 }, -- the chip says "back to <first name>"
 }

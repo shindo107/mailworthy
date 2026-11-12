@@ -115,6 +115,39 @@ function Bags.Part(item, slots, result)
     return part
 end
 
+--- The send switches (settings: Send Auction / Disenchant / Bank / Vendor; Valuation.SEND): what
+--- Send takes of the bank alt's share, by the item's verdict (BankAlt.Verdict). A switch that is
+--- off keeps its items in the bags (result.held says why, result.route what it would have been,
+--- like a skipped bank alt); the Vendor switch, off by default, mails what a vendor pays more for
+--- too (route Valuation.VENDOR), so the bank alt can sell it.
+--- Never for a tag (`settings.forTags`: BankAlt.Settings), a binding's or a return's item
+--- (result.to), a share that already stays (no bank alt, skipped), a hard keep (none has a
+--- verdict) or a soulbound item; and the Vendor switch needs a price source: without one only
+--- white items and staples go (AGENTS safety), so junk stays.
+function Bags.ApplySendSwitches(item, settings, priced)
+    local r = item.result
+    if settings.forTags or settings.hold or type(r) ~= "table" or r.to or r.held then return end
+    local tag = ns.BankAlt.Verdict(item)
+    local key = tag and ns.Valuation.SEND[tag]
+    if not key then return end
+    if r.action == "mail" and settings[key] == false then
+        r.action, r.held = "keep", "sending " .. ns.Valuation.SEND_LABEL[tag] .. " items is off"
+    elseif tag == "v" and r.action == "keep" and settings.sendVendor == true and priced and not item.bound then
+        r.action, r.route, r.keptFor = "mail", ns.Valuation.VENDOR, r.reason
+        r.reason = "vendor item (sending Vendor items is on)"
+        r.postage = r.postage or (settings.postage or 0) * (item.stacks or 1)
+    end
+end
+
+--- The send switches in words, for /mw scan and /mw report: "Auction on, Disenchant on, Bank on, Vendor off".
+function Bags.SendText(settings)
+    local parts = {}
+    for _, tag in ipairs(ns.Valuation.SEND_ORDER) do
+        parts[#parts + 1] = ns.Valuation.SEND_LABEL[tag] .. " " .. (settings[ns.Valuation.SEND[tag]] == true and "on" or "off")
+    end
+    return table.concat(parts, ", ")
+end
+
 --- Scan and value the bags. `settings.hold` (Bags.HoldReason): the bank alt's share is kept, with
 --- result.held saying why and result.route what it would have been. `settings.returns`
 --- (Returns.Owed, Return to sender on): stacks another character mailed this one go back to them
@@ -169,6 +202,7 @@ function Bags.Evaluate(settings)
         if settings.hold and item.result.action == "mail" and not item.result.to then
             item.result.action, item.result.held = "keep", settings.hold
         end
+        Bags.ApplySendSwitches(item, settings, priced)
     end
     local function file(item)
         if item.result.action == "mail" then
@@ -266,7 +300,7 @@ end
 local money = function(c) return ns.Valuation.Money(c) end
 
 local ROUTE = { ah = "AH", de = "DE", common = "COMMON", bank = "BANK", friend = "FRIEND", ["return"] = "RETURN",
-    noprice = "NO PRICE" }
+    noprice = "NO PRICE", vendor = "VENDOR" }
 
 local function itemName(item)
     local name = item.link:match("%[(.-)%]") or item.link
@@ -403,6 +437,7 @@ function Bags.Report(result)
             ns.Valuation.DURATION_HOURS[s.duration], ns.Valuation.DEPOSIT_MULTIPLIER[s.duration],
             math.floor(s.cut * 100 + 0.5), money(s.postage), Bags.MinGainText(s), math.floor(s.minGainPct * 100 + 0.5),
             s.disenchant and "on" or "off", s.maxAgeDays, tostring(s.serverDay), Bags.ProfessionMatsText(s)),
+        "send: " .. Bags.SendText(s),
         string.format("total: %d items (%d stacks) in %d mail(s), %s more than vendoring, postage %s%s",
             t.items, t.stacks, t.mails, money(t.gain), money(t.postage),
             t.routed > 0 and string.format(" (%d stacks to friends)", t.routed) or ""),

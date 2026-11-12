@@ -685,7 +685,8 @@ describe("valuation", function()
     describe("settings", function()
         it("defaults: 24h, 5% cut, 30c postage, 5s and 25%, 7 days", function()
             assert.same({ duration = 3, relistFactor = 0.5, cut = 0.05, postage = 30, minGain = 500, minGainPct = 0.25,
-                maxAgeDays = 7, disenchant = false, keepProfessionMats = true, sellGathered = false }, S)
+                maxAgeDays = 7, disenchant = false, keepProfessionMats = true, sellGathered = false,
+                sendAuction = true, sendDisenchant = true, sendBank = true, sendVendor = false }, S)
         end)
 
         it("disenchant follows Disenchantry until the player sets it", function()
