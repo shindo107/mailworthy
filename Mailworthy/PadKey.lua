@@ -11,7 +11,8 @@
 --   window  mail window focused, Mailworthy window open:    Triangle closes,
 --           D-pad moves Mailworthy's highlight (Nav), Cross presses, Circle closes
 --   bags    bags focused:  L3 locks / unlocks the selected item (Locks)
---   settings  the settings, friends, ledger, locked items, summary or report window open, anywhere (out of combat): D-pad moves,
+--   merchant  merchant window focused:  Triangle opens / closes the vendor window (Vendor)
+--   settings  the settings, friends, ledger, locked items, summary, vendor or report window open, anywhere (out of combat): D-pad moves,
 --           Cross presses, Circle closes it. Our own window, so no Blizzard
 --           panel needs focus; the bindings go as soon as it closes.
 --
@@ -34,6 +35,7 @@ PadKey.SETS = {
         PADDLEFT = "MailworthyPadLeft", PADDRIGHT = "MailworthyPadRight",
     },
     bags = { PADLSTICK = "MailworthyPadLock" },
+    merchant = { PAD4 = "MailworthyPadVendor" },
     settings = {
         PAD1 = "MailworthyPadCross", PAD2 = "MailworthyPadCircle",
         PADDUP = "MailworthyPadUp", PADDDOWN = "MailworthyPadDown",
@@ -75,7 +77,7 @@ function PadKey.Wanted()
     -- "settings": our free-standing windows (settings, friends, ledger, locked items, bank alt summary,
     -- report), anywhere.
     local standalone = false
-    for _, mod in ipairs({ ns.SettingsUI, ns.RoutesUI, ns.LedgerUI, ns.LocksUI, ns.BankAlt, ns.Report }) do
+    for _, mod in ipairs({ ns.SettingsUI, ns.RoutesUI, ns.LedgerUI, ns.LocksUI, ns.BankAlt, ns.Vendor, ns.Report }) do
         local f = mod and mod.Frame()
         if f and f:IsShown() then standalone = true end
     end
@@ -88,6 +90,9 @@ function PadKey.Wanted()
         if ns.Features.On("padTriangle") then return "mail" end
     elseif isBagFrame(focused) and ns.Features.On("padLock") then
         return "bags"
+    elseif focused ~= nil and focused == rawget(_G, "MerchantFrame") and focused:IsShown() and ns.Features.On("padVendor")
+        and ns.Features.On("vendorButton") then
+        return "merchant"
     end
     return nil
 end
@@ -181,6 +186,7 @@ function PadKey.Create()
         padButton("MailworthyPad" .. dir, function() ns.Nav.Move(dir:lower()) end)
     end
     padButton("MailworthyPadLock", function() ns.Locks.ToggleSelectedBagSlot() end)
+    padButton("MailworthyPadVendor", function() ns.Vendor.Toggle("Triangle") end)
     -- Hint under the combined bags (a font string: not a frame, not seen by smart navigation).
     local bags = rawget(_G, "ContainerFrameCombinedBags")
     if type(bags) == "table" and ns.Features.On("padLock") then
