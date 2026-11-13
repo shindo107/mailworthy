@@ -515,6 +515,92 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true })
     end)
 
+    it("a bank pin (mouse): the pinned item goes to the bank alt, not to a binding's friend; a pinned hard keep stays", function()
+        -- Pins.lua: "always bank this". Junk the rule keeps, a material a binding would take, and three
+        -- hard keeps the player pinned by mistake.
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, ENCHANTING)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(previewed(ns)[4865], "junk stays until it is pinned")
+        assert.equal(BOB, previewed(ns)[10940], "the binding takes the dust until it is pinned")
+        WowStub.state.mods = { alt = true, ctrl = true }
+        for _, at in ipairs({ { 0, 7 }, { 2, 6 }, { 0, 1 }, { 0, 3 }, { 0, 4 } }) do -- pelt, dust, Hearthstone, quest item, locked ore
+            -- This build's own click handler: the global hook is shared by every addon load in this file.
+            ns.Pins.OnModifiedItemClick("link", WowStub.itemLocation(at[1], at[2]))
+        end
+        WowStub.state.mods = {}
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[4865], "the pinned junk goes to the bank alt")
+        assert.equal(BANK_ALT, preview[10940], "the pinned dust goes to the bank alt, not to the friend")
+        assert.is_nil(preview[6948], "a pinned soulbound item stays")
+        assert.is_nil(preview[5022], "a pinned quest item stays")
+        assert.is_nil(preview[2775], "a pinned locked item stays")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("a bank pin (controller): R3 on the selected bag item, then Send mails it as previewed", function()
+        WowStub.state.gamepadUI = true
+        ns.Fire("MAIL_SHOW")
+        mailbox()
+        local watcher = _G.MailworthyPadWatcher
+        local function tick() watcher.scripts.OnUpdate(watcher, 0.2) end
+        local function press(name)
+            WowStub.state.now = WowStub.state.now + 1
+            _G[name]:Click()
+            tick()
+        end
+        WowStub.state.activeFrame = ContainerFrameCombinedBags
+        tick()
+        assert.equal("CLICK MailworthyPadPin:LeftButton", WowStub.state.bindings.PADRSTICK, "R3 isn't bound in the bags")
+        WowStub.state.navButton = WowStub.itemButton(0, 7) -- Ruined Pelt: junk, stays by the rule
+        press("MailworthyPadPin")
+        WowStub.state.activeFrame = MailFrame
+        tick()
+        press("MailworthyPadTriangle")
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[4865], "the pinned junk goes to the bank alt")
+        ns.Nav.Select(_G.MailworthyMailSend)
+        press("MailworthyPadCross")
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("a bank pin without Auctionator: the pinned green and junk go to the bank alt; unpinned, they stay", function()
+        -- Rule changed on purpose (operator, 2026-11-13: "Pins override them"): a pin overrides the
+        -- no-price-source rule (whites and staples only) and grey junk staying; never a hard keep.
+        _G.Auctionator = nil
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(previewed(ns)[6515], "a green stays without prices until it is pinned")
+        assert.is_nil(previewed(ns)[4865], "junk stays without prices until it is pinned")
+        for _, id in ipairs({ 6515, 4865, 6948, 2775 }) do -- the green, junk, the Hearthstone, the locked ore
+            ns.Pins.Set(id, WowStub.link(id, "item " .. id), ns.Pins.BANK, "spec")
+        end
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[6515], "the pinned green goes to the bank alt")
+        assert.equal(BANK_ALT, preview[4865], "the pinned junk goes to the bank alt")
+        assert.is_nil(preview[6948], "a pinned soulbound item stays")
+        assert.is_nil(preview[2775], "a pinned locked item stays")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
+    it("no bank alt: a pinned item stays in the bags like the rest of the bank alt's share", function()
+        MailworthyDB.bankAlts = {}
+        ns.Pins.Set(4865, WowStub.link(4865, "Ruined Pelt"), ns.Pins.BANK, "spec")
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(0, #ns.MailWindow.Result().mail, "nobody to mail to")
+        _G.MailworthyMailSend:Click()
+        WowStub.runTimers()
+        assert.equal(0, #WowStub.state.sent)
+    end)
+
     it("a class binding: the mage friend gets the mage-only scroll, the bank alt the rest, nobody else", function()
         -- operator, 2026-11-08: "this is a mage only item, id like to be able to friend mail these types of items too"
         WowStub.setBag(0, 13, WowStub.item(211234, "Scroll: VOCE WELL", { sell = 15, class = 0 }))
@@ -831,6 +917,24 @@ describe("critical path: mailing", function()
         assertReturnSubjects({ [BOB] = true, [MAIN] = true })
         ns.Fire("MAIL_CLOSED")
         assert.is_false(ns.Returns.On(), "off again at the next visit")
+    end)
+
+    it("Return to sender and a bank pin: Return to sender wins, the pinned item goes back to who mailed it", function()
+        -- operator, 2026-11-13: "return to sender should win" (Codex review asked which wins).
+        taken()
+        ns.Pins.Set(2592, WowStub.link(2592, "Wool Cloth"), ns.Pins.BANK, "spec") -- Bob mailed it
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(BANK_ALT, previewed(ns)[2592], "Return to sender off: the pin sends it to the bank alt")
+        _G.MailworthyMailReturn:Click()
+        local preview = previewed(ns)
+        assert.equal(BOB, preview[2592], "on: back to Bob, pinned or not")
+        assert.equal(MAIN, preview[3001])
+        assertReturnsShown()
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true, [MAIN] = true })
+        assertReturnSubjects({ [BOB] = true, [MAIN] = true })
     end)
 
     it("Return to sender pressed twice: back to normal, nothing goes back", function()

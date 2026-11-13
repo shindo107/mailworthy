@@ -21,12 +21,14 @@ function ns.Init()
     MailworthyDB.routes = MailworthyDB.routes or {}                   -- realm|faction -> the account's bindings
     MailworthyDB.peers = MailworthyDB.peers or {}                     -- realm|faction -> Mailworthy users heard from
     MailworthyDB.features = MailworthyDB.features or {}
+    MailworthyDB.pins = MailworthyDB.pins or {}                       -- item ID -> { kind, link, at }: the account's pins (Pins.lua)
 end
 
 -- Kill switches for each piece that touches Blizzard UI, so a problem in game
 -- can be isolated with /mw feature <name> off + /reload instead of a new build.
 ns.Features = { DEFAULTS = {
     mailButton = true, padTriangle = true, padNav = true, padLock = true, altClickLock = true, slotBorder = true,
+    pinClick = true, padPin = true,
     vendorButton = true, padVendor = true,
     minimapButton = true, bankAltTags = true, tooltipLines = true, comms = true, staleNudge = true, crafterOffer = true,
     tiers = true, tierCheck = true, guildTemplate = true, ledger = true, questNeeds = true, autoOpen = true,
@@ -100,6 +102,8 @@ local HELP = {
     "At a mailbox: open the Send Mail tab and the Mailworthy window opens (the Mailworthy button under the mail window"
         .. " toggles it). Controller: Send Mail tab ({PADRSHOULDER}); {PAD4} closes and reopens it.",
     "Lock an item (it stays locked wherever it moves): Alt+click it, or {PADLSTICK} in your bags (controller).",
+    "Pin an item to always bank it (Send mails it to your bank alt, on every character): Ctrl+Alt+click it, or"
+        .. " {PADRSTICK} in your bags (controller). /mw pins lists them.",
     "Locked items glow blue while the Mailworthy window is open (settings: always); a new lock glows a moment anywhere."
         .. " In the Mailworthy window, pressing an item locks or unlocks it.",
     "/mw or /mw settings - bank alt, minimum gain, disenchant, listing length, keep your professions' materials"
@@ -116,8 +120,8 @@ local HELP = {
     "/mw summary - on your bank alt (or without one): what to list, disenchant or vendor",
     "At a vendor: the \"Mailworthy: sell V\" button under the merchant window ({PAD4} with a controller, or /mw vendor)"
         .. " lists the items tagged V and sells them, 12 stacks a press (the Buyback tab can undo a press).",
-    "/mw feature <mailButton|padTriangle|padNav|padLock|altClickLock|slotBorder|vendorButton|padVendor|minimapButton|bankAltTags"
-        .. "|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail"
+    "/mw feature <mailButton|padTriangle|padNav|padLock|padPin|altClickLock|pinClick|slotBorder|vendorButton|padVendor"
+        .. "|minimapButton|bankAltTags|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail"
         .. "|peerMark|versionNotice|tripNudge|crafterOffer"
         .. "|baganatorTags|bagnonTags|arkInventoryTags|betterBagsTags|auctionatorTags> on|off"
         .. " - isolate a problem (then /reload)",
@@ -139,6 +143,8 @@ function ns.HandleSlash(msg)
         featureCommand(rest)
     elseif cmd == "locks" then
         ns.LocksUI.Show()
+    elseif cmd == "pins" then
+        ns.Pins.PrintList()
     elseif cmd == "friends" or cmd == "bindings" then
         ns.RoutesUI.Show()
     elseif cmd == "guild" then

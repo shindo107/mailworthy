@@ -448,9 +448,11 @@ end
 
 local evaluate
 
+Valuation.PIN_BANK = "bank" -- item.pin: Pins.BANK (Pins.lua loads before this file; kept apart so this stays pure)
+
 --- item: { link, itemID, count, stacks, quality, classID, vendor (copper per unit; nil = not
 ---   loaded yet), bound, quest, conjured (Conjured.Is), questFor (the title of an active quest
----   that needs it), inUse (locked by the game), locked (Mailworthy lock) }
+---   that needs it), inUse (locked by the game), locked (Mailworthy lock), pin ("bank": Pins.lua) }
 --- price: nil when there's no price source at all (no Auctionator); else
 ---   { ah = copper per unit or nil, age = days or nil, de = copper per item or nil }
 ---   history = Prices.History rows (optional), exact = true / false / nil }
@@ -471,6 +473,19 @@ function Valuation.Evaluate(item, price, settings)
     if item.questFor then return keep("a quest needs it", { quest = item.questFor }) end
     if item.inUse then return keep("in use") end
     if Valuation.IsTool(item) then return keep("profession tool") end
+    -- A bank pin (Pins.lua): the player asked for this item to always go to the bank alt and be
+    -- banked there, whatever the market or a profession of this character says. Past every hard
+    -- keep above, so a pin never mails what the rule wouldn't touch. It overrides the no-price-source
+    -- rule and the grey junk rule (operator, 2026-11-13: "Pins override them"), not the item data
+    -- hard keep or a failed price call.
+    if item.pin == Valuation.PIN_BANK then
+        if item.vendor == nil then return keep("item info not loaded yet") end
+        if type(price) == "table" and price.failed then
+            return keep("no price", { vendor = item.vendor * (item.count or 1), failed = true })
+        end
+        return { action = "mail", route = "bank", listRoute = "common", reason = "bank: you pinned it", pinned = true,
+            vendor = (item.vendor or 0) * (item.count or 1), postage = (settings.postage or 0) * (item.stacks or 1) }
+    end
     if settings.keepProfessionMats then
         local profession, _, untilSkill, convert, window = Valuation.NeededBy(item, settings.professions,
             settings.tiers, settings.priceOf)

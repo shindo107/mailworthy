@@ -1,4 +1,5 @@
--- Blue glow on locked items in the bags: the quest-item border, tinted blue.
+-- Blue glow on locked items in the bags: the quest-item border, tinted blue. A bank-pinned item
+-- (Pins.lua) glows the same way in the pin's green (Pins.COLOR; a lock wins on an item that is both).
 -- Textures are created on the game's bag item buttons (CreateTexture isn't
 -- hooked by smart navigation and
 -- textures aren't returned by GetChildren, so its button scan never sees them)
@@ -29,11 +30,21 @@ Border.FLASH = 3 -- seconds a fresh lock glows away from the mailbox
 
 local borders = setmetatable({}, { __mode = "k" }) -- button -> { textures }
 local frames = {}
-local flashes = {} -- itemID -> GetTime() until which a fresh lock glows anyway
+local flashes = { lock = {}, pin = {} } -- kind -> itemID -> GetTime() until which a fresh lock / pin glows anyway
 local decorators = {} -- fn(button, bag, slot): more per-slot drawing (bank alt tags)
 
 --- Draw more on every bag button after each refresh (same hooks, same rules).
 function Border.AddDecorator(fn) table.insert(decorators, fn) end
+
+--- Pin a texture or font string of ours on someone else's button at `alpha` (default 1): a skin
+--- that fades every region of an item button it doesn't know (EllesmereUI through Baganator's
+--- "Ellesmere UI" theme: SetAlpha(0) when it skins the button, again on every restrip; issue #89)
+--- leaves it alone. The field is written on our own region, never on the button.
+function Border.HoldAlpha(region, alpha)
+    region:SetAlpha(alpha or 1)
+    region.SetAlpha = function() end
+    return region
+end
 
 --- The lock glow for any button (ours or the game's bag buttons), created once,
 --- kept in our own weak table.
@@ -46,9 +57,8 @@ function Border.Glow(button)
         tex:SetTexture(Border.TEXTURE)
         tex:SetAllPoints()
         tex:SetDesaturated(true)
-        tex:SetVertexColor(unpack(Border.COLOR))
         tex:SetBlendMode(blend)
-        if blend == "ADD" then tex:SetAlpha(Border.GLOW_ALPHA) end
+        Border.HoldAlpha(tex, blend == "ADD" and Border.GLOW_ALPHA or 1)
         tex:Hide()
         set[i] = tex
     end
@@ -56,11 +66,23 @@ function Border.Glow(button)
     return set
 end
 
-function Border.Show(button, shown)
+--- Show the glow in `color` (default the lock's blue), or hide it.
+function Border.Show(button, shown, color)
     if not shown and not borders[button] then return end
+    color = color or Border.COLOR
     for _, tex in ipairs(Border.Glow(button)) do
-        if shown then tex:Show() else tex:Hide() end
+        if shown then
+            tex:SetVertexColor(color[1], color[2], color[3])
+            tex:Show()
+        else
+            tex:Hide()
+        end
     end
+end
+
+--- Is this item bank-pinned (Pins.lua)?
+local function pinned(itemID)
+    return itemID ~= nil and ns.Pins ~= nil and ns.Pins.Kind(itemID) == ns.Pins.BANK
 end
 
 --- Is the Mailworthy window open? It lives under the mail frame's tabs, so it is visible only
@@ -84,27 +106,44 @@ end
 
 --- Is this item in its feedback flash (locked moments ago, away from the mailbox)?
 function Border.Flashing(itemID)
-    local until_ = itemID ~= nil and flashes[itemID]
-    return until_ ~= nil and now() < until_
+    if itemID == nil then return false end
+    for _, list in pairs(flashes) do
+        local until_ = list[itemID]
+        if until_ ~= nil and now() < until_ then return true end
+    end
+    return false
 end
 
---- A lock changed: a new lock away from the mailbox flashes for FLASH seconds.
-function Border.OnLockChanged(itemID, locked)
-    if itemID == nil then return end
-    flashes[itemID] = nil
-    if locked and ns.Features.On("slotBorder") and not Border.Wanted() then
-        flashes[itemID] = now() + Border.FLASH
+--- Start (on) or end a lock's or a pin's flash: each its own, so one never ends the other's.
+local function flash(kind, itemID, on)
+    local list = flashes[kind]
+    list[itemID] = nil
+    if on and ns.Features.On("slotBorder") and not Border.Wanted() then
+        list[itemID] = now() + Border.FLASH
         local after = C_Timer and C_Timer.After
         if type(after) == "function" then
             pcall(after, Border.FLASH, function()
-                if flashes[itemID] ~= nil and now() >= flashes[itemID] then
-                    flashes[itemID] = nil
+                if list[itemID] ~= nil and now() >= list[itemID] then
+                    list[itemID] = nil
                     Border.RefreshAll()
                 end
             end)
         end
     end
     Border.RefreshAll()
+end
+
+--- A lock changed: a new lock away from the mailbox flashes for FLASH seconds. A new pin too
+--- (Border.OnPinChanged).
+function Border.OnLockChanged(itemID, locked)
+    if itemID == nil then return end
+    flash("lock", itemID, locked)
+end
+
+--- A pin changed (Pins.OnChanged): a new pin flashes green like a new lock flashes blue.
+function Border.OnPinChanged(itemID, kind)
+    if itemID == nil then return end
+    flash("pin", itemID, kind == (ns.Pins and ns.Pins.BANK))
 end
 
 --- Why an item glows. The controller's key is the game's own icon for the left stick press, so
@@ -114,11 +153,20 @@ function Border.Tooltip()
         .. "Alt+click it (" .. ns.Gamepad.Glyph(ns.Gamepad.STICK_LEFT_PRESS, 14) .. " on a controller) to unlock."
 end
 
---- The tooltip line that says why an item glows, or nil when it doesn't glow.
+--- Why a pinned item glows green (R3 / RS by the player's controller, like the lock's line).
+function Border.PinTooltip()
+    return "Pinned in Mailworthy: Send mails it to your bank alt every time, unless it can never be mailed"
+        .. " (soulbound, locked, a quest's). Ctrl+Alt+click it (" .. ns.Gamepad.Glyph(ns.Gamepad.STICK_RIGHT_PRESS, 14)
+        .. " on a controller) to unpin."
+end
+
+--- The tooltip line that says why an item glows and its colour, or nil when it doesn't glow.
 function Border.TooltipLine(itemID)
-    if itemID == nil or not ns.Features.On("slotBorder") or not ns.Locks.IsItemLocked(itemID) then return nil end
+    if itemID == nil or not ns.Features.On("slotBorder") then return nil end
     if not (Border.Wanted() or Border.Flashing(itemID)) then return nil end
-    return Border.Tooltip()
+    if ns.Locks.IsItemLocked(itemID) then return Border.Tooltip(), Border.COLOR end
+    if pinned(itemID) then return Border.PinTooltip(), ns.Pins.COLOR end
+    return nil
 end
 
 local function onTooltip(tooltip, data)
@@ -126,9 +174,9 @@ local function onTooltip(tooltip, data)
     local id = type(data) == "table" and tonumber(data.id) or nil
     -- A row of the Mailworthy window says it itself ("Click to unlock": MailWindow.TooltipLines).
     if id and ns.MailWindow and ns.MailWindow.TooltipItem(tooltip) == id then return end
-    local line = Border.TooltipLine(id)
+    local line, color = Border.TooltipLine(id)
     if not line then return end
-    tooltip:AddLine(line, Border.COLOR[1], Border.COLOR[2], Border.COLOR[3], true)
+    tooltip:AddLine(line, color[1], color[2], color[3], true)
 end
 
 function Border.InstallTooltip()
@@ -179,7 +227,9 @@ function Border.RefreshButton(button, bag, slot, itemID, wanted, link)
             itemID = info and info.itemID
         end
         local locked = itemID ~= nil and ns.Locks.IsItemLocked(itemID)
-        Border.Show(button, locked and (wanted or Border.Flashing(itemID)))
+        local pin = not locked and pinned(itemID)
+        Border.Show(button, (locked or pin) and (wanted or Border.Flashing(itemID)),
+            pin and ns.Pins.COLOR or Border.COLOR)
     end
     for _, fn in ipairs(decorators) do
         local okDecorate, err = pcall(fn, button, bag, slot, itemID, link)
@@ -275,6 +325,7 @@ function Border.Install()
     end
     if ns.Features.On("slotBorder") then Border.InstallTooltip() end
     ns.Locks.OnChanged(Border.OnLockChanged)
+    ns.Pins.OnChanged(Border.OnPinChanged)
     ns.Log.Add("border", "UpdateItems hooked on %d container frames", hooked)
 end
 

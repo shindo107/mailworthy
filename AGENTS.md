@@ -38,6 +38,11 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   "Yes, gear goes too"; "Stale prices go too"; replaces "an item without a price stays in
   the bags" and its launch-days 0-13 exception for white trade goods). Grey junk stays, an
   item whose price call failed stays, and the hard keeps above come first.
+  A **bank pin** (`Pins.lua`, Ctrl+Alt+click / R3) mails the pinned item to the bank alt whatever
+  its price or quality, grey junk too and without a price source (operator, 2026-11-13: "Pins
+  override them"); never past a hard keep, item data not loaded yet or a failed price call, and
+  never to a binding. With Return to sender on, what another player mailed goes back to them,
+  pinned or not (operator, 2026-11-13: "return to sender should win").
   A profession binding mails its materials and its profession's recipes to the bound player
   whatever their price (operator, 2026-11-08: "keep as is"; recipes: "recipes should go to
   their respective profession mappings"), under its price cap when there is a price; a class
@@ -80,7 +85,7 @@ textures / font strings on Blizzard frames kept in our own tables, read-only
 ## Critical path (STRICT)
 
 `spec/critical_path_spec.lua` is the shipping gate: a mailbox visit with a realistic
-bag, by mouse and by controller, with and without Auctionator, with a binding, with a guild
+bag, by mouse and by controller, with and without Auctionator, with a binding, with a bank pin, with a guild
 template (on and off), with Return to sender (on a main and on the bank alt), and on
 an older build's SavedVariables; every mail checked against the Safety rules above, and
 what was previewed must be exactly what was sent. CI runs it as its own job,

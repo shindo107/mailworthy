@@ -15,6 +15,7 @@ Blocked.lua
 Characters.lua
 Gamepad.lua
 Locks.lua
+Pins.lua
 Border.lua
 Prices.lua
 Disenchant.lua
