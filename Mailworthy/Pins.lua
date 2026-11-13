@@ -20,6 +20,10 @@ local Pins = {}
 ns.Pins = Pins
 
 Pins.BANK = "bank"
+-- A pin's colour, everywhere it shows: the slot glow (Border.lua), the B tag on a pinned item
+-- (BankAlt.TAGS.pin), its chip in the Mailworthy window and the tooltip line (operator,
+-- 2026-11-13: green, not gold, which the quest border uses; "match the equivalent tags").
+Pins.COLOR = { 0.3, 0.7, 0.25 }
 
 local listeners = {}
 

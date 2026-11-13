@@ -151,7 +151,36 @@ describe("bank pins", function()
             local lines = ns.BankAlt.TooltipLines(it, nil, settings())
             local text = {}
             for _, l in ipairs(lines) do text[#text + 1] = l[1] end
-            assert.truthy(table.concat(text, " "):find("you pinned this item for the bank", 1, true), table.concat(text, " "))
+            assert.truthy(table.concat(text, " "):find("you pinned this item for your bank alt", 1, true), table.concat(text, " "))
+            assert.truthy(lines[1][1]:find("[Pinned]", 1, true), "the label")
+            assert.same(ns.Pins.COLOR, { lines[2][2], lines[2][3], lines[2][4] }, "the reason in the pin's green")
+        end)
+
+        it("no price source: a pinned item goes anyway, white or not, junk too (operator, 2026-11-13)", function()
+            for _, quality in ipairs({ 0, 1, 2, 3 }) do
+                local r = ns.Valuation.Evaluate(item({ quality = quality, classID = 4, subclassID = 0 }), nil, settings())
+                assert.equal("bank", r.route, "quality " .. quality)
+            end
+        end)
+
+        it("a pin waits for the item's data, and a failed price call still keeps it", function()
+            local unloaded = item()
+            unloaded.vendor = nil
+            local r = ns.Valuation.Evaluate(unloaded, { ah = 174, age = 0 }, settings())
+            assert.equal("item info not loaded yet", r.reason)
+            r = ns.Valuation.Evaluate(item(), { failed = true }, settings())
+            assert.equal("keep", r.action)
+            assert.is_true(r.failed)
+        end)
+
+        it("the chip and the row tooltip in the Mailworthy window say pinned, in green", function()
+            local r = ns.Valuation.Evaluate(item(), { ah = 174, age = 0 }, settings())
+            assert.equal(ns.MailWindow.CHIPS.pinned, ns.MailWindow.ChipFor(r))
+            assert.same(ns.Pins.COLOR, { ns.MailWindow.CHIPS.pinned[2], ns.MailWindow.CHIPS.pinned[3],
+                ns.MailWindow.CHIPS.pinned[4] })
+            assert.equal(ns.MailWindow.CHIPS.bank, ns.MailWindow.ChipFor({ route = "bank" }))
+            local where = ns.MailWindow.TooltipLines({ result = r }, false, false, "Roknua Themicrulah", false)
+            assert.equal("Mailing to Roknua: you pinned it for your bank alt.", where)
         end)
 
         it("the bags carry the pin into the rule", function()

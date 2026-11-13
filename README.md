@@ -56,7 +56,10 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   Send, whatever the auction house or your professions say, and carries the **B** tag on every
   character (pins are saved for the account, so the bank alt knows them). A pin never beats a
   lock or any other hard keep, and a pinned item goes to the bank alt, never to a binding's
-  friend. `/mw pins` lists them.
+  friend. A pin overrides the price rules: a pinned green, or grey junk, goes even without
+  Auctionator. Pinned items glow green in your bags (like the lock's blue, while the Mailworthy
+  window is open, or always with the glow setting; a new pin flashes), and their **B** tag,
+  their "Pinned" chip and their tooltip line are the same green. `/mw pins` lists them.
 - **On your bank alt:** bag slots carry **AH / B / DE / V** tags (list it, bank it for a
   later phase or for your own crafting, disenchant it, vendor it now) recomputed with that
   character's own prices;

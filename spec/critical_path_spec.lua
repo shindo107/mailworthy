@@ -569,6 +569,27 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
     end)
 
+    it("a bank pin without Auctionator: the pinned green and junk go to the bank alt; unpinned, they stay", function()
+        -- Rule changed on purpose (operator, 2026-11-13: "Pins override them"): a pin overrides the
+        -- no-price-source rule (whites and staples only) and grey junk staying; never a hard keep.
+        _G.Auctionator = nil
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.is_nil(previewed(ns)[6515], "a green stays without prices until it is pinned")
+        assert.is_nil(previewed(ns)[4865], "junk stays without prices until it is pinned")
+        for _, id in ipairs({ 6515, 4865, 6948, 2775 }) do -- the green, junk, the Hearthstone, the locked ore
+            ns.Pins.Set(id, WowStub.link(id, "item " .. id), ns.Pins.BANK, "spec")
+        end
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[6515], "the pinned green goes to the bank alt")
+        assert.equal(BANK_ALT, preview[4865], "the pinned junk goes to the bank alt")
+        assert.is_nil(preview[6948], "a pinned soulbound item stays")
+        assert.is_nil(preview[2775], "a pinned locked item stays")
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
     it("no bank alt: a pinned item stays in the bags like the rest of the bank alt's share", function()
         MailworthyDB.bankAlts = {}
         ns.Pins.Set(4865, WowStub.link(4865, "Ruined Pelt"), ns.Pins.BANK, "spec")
