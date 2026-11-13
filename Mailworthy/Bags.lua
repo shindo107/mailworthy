@@ -184,6 +184,7 @@ function Bags.Evaluate(settings)
     for _, r in ipairs(routes) do gearRoutes = gearRoutes or r.gear == ns.Routes.GEAR_DE end
     local function value(item)
         item.locked = ns.Locks.IsItemLocked(item.itemID)
+        item.pin = ns.Pins.Kind(item.itemID)
         if classRoutes then item.classes, item.myClass = ns.Classes.Of(item.itemID), mine end
         item.questFor = ns.Quests.For(item.link)
         item.conjured = ns.Conjured.Is(item.itemID)
@@ -242,6 +243,9 @@ function Bags.Evaluate(settings)
         local r = item.result
         local hard = ns.Valuation.Unmailable(r) or (r.action == "keep" and ns.Routes.HARD_KEEPS[r.reason])
         local parts, rest = {}, nil
+        -- Return to sender beats a bank pin: what another player mailed goes back to them, shown as
+        -- any return; the rest of a pinned item goes to the bank alt (operator, 2026-11-13:
+        -- "return to sender should win").
         if list and not hard then parts, rest = ns.Returns.Split(item.slots, list) end
         if #parts == 0 then
             file(item)

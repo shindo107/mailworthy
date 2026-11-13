@@ -45,6 +45,8 @@ BankAlt.TAGS = {
     craft = { text = "B", label = "Bank", color = { 0.15, 0.5, 0.45 } },
     de = { text = "DE", label = "Disenchant", color = { 0.45, 0.25, 0.65 } },
     v = { text = "V", label = "Vendor now", color = { 0.45, 0.38, 0.2 } },
+    -- A bank-pinned item (Pins.lua): still B, in the pin's green, like its glow (operator, 2026-11-13).
+    pin = { text = "B", label = "Pinned", color = ns.Pins.COLOR },
 }
 
 local money = function(c) return ns.Valuation.Money(c) end
@@ -158,6 +160,9 @@ local function tagFor(button)
     t.text = button:CreateFontString(nil, "OVERLAY", "SystemFont_Tiny")
     t.text:SetPoint("CENTER", t.bg, "CENTER", 0, 0)
     t.text:SetTextColor(1, 1, 1)
+    -- A bag skin that fades the button's other regions (EllesmereUI; issue #89) leaves the tag alone.
+    ns.Border.HoldAlpha(t.bg)
+    ns.Border.HoldAlpha(t.text)
     tags[button] = t
     return t
 end
@@ -176,7 +181,8 @@ function BankAlt.Decorate(button, bag, slot, itemID, link)
             item = (link and c.byLink[link]) or (itemID and c.byItemID[itemID]) or nil
         end
     end
-    local tag = item and item.verdict and BankAlt.TAGS[item.verdict]
+    local tag = item and item.verdict
+        and (item.verdict == "b" and item.result and item.result.pinned and BankAlt.TAGS.pin or BankAlt.TAGS[item.verdict])
     if not tag then
         local t = tags[button]
         if t then t.bg:Hide() t.text:Hide() end
@@ -263,7 +269,8 @@ end
 function BankAlt.TooltipLines(item, record, settings)
     local lines = {}
     local verdict = item and (item.advice or item.verdict)
-    local tag = verdict and BankAlt.TAGS[verdict]
+    local pinned = verdict == "b" and item.result and item.result.pinned
+    local tag = verdict and (pinned and BankAlt.TAGS.pin or BankAlt.TAGS[verdict])
     local otherLabel, otherText
     if not tag then otherLabel, otherText = BankAlt.OtherLine(item, ns.Bags.HoldReason() or false) end
     local label = tag and tag.label or otherLabel
@@ -279,6 +286,8 @@ function BankAlt.TooltipLines(item, record, settings)
             text = string.format("Auction price today: %s each%s%s. After the %d%% cut and the %dh deposit: %s more than a vendor.",
                 money(unit), basis, ageText(p.age), math.floor(settings.cut * 100 + 0.5),
                 ns.Valuation.DURATION_HOURS[settings.duration], money(r.gain))
+        elseif verdict == "b" and r.pinned then
+            text = "Bank it: you pinned this item for your bank alt (/mw pins lists them). Ctrl+Alt+click it again to unpin."
         elseif verdict == "b" then
             local why = tostring(r.reason):gsub("^bank: ", "")
             text = "Bank it, don't list it yet: " .. why .. ". " .. (r.gain
@@ -297,7 +306,8 @@ function BankAlt.TooltipLines(item, record, settings)
         else
             text = string.format("Worth no more than a vendor today: sell it (%s).", money(r.vendor))
         end
-        lines[#lines + 1] = { text, 1, 1, 1 }
+        local c = pinned and ns.Pins.COLOR or { 1, 1, 1 } -- a pin's line in its green, like its glow and tag
+        lines[#lines + 1] = { text, c[1], c[2], c[3] }
     end
     if record then
         local was = BankAlt.TAGS[record.route] and BankAlt.TAGS[record.route].label
@@ -480,6 +490,7 @@ ns.On("PLAYER_LOGIN", function()
         legend:SetPoint("TOPRIGHT", bags, "BOTTOMRIGHT", -10, -4)
     end
     ns.Locks.OnChanged(redraw)
+    ns.Pins.OnChanged(redraw)
     ns.Mailer.OnSent(function() BankAlt.AfterSend() end)
     local settings = ns.SettingsUI.Frame()
     if settings then settings:HookScript("OnHide", redraw) end
