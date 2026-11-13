@@ -107,6 +107,28 @@ describe("controller bindings", function()
         assert.is_nil(WowStub.state.bindings.PADLSTICK)
     end)
 
+    it("Triangle at a focused merchant window opens the vendor window; its own switch gives the key back", function()
+        MailFrame:Hide()
+        SendMailFrame:Hide()
+        MerchantFrame:Show()
+        ns.Fire("MERCHANT_SHOW")
+        WowStub.state.activeFrame = MerchantFrame
+        tick()
+        assert.equal(click("MailworthyPadVendor"), WowStub.state.bindings.PAD4)
+        _G.MailworthyPadVendor:Click()
+        assert.is_true(ns.Vendor.Frame():IsShown())
+        tick()
+        assert.equal(click("MailworthyPadCross"), WowStub.state.bindings.PAD1, "our window: the D-pad set")
+        ns.Vendor.Frame():Hide()
+        WowStub.state.activeFrame = nil
+        tick()
+        MailworthyDB.features.padVendor = false
+        WowStub.state.activeFrame = MerchantFrame
+        tick()
+        assert.is_nil(WowStub.state.bindings.PAD4, "padVendor off: Triangle stays Blizzard's")
+        MerchantFrame:Hide()
+    end)
+
     it("lets go when nothing of ours is focused, at combat, and without the controller UI", function()
         WowStub.state.activeFrame = MailFrame
         tick()

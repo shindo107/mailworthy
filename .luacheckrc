@@ -52,7 +52,7 @@ read_globals = {
 files["spec/**"] = {
     std = "+busted",
     globals = { "WowStub", "print", "unpack", "time", "date", "CreateFrame", "InboxFrame", "SendMailFrame",
-        "C_Container", "Auctionator", "Menu", "MailFrame",
+        "C_Container", "Auctionator", "Menu", "MailFrame", "MerchantFrame",
         "MailworthyMailButton", "GamepadSharedUtility", "GamepadMode", "ContainerFrameCombinedBags", "ContainerFrameContainer",
         "HandleModifiedItemClick", "MailworthyPadWatcher", "DisenchantryDB", "MailworthyInboxButton", "GameTooltip", "SmartNavigation", "Minimap", "MailworthyMinimapButton", "MailworthySettingsFrame", "TooltipDataProcessor", "Enum", "TooltipUtil", "MailworthySummaryFrame", "MailworthyReportFrame",
         "MailworthyFriendsFrame", "C_Club", "C_ChatInfo", "C_GuildInfo",

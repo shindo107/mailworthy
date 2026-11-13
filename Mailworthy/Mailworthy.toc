@@ -49,6 +49,7 @@ LocksUI.lua
 MinimapButton.lua
 MailWindow.lua
 BankAlt.lua
+Vendor.lua
 BagAddons.lua
 AuctionatorTags.lua
 Report.lua

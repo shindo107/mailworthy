@@ -257,6 +257,27 @@ describe("D-pad reach in every view", function()
         assertNavigable("summary", 1)
     end)
 
+    it("the vendor window: nothing to sell, a few stacks, and more than one press's worth", function()
+        ns.Config.SetBankAlt("Roknua Themicrulah")
+        MerchantFrame:Show()
+        ns.Fire("MERCHANT_SHOW")
+        ns.Vendor.Toggle("spec")
+        tick()
+        assertNavigable("vendor window, nothing to sell", 2)
+        for i = 1, 3 do
+            WowStub.setBag(0, i, WowStub.item(4865 + i, "Junk " .. i, { quality = 0, sell = 12, class = 15 }))
+        end
+        ns.Vendor.Refresh()
+        assertNavigable("vendor window", 2)
+        for i = 4, 16 do
+            WowStub.setBag(1, i - 3, WowStub.item(4865 + i, "Junk " .. i, { quality = 0, sell = 12, class = 15 }))
+        end
+        ns.Vendor.Refresh()
+        assertNavigable("vendor window, a second press's worth", 2)
+        ns.Vendor.Frame():Hide()
+        MerchantFrame:Hide()
+    end)
+
     it("locked items: empty, a few, and several pages", function()
         ns.LocksUI.Show()
         tick()

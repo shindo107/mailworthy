@@ -83,6 +83,7 @@ function WowStub.reset()
     _G.SendMailFrame = WowStub.newWidget("Frame", "SendMailFrame")
     _G.InboxFrame = WowStub.newWidget("Frame", "InboxFrame")
     _G.MailFrame = WowStub.newWidget("Frame", "MailFrame")
+    _G.MerchantFrame = WowStub.newWidget("Frame", "MerchantFrame")
     -- Blizzard's Send Mail tab: Mailworthy's code must never click it (specs check tabClicks stays 0).
     _G.MailFrameTab2 = WowStub.newWidget("Button", "MailFrameTab2")
     _G.MailFrameTab2.shown = true
@@ -487,7 +488,17 @@ _G.C_Container = {
         return { isQuestItem = item and item.quest or false }
     end,
     UseContainerItem = function(bag, slot)
-        if SendMailFrame:IsShown() then attachItem(at(bag, slot)) else table.insert(s().used, { bag, slot }) end
+        if SendMailFrame:IsShown() then
+            attachItem(at(bag, slot))
+        elseif _G.MerchantFrame:IsShown() and at(bag, slot) then -- a right-click at a merchant: sold
+            local item = at(bag, slot)
+            s().sold = s().sold or {}
+            table.insert(s().sold, { bag = bag, slot = slot, itemID = item.itemID, count = item.stackCount or 1,
+                bound = item.isBound == true, quest = item.quest == true })
+            s().bags[bag][slot] = nil
+        else
+            table.insert(s().used, { bag, slot })
+        end
     end,
     PickupContainerItem = function(bag, slot) s().cursor = at(bag, slot) end,
 }
