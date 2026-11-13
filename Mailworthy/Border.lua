@@ -35,6 +35,16 @@ local decorators = {} -- fn(button, bag, slot): more per-slot drawing (bank alt 
 --- Draw more on every bag button after each refresh (same hooks, same rules).
 function Border.AddDecorator(fn) table.insert(decorators, fn) end
 
+--- Pin a texture or font string of ours on someone else's button at `alpha` (default 1): a skin
+--- that fades every region of an item button it doesn't know (EllesmereUI through Baganator's
+--- "Ellesmere UI" theme: SetAlpha(0) when it skins the button, again on every restrip; issue #89)
+--- leaves it alone. The field is written on our own region, never on the button.
+function Border.HoldAlpha(region, alpha)
+    region:SetAlpha(alpha or 1)
+    region.SetAlpha = function() end
+    return region
+end
+
 --- The lock glow for any button (ours or the game's bag buttons), created once,
 --- kept in our own weak table.
 function Border.Glow(button)
@@ -48,7 +58,7 @@ function Border.Glow(button)
         tex:SetDesaturated(true)
         tex:SetVertexColor(unpack(Border.COLOR))
         tex:SetBlendMode(blend)
-        if blend == "ADD" then tex:SetAlpha(Border.GLOW_ALPHA) end
+        Border.HoldAlpha(tex, blend == "ADD" and Border.GLOW_ALPHA or 1)
         tex:Hide()
         set[i] = tex
     end
