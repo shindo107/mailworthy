@@ -121,8 +121,8 @@ local HELP = {
     "At a vendor: the \"Mailworthy: sell V\" button under the merchant window ({PAD4} with a controller, or /mw vendor)"
         .. " lists the items tagged V and sells them, 12 stacks a press (the Buyback tab can undo a press).",
     "/mw feature <mailButton|padTriangle|padNav|padLock|padPin|altClickLock|pinClick|slotBorder|vendorButton|padVendor"
-        .. "|minimapButton|bankAltTags|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds|autoOpen|returnToSender|bankAltMail"
-        .. "|peerMark|versionNotice|tripNudge|crafterOffer"
+        .. "|minimapButton|bankAltTags|tooltipLines|comms|staleNudge|tiers|tierCheck|guildTemplate|ledger|questNeeds"
+        .. "|autoOpen|returnToSender|bankAltMail|peerMark|versionNotice|tripNudge|crafterOffer"
         .. "|baganatorTags|bagnonTags|arkInventoryTags|betterBagsTags|auctionatorTags> on|off"
         .. " - isolate a problem (then /reload)",
     "/mw report - a copyable report for bug reports",
