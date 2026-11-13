@@ -61,7 +61,13 @@ UI.CHIPS = {
     noprice = { "No price", 0.35, 0.35, 0.5 }, -- no auction price yet: the bank alt holds it (2026-11-08)
     friend = { "to a friend", 0.55, 0.35, 0.12 }, -- the chip says "to <first name>"
     ["return"] = { "back to sender", 0.5, 0.3, 0.5 }, -- the chip says "back to <first name>"
+    pinned = { "Pinned", ns.Pins.COLOR[1], ns.Pins.COLOR[2], ns.Pins.COLOR[3] }, -- a bank pin (Pins.lua), in its green
 }
+
+--- The chip for a result: a pinned item's own, else its route's.
+function UI.ChipFor(r)
+    return (r.pinned and UI.CHIPS.pinned) or UI.CHIPS[r.route] or UI.CHIPS.common
+end
 
 function UI.Frame() return frame end
 function UI.Result() return result end
@@ -99,7 +105,7 @@ end
 --- Pure: a player-facing reason for an item that stays, without the advice (UI.StayReason).
 function UI.WhyKept(r)
     if r.held then -- the bank alt's share, held (none set, or skipped this visit): Bags.HoldReason
-        local chip = UI.CHIPS[r.route] or UI.CHIPS.common
+        local chip = UI.ChipFor(r)
         return string.format("%s%s: %s", chip[1], r.gain and (" +" .. money(r.gain)) or "", r.held)
     end
     if r.quest then return r.quest .. " needs it" end
@@ -251,8 +257,8 @@ function UI.TooltipLines(item, staying, pad, bankAlt, busy)
         return where, busy and UI.BUSY_LINE or (verb .. " to lock it, so it always stays.")
     end
     local to = r.to or bankAlt
-    local where = to and ((r.route == "return" and "Going back to " or "Mailing to ") .. firstName(to) .. ".")
-        or "Mailing."
+    local where = to and ((r.route == "return" and "Going back to " or "Mailing to ") .. firstName(to)
+        .. (r.pinned and ": you pinned it for your bank alt." or ".")) or "Mailing."
     return where, busy and UI.BUSY_LINE or (verb .. " to lock: it stays in your bags and is never mailed.")
 end
 
@@ -281,7 +287,7 @@ end
 
 local function addLines(tooltip)
     local where, press = UI.TooltipLines(tipRow.item, tipRow.staying, tipPad, ns.Config.BankAlt(), ns.Mailer.Busy())
-    local c = ns.Border.COLOR
+    local c = (tipRow.item.result or {}).pinned and ns.Pins.COLOR or ns.Border.COLOR -- a pin's line in its green
     tipAdded = true
     tooltip:AddLine(" ")
     tooltip:AddLine(where, c[1], c[2], c[3], true)
@@ -711,7 +717,7 @@ local function fillList(rows, items, page, perPage, fill)
 end
 
 local function fillMailRow(row, item)
-    local chip = UI.CHIPS[item.result.route] or UI.CHIPS.common
+    local chip = UI.ChipFor(item.result)
     row.icon:SetTexture(item.icon)
     row.name:SetText(UI.ItemText(item.link, item.count, item.stacks))
     local to = item.result.to and firstName(item.result.to)
@@ -1372,6 +1378,7 @@ ns.On("PLAYER_LOGIN", function()
         if not ok then ns.Log.Add("ui", "tab watcher error: %s", tostring(err)) end
     end)
     ns.Locks.OnChanged(refreshIfShown)
+    ns.Pins.OnChanged(refreshIfShown)
     -- While sending, redraw the status only; once it's done or stopped, re-scan: the bag
     -- update for the sent items may have come mid-send, when it was skipped (v0.4.0).
     ns.Mailer.OnChanged(function()

@@ -84,6 +84,15 @@ describe("bank alt view", function()
         assert.equal(1, button.fontStrings[1]:GetAlpha())
     end)
 
+    it("a pinned item's B tag is in the pin's green, like its glow", function()
+        ns.Pins.Set(2589, WowStub.link(2589, "Linen Cloth"), ns.Pins.BANK, "spec") -- V by the market
+        combined:UpdateItems()
+        assert.equal("B", tagOf(combined.Items[2]))
+        local c = combined.Items[2].textures[#combined.Items[2].textures].color
+        assert.same(ns.Pins.COLOR, c)
+        assert.equal("AH", tagOf(combined.Items[1]))
+    end)
+
     it("counts no postage on the bank alt", function()
         local item
         for _, i in ipairs(ns.BankAlt.Refresh().mail) do if i.itemID == 2770 then item = i end end
