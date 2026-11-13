@@ -67,6 +67,23 @@ describe("bank alt view", function()
         assert.is_nil(tagOf(combined.Items[4]))
     end)
 
+    it("a skin that fades the button's textures (EllesmereUI, issue #89) leaves the tag's background", function()
+        combined:UpdateItems()
+        local button = combined.Items[1]
+        assert.equal("AH", tagOf(button))
+        -- EllesmereUI's ApplyButton / Restrip: SetAlpha(0) on every texture region it doesn't keep.
+        for _, region in ipairs(button.textures) do region:SetAlpha(0) end
+        combined:UpdateItems()
+        for _, region in ipairs(button.textures) do region:SetAlpha(0) end -- a restrip without a redraw
+        assert.equal(1, #button.textures, "the tag background")
+        assert.equal(1, button.textures[1]:GetAlpha())
+        assert.is_true(button.textures[1]:IsShown())
+        assert.equal("AH", tagOf(button))
+        -- A skin that fades font strings too leaves the letters.
+        for _, region in ipairs(button.fontStrings) do region:SetAlpha(0) end
+        assert.equal(1, button.fontStrings[1]:GetAlpha())
+    end)
+
     it("counts no postage on the bank alt", function()
         local item
         for _, i in ipairs(ns.BankAlt.Refresh().mail) do if i.itemID == 2770 then item = i end end

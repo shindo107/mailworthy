@@ -127,6 +127,15 @@ describe("locked-item glow", function()
         assert.equal(2, #combined.Items[2].textures, "border + additive glow")
     end)
 
+    it("a skin that fades the button's textures (EllesmereUI, issue #89) leaves the glow", function()
+        MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
+        combined:UpdateItems()
+        local textures = combined.Items[2].textures
+        for _, region in ipairs(textures) do region:SetAlpha(0) end
+        assert.equal(1, textures[1]:GetAlpha(), "the border")
+        assert.equal(ns.Border.GLOW_ALPHA, textures[2]:GetAlpha(), "the additive glow")
+    end)
+
     it("follows a lock change at once, and recomputes pooled buttons", function()
         ns.Locks.Toggle(0, 1, "test")
         assert.is_true(shown(combined.Items[1]))

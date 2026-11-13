@@ -157,6 +157,9 @@ local function tagFor(button)
     t.text = button:CreateFontString(nil, "OVERLAY", "SystemFont_Tiny")
     t.text:SetPoint("CENTER", t.bg, "CENTER", 0, 0)
     t.text:SetTextColor(1, 1, 1)
+    -- A bag skin that fades the button's other regions (EllesmereUI; issue #89) leaves the tag alone.
+    ns.Border.HoldAlpha(t.bg)
+    ns.Border.HoldAlpha(t.text)
     tags[button] = t
     return t
 end
