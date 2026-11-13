@@ -313,6 +313,8 @@ end
 --- by Routes.Before; its cap and its Gear switch decide, as if it were the only one.
 function Routes.Divert(item, verdict, price, settings, routes)
     if verdict and verdict.action == "keep" and Routes.HARD_KEEPS[verdict.reason] then return nil end
+    -- A pinned item (Pins.lua) goes to the bank alt: the player asked for exactly that, binding or not.
+    if verdict and verdict.pinned then return nil end
     -- A failed price call mails nothing, to a binding neither (AGENTS safety; Codex review, 2026-11-08).
     if type(price) == "table" and price.failed then return nil end
     local unit -- the current auction price (none past the age limit)
