@@ -41,7 +41,8 @@ Mailworthy is a WoW Forever addon (`## Interface: 16001`). Start with
   A **bank pin** (`Pins.lua`, Ctrl+Alt+click / R3) mails the pinned item to the bank alt whatever
   its price or quality, grey junk too and without a price source (operator, 2026-11-13: "Pins
   override them"); never past a hard keep, item data not loaded yet or a failed price call, and
-  never to a binding.
+  never to a binding. With Return to sender on, what another player mailed goes back to them,
+  pinned or not (operator, 2026-11-13: "return to sender should win").
   A profession binding mails its materials and its profession's recipes to the bound player
   whatever their price (operator, 2026-11-08: "keep as is"; recipes: "recipes should go to
   their respective profession mappings"), under its price cap when there is a price; a class

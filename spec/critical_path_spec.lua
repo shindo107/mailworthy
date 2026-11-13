@@ -919,20 +919,22 @@ describe("critical path: mailing", function()
         assert.is_false(ns.Returns.On(), "off again at the next visit")
     end)
 
-    it("Return to sender and a bank pin: the pinned item goes to the bank alt, the rest back as before", function()
-        -- Codex review, 2026-11-13: the pin is the player's word on that one item; Return to sender a visit's switch.
+    it("Return to sender and a bank pin: Return to sender wins, the pinned item goes back to who mailed it", function()
+        -- operator, 2026-11-13: "return to sender should win" (Codex review asked which wins).
         taken()
         ns.Pins.Set(2592, WowStub.link(2592, "Wool Cloth"), ns.Pins.BANK, "spec") -- Bob mailed it
         mailbox()
         _G.MailworthyMailButton:Click()
+        assert.equal(BANK_ALT, previewed(ns)[2592], "Return to sender off: the pin sends it to the bank alt")
         _G.MailworthyMailReturn:Click()
         local preview = previewed(ns)
-        assert.equal(BANK_ALT, preview[2592], "pinned: the bank alt, not back to Bob")
-        assert.equal(MAIN, preview[3001], "what isn't pinned still goes back")
+        assert.equal(BOB, preview[2592], "on: back to Bob, pinned or not")
+        assert.equal(MAIN, preview[3001])
         assertReturnsShown()
         _G.MailworthyMailSend:Click()
         deliver(ns)
-        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [MAIN] = true })
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [BOB] = true, [MAIN] = true })
+        assertReturnSubjects({ [BOB] = true, [MAIN] = true })
     end)
 
     it("Return to sender pressed twice: back to normal, nothing goes back", function()
