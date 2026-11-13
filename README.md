@@ -16,7 +16,7 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   why, and a **Settings** button to fix anything before you press Send.
 - **Keyboard/mouse first, controller too:** everything works with keyboard and mouse, and with a gamepad alone.
 - **Lock items** you never want mailed: Alt+click (mouse) or L3 / LS (press the left stick) in your bags (controller); the lock follows the item.
-- **Pin items** you always want banked: Ctrl+Alt+click (mouse) or R3 / RS (press the right stick) in your bags (controller); Send mails a pinned item to your bank alt every time, from every character.
+- **Pin items** you always want banked or always want vendored: Ctrl+Alt+click (mouse) or R3 / RS (press the right stick) in your bags (controller): once for the bank (Send mails it to your bank alt every time, from every character), twice for the vendor (it stays and shows **V**), a third time to unpin.
 - **Every bag counts:** backpack, bags 1-4 (profession bags too) and the reagent bag.
 
 ## Using it
@@ -51,15 +51,20 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
   says why; elsewhere a new lock glows for a moment so you see it took. Locks stay
   wherever the item moves. **Locked items** (`/mw locks`, or Settings > More) lists them with
   how many your bags hold and an Unlock button each, also for an item you banked or used up.
-- **Pin items** you always want banked: Ctrl+Alt+click (mouse) or R3 / RS in your bags
-  (controller), and again to unpin. A pinned item goes to your bank alt every time you press
-  Send, whatever the auction house or your professions say, and carries the **B** tag on every
-  character (pins are saved for the account, so the bank alt knows them). A pin never beats a
-  lock or any other hard keep, and a pinned item goes to the bank alt, never to a binding's
-  friend. A pin overrides the price rules: a pinned green, or grey junk, goes even without
-  Auctionator. Pinned items glow green in your bags (like the lock's blue, while the Mailworthy
-  window is open, or always with the glow setting; a new pin flashes), and their **B** tag,
-  their "Pinned" chip and their tooltip line are the same green. `/mw pins` lists them.
+- **Pin items** you always want banked or vendored: Ctrl+Alt+click (mouse) or R3 / RS in your
+  bags (controller) moves an item's pin on: bank, vendor, none. Pins are saved for the account,
+  so the bank alt knows them. `/mw pins` lists them.
+  - A **bank pin**: the item goes to your bank alt every time you press Send, whatever the
+    auction house or your professions say, and carries the **B** tag on every character. It
+    never beats a lock or any other hard keep, and it goes to the bank alt, never to a
+    binding's friend. A pin overrides the price rules: a pinned green, or grey junk, goes even
+    without Auctionator. Pinned items glow green in your bags (like the lock's blue, while the
+    Mailworthy window is open, or always with the glow setting; a new pin flashes), and their
+    **B** tag, their "Pinned" chip and their tooltip line are the same green.
+  - A **vendor pin**: the item is never mailed and carries the **V** tag on every character,
+    whatever the auction house says, soulbound or not (an outgrown quest reward). It needs a
+    vendor price; a locked item, a quest item and an item in use are left alone. No binding and
+    no Return to sender takes a vendor-pinned item.
 - **On your bank alt:** bag slots carry **AH / B / DE / V** tags (list it, bank it for a
   later phase or for your own crafting, disenchant it, vendor it now) recomputed with that
   character's own prices;
@@ -241,7 +246,7 @@ than at the vendor goes to your bank alt. The rest stays in your bags to vendor.
 /mw guild             your guild's template: guild rules on / off; the guild master and officers edit and publish it
 /mw summary           on your bank alt: what to list, disenchant or vendor
 /mw locks             this character's locked items, each with Unlock (also for one no longer in your bags)
-/mw pins              the account's pinned items (always mailed to the bank alt)
+/mw pins              the account's pinned items (bank: always mailed to the bank alt; vendor: never mailed, tagged V)
 /mw report            a copyable report for bug reports
 /mw feature <name> on|off   turn one piece off to isolate a problem (then /reload); /mw feature lists them
 /mw help              all commands
@@ -305,7 +310,7 @@ each in-game round are in [docs/DISCOVERY-SESSION-2.md](docs/DISCOVERY-SESSION-2
 
 | API / behaviour | What to check | Status |
 |---|---|---|
-| Bank pins (`Pins.lua`): Ctrl+Alt+click on a bag item reaches the `HandleModifiedItemClick` post-hook (the lock's hook, which Alt alone reaches); with Ctrl held Blizzard's dress-up case may also run for gear. Controller: `PADRSTICK` (R3 / RS) bound in the bags with `SetOverrideBindingClick`, like L3; assumed free there, not measured | Ctrl+Alt+click an item: chat says "Bank pin on ...", the slot shows **B**, the Mailworthy window lists it for the bank alt; again unpins. With a controller: R3 on a bag item does the same, and nothing else happens (no camera or target change); `/mw feature padPin off` gives R3 back | open |
+| Bank pins (`Pins.lua`): Ctrl+Alt+click on a bag item reaches the `HandleModifiedItemClick` post-hook (the lock's hook, which Alt alone reaches); with Ctrl held Blizzard's dress-up case may also run for gear. Controller: `PADRSTICK` (R3 / RS) bound in the bags with `SetOverrideBindingClick`, like L3; assumed free there, not measured | Ctrl+Alt+click an item: chat says "Bank pin on ...", the slot shows **B**, the Mailworthy window lists it for the bank alt; again: "Vendor pin on ...", the slot shows **V** (on a soulbound item too) and the window keeps it; a third time unpins. With a controller: R3 on a bag item does the same, and nothing else happens (no camera or target change); `/mw feature padPin off` gives R3 back | open |
 | Window and controller (QoL pass B, 2026-11-09): two-way pagers ("<" beside "2/5  >") in the mail window, the ledger and the friends window, placed by anchor to the page button; D-pad Up from the top row to Send, Down from the bottom row to the top (`Nav.SetWrap`); Choose bank alt... on the To line | with a controller at the mailbox: one Up press from the first button lands on Send, Down returns; a list longer than a page shows "<" left of "1/2  >" without overlapping the heading, and both turn the page; with no bank alt, Choose bank alt... opens the picker and picking one fills the list; changing "at least" in Settings moves items between Mailing and Staying while Settings is open | open (2026-11-09) |
 | Send path (QoL pass, 2026-11-09): `GetMoney()` and `GetSendMailPrice()` (both in Forever's `MailFrame.lua`, its own Send check), the `PLAYER_MONEY` event (standard, not found in Forever's source; registered in `pcall`, without it the postage note updates at the next redraw), `PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)` (the kit `MailFrame.lua` plays; `pcall`) | at a mailbox: Send, then Stop mid-run: the mail on its way arrives, the rest stays, the note says "Stopped after 1 of N"; a full send ends with "Sent N mails to ...: +gain" in the window and one chat line, and one click sound; with less money than the postage Send reads "Postage: ..." greyed out, and looting or selling a little brings it back | open (2026-11-09) |
 | Trip line (2026-11-09): `C_Container.GetContainerNumFreeSlots(bag)` -> `numFreeSlots, bagFamily` (in Forever's `ContainerDocumentation.lua`; pcall'd, one bag without an answer = nothing scanned or said) summed over bags 0..`NUM_BAG_SLOTS` where `bagFamily` is 0, on `BAG_UPDATE_DELAYED` (and `PLAYER_REGEN_ENABLED`). Assumed, not measured: general bags report family 0 and a profession bag a non-zero one; a bag change always follows the loot that fills the bags; the scan at login has item data ready (a scan is repeated only when the bags, settings or bindings change, not when prices or item data arrive later) | away from a mailbox, fill the bags to 4 free slots (the backpack button's number) with something Mailworthy would mail: one chat line "N bag slots left. M items are worth mailing: +X more than vendoring.", the same N as the backpack button; hover the minimap button: "Worth mailing now: ..."; no second chat line until `/reload`; `/mw report` log lines `trip` show each scan. Off: `/mw feature tripNudge off` | open (2026-11-09) |

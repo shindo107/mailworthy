@@ -100,6 +100,7 @@ end
 function BankAlt.Verdict(item)
     local r = item.result
     if not r then return nil end
+    if r.vendorPin then return "v" end -- a vendor pin (Pins.lua): V whatever the market says
     if ns.Valuation.BankForCraft(r) then return "craft" end
     if r.action == "mail" then
         if r.route == "bank" then return "b" end
@@ -295,6 +296,9 @@ function BankAlt.TooltipLines(item, record, settings)
                 or "No auction price yet, so the gain is unknown.")
         elseif verdict == "craft" then
             text = "Bank it: " .. ns.MailWindow.WhyKept(r) .. ". It waits in your bank, not your bags, until you craft."
+        elseif verdict == "v" and r.vendorPin then
+            text = string.format("Vendor it (%s): you pinned this item for the vendor (Pins: /mw pins). Pin it again to unpin.",
+                money(r.vendor))
         elseif verdict == "de" then
             text = string.format("Disenchanting today: %s, %s more than a vendor.", money(p.de), money(r.gain))
         elseif p.ah then

@@ -590,6 +590,32 @@ describe("critical path: mailing", function()
         assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
     end)
 
+    it("a vendor pin: the pinned items never leave, priced, soulbound or wanted by a binding", function()
+        -- Pins.lua: "always vendor this". A green the rule would mail for the auction house, a soulbound
+        -- green, and a material a binding would take: all three stay, tagged V.
+        WowStub.setBag(2, 6, WowStub.item(10940, "Strange Dust", { count = 20, sell = 2, class = 7, subclass = 12 }))
+        prices[WowStub.link(10940, "Strange Dust")] = 3
+        ns.Routes.Add(BOB, ENCHANTING)
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        assert.equal(BANK_ALT, previewed(ns)[6515], "the green goes until it is pinned")
+        for _, pin in ipairs({ { 6515, "Spellbinder Robes" }, { 6125, "Brawler's Pants" }, { 10940, "Strange Dust" } }) do
+            ns.Pins.Set(pin[1], WowStub.link(pin[1], pin[2]), ns.Pins.VENDOR, "spec")
+        end
+        local preview = previewed(ns)
+        assert.is_nil(preview[6515], "the vendor-pinned green stays")
+        assert.is_nil(preview[6125], "the vendor-pinned soulbound green stays")
+        assert.is_nil(preview[10940], "the vendor-pinned dust stays: the binding doesn't take it")
+        local tagged = {}
+        for _, it in ipairs(ns.MailWindow.Result().keep) do tagged[it.itemID] = ns.BankAlt.Verdict(it) end
+        assert.equal("v", tagged[6515])
+        assert.equal("v", tagged[6125])
+        assert.equal("v", tagged[10940])
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true })
+    end)
+
     it("no bank alt: a pinned item stays in the bags like the rest of the bank alt's share", function()
         MailworthyDB.bankAlts = {}
         ns.Pins.Set(4865, WowStub.link(4865, "Ruined Pelt"), ns.Pins.BANK, "spec")
