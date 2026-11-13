@@ -103,7 +103,8 @@ local HELP = {
         .. " toggles it). Controller: Send Mail tab ({PADRSHOULDER}); {PAD4} closes and reopens it.",
     "Lock an item (it stays locked wherever it moves): Alt+click it, or {PADLSTICK} in your bags (controller).",
     "Pin an item to always bank it (Send mails it to your bank alt, on every character): Ctrl+Alt+click it, or"
-        .. " {PADRSTICK} in your bags (controller). /mw pins lists them.",
+        .. " {PADRSTICK} in your bags (controller). Again: always vendor it (it stays, tagged V). A third time unpins."
+        .. " /mw pins lists them.",
     "Locked items glow blue while the Mailworthy window is open (settings: always); a new lock glows a moment anywhere."
         .. " In the Mailworthy window, pressing an item locks or unlocks it.",
     "/mw or /mw settings - bank alt, minimum gain, disenchant, listing length, keep your professions' materials"

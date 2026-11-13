@@ -54,6 +54,7 @@ Routes.ROUTE = "friend"     -- the verdict route of a diverted item
 Routes.HARD_KEEPS = {
     locked = true, soulbound = true, ["quest item"] = true, ["a quest needs it"] = true, ["in use"] = true,
     ["profession tool"] = true, ["item info not loaded yet"] = true, ["conjured item"] = true,
+    ["vendor: you pinned it"] = true, -- Valuation.VENDOR_PIN_REASON: kept for the vendor (may be soulbound)
 }
 
 -- Verdicts a class binding doesn't override either: AGENTS safety keeps anything but white items

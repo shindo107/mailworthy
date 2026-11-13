@@ -10,8 +10,8 @@
 --   mail    mail window focused, Mailworthy window closed:  Triangle opens it
 --   window  mail window focused, Mailworthy window open:    Triangle closes,
 --           D-pad moves Mailworthy's highlight (Nav), Cross presses, Circle closes
---   bags    bags focused:  L3 locks / unlocks the selected item (Locks), R3 pins / unpins it
---           for the bank (Pins); each key has its own switch (padLock, padPin)
+--   bags    bags focused:  L3 locks / unlocks the selected item (Locks), R3 moves its pin on
+--           (bank, vendor, none: Pins); each key has its own switch (padLock, padPin)
 --   merchant  merchant window focused:  Triangle opens / closes the vendor window (Vendor)
 --   settings  the settings, friends, ledger, locked items, summary, vendor or report window open, anywhere (out of combat): D-pad moves,
 --           Cross presses, Circle closes it. Our own window, so no Blizzard
@@ -211,7 +211,7 @@ function PadKey.RefreshHint()
         parts[#parts + 1] = ns.Gamepad.Glyph(ns.Gamepad.STICK_LEFT_PRESS, 14) .. " Mailworthy: lock / unlock item"
     end
     if ns.Features.On("padPin") then
-        parts[#parts + 1] = ns.Gamepad.Glyph(ns.Gamepad.STICK_RIGHT_PRESS, 14) .. " bank pin"
+        parts[#parts + 1] = ns.Gamepad.Glyph(ns.Gamepad.STICK_RIGHT_PRESS, 14) .. " pin: bank / vendor"
     end
     PadKey.bagHint:SetText(ns.MailButton.GamepadUI() and table.concat(parts, "   ") or "")
 end
