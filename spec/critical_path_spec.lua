@@ -919,6 +919,22 @@ describe("critical path: mailing", function()
         assert.is_false(ns.Returns.On(), "off again at the next visit")
     end)
 
+    it("Return to sender and a bank pin: the pinned item goes to the bank alt, the rest back as before", function()
+        -- Codex review, 2026-11-13: the pin is the player's word on that one item; Return to sender a visit's switch.
+        taken()
+        ns.Pins.Set(2592, WowStub.link(2592, "Wool Cloth"), ns.Pins.BANK, "spec") -- Bob mailed it
+        mailbox()
+        _G.MailworthyMailButton:Click()
+        _G.MailworthyMailReturn:Click()
+        local preview = previewed(ns)
+        assert.equal(BANK_ALT, preview[2592], "pinned: the bank alt, not back to Bob")
+        assert.equal(MAIN, preview[3001], "what isn't pinned still goes back")
+        assertReturnsShown()
+        _G.MailworthyMailSend:Click()
+        deliver(ns)
+        assertSafeAndComplete(ns, preview, { [BANK_ALT] = true, [MAIN] = true })
+    end)
+
     it("Return to sender pressed twice: back to normal, nothing goes back", function()
         taken()
         mailbox()

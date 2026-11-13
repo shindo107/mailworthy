@@ -194,6 +194,19 @@ describe("bank pins", function()
         end)
     end)
 
+    it("a pin can't change while a send runs: what is on its way was previewed (Codex review)", function()
+        local busy = ns.Mailer.Busy
+        ns.Mailer.Busy = function() return true end
+        WowStub.state.mods = { alt = true, ctrl = true }
+        HandleModifiedItemClick("link", WowStub.itemLocation(0, 3))
+        assert.is_nil(ns.Pins.Kind(2770))
+        assert.truthy(WowStub.printed[#WowStub.printed]:find(ns.Pins.BUSY, 1, true))
+        ns.Mailer.Busy = busy
+        HandleModifiedItemClick("link", WowStub.itemLocation(0, 3))
+        WowStub.state.mods = {}
+        assert.equal("bank", ns.Pins.Kind(2770), "pins again once it's done")
+    end)
+
     it("/mw feature pinClick off: no hook, Ctrl+Alt+click does nothing", function()
         _G.HandleModifiedItemClick = original
         local ns2 = loadAddon()

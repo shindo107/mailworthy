@@ -59,8 +59,16 @@ function Pins.Set(itemID, link, kind, how)
     return kind
 end
 
---- Toggle the bank pin on whatever item is in this bag slot.
+Pins.BUSY = "Sending: pins can't change until it's done."
+
+--- Toggle the bank pin on whatever item is in this bag slot. Not while a send runs: what is on its
+--- way was previewed, and a pin changed now would change nothing in it (Codex review, 2026-11-13).
 function Pins.Toggle(bag, slot, how)
+    if ns.Mailer and ns.Mailer.Busy() then
+        ns.Print(Pins.BUSY)
+        ns.Log.Add("pin", "%s ignored: sending", tostring(how))
+        return nil
+    end
     local info = ns.Locks.ItemAt(bag, slot)
     if not info or not info.itemID then return nil end
     return Pins.Set(info.itemID, info.hyperlink, Pins.Kind(info.itemID) == nil and Pins.BANK or nil, how)

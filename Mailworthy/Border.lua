@@ -30,7 +30,7 @@ Border.FLASH = 3 -- seconds a fresh lock glows away from the mailbox
 
 local borders = setmetatable({}, { __mode = "k" }) -- button -> { textures }
 local frames = {}
-local flashes = {} -- itemID -> GetTime() until which a fresh lock glows anyway
+local flashes = { lock = {}, pin = {} } -- kind -> itemID -> GetTime() until which a fresh lock / pin glows anyway
 local decorators = {} -- fn(button, bag, slot): more per-slot drawing (bank alt tags)
 
 --- Draw more on every bag button after each refresh (same hooks, same rules).
@@ -106,22 +106,25 @@ end
 
 --- Is this item in its feedback flash (locked moments ago, away from the mailbox)?
 function Border.Flashing(itemID)
-    local until_ = itemID ~= nil and flashes[itemID]
-    return until_ ~= nil and now() < until_
+    if itemID == nil then return false end
+    for _, list in pairs(flashes) do
+        local until_ = list[itemID]
+        if until_ ~= nil and now() < until_ then return true end
+    end
+    return false
 end
 
---- A lock changed: a new lock away from the mailbox flashes for FLASH seconds. A new pin too
---- (Border.OnPinChanged).
-function Border.OnLockChanged(itemID, locked)
-    if itemID == nil then return end
-    flashes[itemID] = nil
-    if locked and ns.Features.On("slotBorder") and not Border.Wanted() then
-        flashes[itemID] = now() + Border.FLASH
+--- Start (on) or end a lock's or a pin's flash: each its own, so one never ends the other's.
+local function flash(kind, itemID, on)
+    local list = flashes[kind]
+    list[itemID] = nil
+    if on and ns.Features.On("slotBorder") and not Border.Wanted() then
+        list[itemID] = now() + Border.FLASH
         local after = C_Timer and C_Timer.After
         if type(after) == "function" then
             pcall(after, Border.FLASH, function()
-                if flashes[itemID] ~= nil and now() >= flashes[itemID] then
-                    flashes[itemID] = nil
+                if list[itemID] ~= nil and now() >= list[itemID] then
+                    list[itemID] = nil
                     Border.RefreshAll()
                 end
             end)
@@ -130,9 +133,17 @@ function Border.OnLockChanged(itemID, locked)
     Border.RefreshAll()
 end
 
+--- A lock changed: a new lock away from the mailbox flashes for FLASH seconds. A new pin too
+--- (Border.OnPinChanged).
+function Border.OnLockChanged(itemID, locked)
+    if itemID == nil then return end
+    flash("lock", itemID, locked)
+end
+
 --- A pin changed (Pins.OnChanged): a new pin flashes green like a new lock flashes blue.
 function Border.OnPinChanged(itemID, kind)
-    Border.OnLockChanged(itemID, kind == (ns.Pins and ns.Pins.BANK))
+    if itemID == nil then return end
+    flash("pin", itemID, kind == (ns.Pins and ns.Pins.BANK))
 end
 
 --- Why an item glows. The controller's key is the game's own icon for the left stick press, so

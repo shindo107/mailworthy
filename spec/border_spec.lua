@@ -151,6 +151,18 @@ describe("locked-item glow", function()
         assert.is_false(shown(combined.Items[1]), "unpinning shows nothing")
     end)
 
+    it("a lock's flash and a pin's flash are their own: unpinning doesn't end a fresh lock's (Codex review)", function()
+        ns.Pins.Set(2770, "Copper Ore", ns.Pins.BANK, "spec")
+        closeMailbox(ns)
+        ns.Locks.Toggle(0, 2, "Alt+click")
+        assert.same(ns.Border.COLOR, combined.Items[2].textures[1].color, "the lock's blue flash")
+        local glow = combined.Items[2].textures -- [1], [2]: the glow (a pinned item may have a tag after them)
+        assert.is_true(glow[1]:IsShown() and glow[2]:IsShown(), "the lock's flash")
+        ns.Pins.Set(2770, "Copper Ore", nil, "Ctrl+Alt+click")
+        assert.is_true(glow[1]:IsShown() and glow[2]:IsShown(), "still flashing blue")
+        assert.same(ns.Border.COLOR, combined.Items[2].textures[1].color)
+    end)
+
     it("a skin that fades the button's textures (EllesmereUI, issue #89) leaves the glow", function()
         MailworthyCharDB.lockedItems[2770] = { link = "Copper Ore" }
         combined:UpdateItems()

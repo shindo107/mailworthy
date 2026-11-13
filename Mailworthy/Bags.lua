@@ -208,7 +208,9 @@ function Bags.Evaluate(settings)
         local r = item.result
         local hard = ns.Valuation.Unmailable(r) or (r.action == "keep" and ns.Routes.HARD_KEEPS[r.reason])
         local parts, rest = {}, nil
-        if list and not hard then parts, rest = ns.Returns.Split(item.slots, list) end
+        -- A bank pin beats Return to sender: the player asked for this item to go to the bank alt
+        -- (Codex review, 2026-11-13).
+        if list and not hard and not r.pinned then parts, rest = ns.Returns.Split(item.slots, list) end
         if #parts == 0 then
             file(item)
         else
